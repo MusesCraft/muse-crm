@@ -337,8 +337,9 @@ def _handle_webhook_message(
             
             logger.info(f"✅ [webhook] 訊息已儲存：conversation={conversation.id}, message={message.id}")
             
-            # ── 6. 觸發 LLM 分析任務（per-message，Celery 背景處理） ──
-            analyze_message.delay(str(message.id))
+            # ── 6. LLM 分析在 Session 關閉時觸發（PRD §3.4），非 per-message ──
+            # 分析觸發由 SessionService.close_expired_sessions() 和
+            # cleanup_expired_sessions celery beat 負責
             
         except IntegrityError as e:
             # 處理 meta_message_id 重複的情況

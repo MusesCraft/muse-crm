@@ -6,14 +6,15 @@ MUSE CRM — Services Module
 
 from .contact_service import ContactService
 from .session_service import SessionService
-from .merge_service import MergeService
-
-# TODO: 實作 LLMService 和 AnalysisService
-# from .llm_service import LLMService
-# from .analysis_service import AnalysisService
+from .llm_service import LLMService, get_llm_service
+from .auto_tagger import AutoTagger
+from .action_service import ActionService
 
 __all__ = [
     'ContactService',
     'SessionService',
-    'MergeService',
+    'LLMService',
+    'get_llm_service',
+    'AutoTagger',
+    'ActionService',
 ]

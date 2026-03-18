@@ -165,7 +165,7 @@ SUGGESTED_ACTION_USER = """根據以下對話，建議下一步行動：
 # ============================================================
 
 FULL_ANALYSIS_SYSTEM = """你是一位專業的客戶服務分析師，專門服務建材/石材產業（如石英石、人造石、岩板等）。
-你的任務是對客服對話進行全面分析，包含意圖辨識、實體萃取、摘要生成和動作建議。
+你的任務是對客服對話進行全面分析，萃取 6 個結構化欄位。
 
 你必須以 JSON 格式回覆，不得包含任何其他文字。"""
 
@@ -180,35 +180,14 @@ FULL_ANALYSIS_USER = """對以下對話進行全面分析：
 - 對話狀態：{status}
 - 訊息數量：{message_count}
 
-請以以下 JSON 格式回覆：
+請萃取以下 6 個 MVP 欄位，以 JSON 格式回覆：
 {{
-    "intent": {{
-        "primary": "pricing|spec|visit|complaint|greeting|order|followup|other",
-        "confidence": 0.0到1.0
-    }},
-    "entities": {{
-        "customer_name": "客戶姓名或null",
-        "company": "公司名稱或null",
-        "phone": "電話或null",
-        "email": "Email或null",
-        "products_interested": ["產品列表"],
-        "project_info": "專案資訊或null"
-    }},
-    "summary": {{
-        "text": "對話摘要（100字以內）",
-        "sentiment": "positive|neutral|negative",
-        "urgency": "high|medium|low",
-        "customer_stage": "new_lead|interested|negotiating|ready_to_buy|existing_customer"
-    }},
-    "suggested_actions": [
-        {{
-            "type": "follow_up|quote|visit|call|sample|resolve_complaint|escalate|none",
-            "priority": "high|medium|low",
-            "description": "具體描述",
-            "due_days": 整數
-        }}
-    ],
-    "suggested_tags": ["標籤1", "標籤2"]
+    "customer_name": "從對話中辨識出的客戶真實姓名，如「王先生」「陳小姐」，無法辨識則為 null",
+    "demand_summary": "客戶本次對話的核心需求概述，如「詢問 A 產品的報價與交期」",
+    "mentioned_products": ["對話中提到的具體產品或服務項目列表"],
+    "suggested_tags": ["基於語意判斷的客戶身份/類型標籤，如「潛在客戶」「設計師」「投訴者」"],
+    "conversation_summary": "整段對話的精簡摘要（100字以內）",
+    "suggested_next_action": "根據對話內容建議的跟進動作，如「週五前提供正式報價單」"
 }}"""
 
 

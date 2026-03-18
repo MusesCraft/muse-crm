@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: muse_crm
+      POSTGRES_USER: muse
+      POSTGRES_PASSWORD: muse_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    networks:
+      - muse-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U muse -d muse_crm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - muse-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Backend Flask API (Development)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5000:5000"
+    environment:
+      FLASK_ENV: development
+      FLASK_DEBUG: 1
+      DATABASE_URL: postgresql://muse:muse_dev@postgres:5432/muse_crm
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+    networks:
+      - muse-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles:
+      - dev
+
+  # Celery Worker
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    command: celery -A app.celery worker --loglevel=info
+    environment:
+      FLASK_ENV: development
+      DATABASE_URL: postgresql://muse:muse_dev@postgres:5432/muse_crm
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+    networks:
+      - muse-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles:
+      - dev
+
+  # Celery Beat (定時任務)
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    command: celery -A app.celery beat --loglevel=info
+    environment:
+      FLASK_ENV: development
+      DATABASE_URL: postgresql://muse:muse_dev@postgres:5432/muse_crm
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+    networks:
+      - muse-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles:
+      - dev
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  muse-network:
+    driver: bridge

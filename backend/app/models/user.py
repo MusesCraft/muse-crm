@@ -1,0 +1,175 @@
+"""
+MUSE CRM — User & UserNote Models
+
+使用者和使用者備註模型。
+"""
+
+from datetime import datetime
+from typing import List, Optional
+from sqlalchemy import String, Text, DateTime, Boolean, CheckConstraint, Index
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
+import uuid
+
+from .. import db
+
+
+class User(db.Model):
+    """使用者模型（預留權限系統）"""
+    
+    __tablename__ = 'users'
+    
+    # 主鍵
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), 
+        primary_key=True, 
+        default=uuid.uuid4
+    )
+    
+    # 基本資訊
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[Optional[str]] = mapped_column(String(255), unique=True)
+    
+    # 權限和狀態
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default='agent')  # admin/supervisor/agent/readonly
+    avatar_url: Mapped[Optional[str]] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    
+    # 審計欄位
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), 
+        nullable=False, 
+        default=func.now()
+    )
+    
+    # 關聯
+    notes: Mapped[List["UserNote"]] = relationship(
+        "UserNote", 
+        back_populates="author",
+        cascade="all, delete-orphan"
+    )
+    
+    # 約束和索引
+    __table_args__ = (
+        CheckConstraint("role IN ('admin', 'supervisor', 'agent', 'readonly')", name='ck_user_role'),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<User {self.name} ({self.role})>"
+    
+    @property
+    def is_admin(self) -> bool:
+        """檢查是否為管理員"""
+        return self.role == 'admin'
+    
+    @property
+    def is_supervisor(self) -> bool:
+        """檢查是否為主管"""
+        return self.role == 'supervisor'
+    
+    @property
+    def is_agent(self) -> bool:
+        """檢查是否為客服人員"""
+        return self.role == 'agent'
+    
+    @property
+    def is_readonly(self) -> bool:
+        """檢查是否為唯讀使用者"""
+        return self.role == 'readonly'
+    
+    @property
+    def can_edit_contacts(self) -> bool:
+        """檢查是否可編輯客戶資料"""
+        return self.role in ('admin', 'supervisor', 'agent')
+    
+    @property
+    def can_manage_users(self) -> bool:
+        """檢查是否可管理使用者"""
+        return self.role == 'admin'
+    
+    def to_dict(self) -> dict:
+        """轉換為字典格式"""
+        return {
+            'id': str(self.id),
+            'name': self.name,
+            'email': self.email,
+            'role': self.role,
+            'avatar_url': self.avatar_url,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class UserNote(db.Model):
+    """使用者備註模型"""
+    
+    __tablename__ = 'user_notes'
+    
+    # 主鍵
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), 
+        primary_key=True, 
+        default=uuid.uuid4
+    )
+    
+    # 關聯
+    contact_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), 
+        db.ForeignKey('contacts.id', ondelete='CASCADE'), 
+        nullable=False
+    )
+    author_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), 
+        db.ForeignKey('users.id', ondelete='SET NULL')
+    )
+    
+    # 備註內容
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    
+    # 審計欄位
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), 
+        nullable=False, 
+        default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), 
+        nullable=False, 
+        default=func.now(),
+        onupdate=func.now()
+    )
+    
+    # 關聯
+    contact: Mapped["Contact"] = relationship("Contact", back_populates="notes_by_users")
+    author: Mapped[Optional["User"]] = relationship("User", back_populates="notes")
+    
+    # 索引
+    __table_args__ = (
+        Index('idx_user_notes_contact', 'contact_id', 'created_at'),
+    )
+    
+    def __repr__(self) -> str:
+        content_preview = self.content[:50] + "..." if len(self.content) > 50 else self.content
+        return f"<UserNote {self.id}: '{content_preview}'>"
+    
+    @property
+    def has_author(self) -> bool:
+        """檢查是否有作者"""
+        return self.author_id is not None
+    
+    @property
+    def is_updated(self) -> bool:
+        """檢查是否已更新過"""
+        return self.updated_at > self.created_at
+    
+    def to_dict(self) -> dict:
+        """轉換為字典格式"""
+        return {
+            'id': str(self.id),
+            'contact_id': str(self.contact_id),
+            'author_id': str(self.author_id) if self.author_id else None,
+            'content': self.content,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }

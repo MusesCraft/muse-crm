@@ -9,7 +9,8 @@ from flask import jsonify, request
 from sqlalchemy import func, and_, distinct
 
 from . import api_bp
-from ..models import Contact, Conversation, Message, Action, Tag, ContactTag, Analysis, db
+from ..models import Contact, Conversation, Message, Action, Tag, ContactTag, Analysis
+from .. import db
 
 
 @api_bp.route('/dashboard/overview', methods=['GET'])

@@ -91,8 +91,8 @@ class TestingConfig(BaseConfig):
     DEBUG = True
     TESTING = True
     
-    # 測試用 SQLite 記憶體資料庫
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    # 測試用 PostgreSQL（避免 JSONB 兼容性問題）
+    SQLALCHEMY_DATABASE_URI = 'postgresql://muse:muse_dev@localhost:5432/muse_crm_test'
     
     # 測試時不需要真實的 API keys
     OPENROUTER_API_KEY = 'test-key'

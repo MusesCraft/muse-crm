@@ -8,7 +8,8 @@ from flask import jsonify, request
 from sqlalchemy import desc
 
 from . import api_bp
-from ..models import Conversation, Message, Contact, db
+from ..models import Conversation, Message, Contact
+from .. import db
 
 
 @api_bp.route('/inbox/conversations', methods=['GET'])

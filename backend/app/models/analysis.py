@@ -6,8 +6,8 @@ LLM 分析結果和分析佇列模型。
 
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import String, Text, Integer, Boolean, JSONB, DateTime, Index, CheckConstraint
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+from sqlalchemy import String, Text, Integer, Boolean, DateTime, Index, CheckConstraint
+from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 import uuid

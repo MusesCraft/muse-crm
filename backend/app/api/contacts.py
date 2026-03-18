@@ -8,7 +8,8 @@ from flask import jsonify, request
 from sqlalchemy import desc, or_, func
 
 from . import api_bp
-from ..models import Contact, ContactTag, Tag, UserNote, db
+from ..models import Contact, ContactTag, Tag, UserNote
+from .. import db
 
 
 @api_bp.route('/contacts', methods=['GET'])

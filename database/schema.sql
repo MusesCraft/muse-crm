@@ -88,7 +88,7 @@ CREATE TABLE messages (
                     CHECK (message_type IN ('text', 'image', 'sticker', 'attachment', 'referral')),
     content         TEXT,
     media_url       TEXT,
-    metadata        JSONB,                                 -- 附件 metadata、貼圖 ID 等
+    message_metadata JSONB,                                -- 附件 metadata、貼圖 ID 等
     meta_message_id VARCHAR(255) UNIQUE,                   -- Meta 平台訊息 ID（冪等性）
     sent_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     is_read         BOOLEAN NOT NULL DEFAULT FALSE,

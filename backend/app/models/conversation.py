@@ -6,8 +6,8 @@ MUSE CRM — Conversation Model
 
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import String, DateTime, Boolean, Integer, JSONB, Index, CheckConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String, DateTime, Boolean, Integer, Index, CheckConstraint
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 import uuid
@@ -53,10 +53,6 @@ class Conversation(db.Model):
     
     # Ad Referral
     ad_referral: Mapped[Optional[dict]] = mapped_column(JSONB)  # { ad_id, campaign_name, creative_id }
-    has_ad_referral: Mapped[Optional[bool]] = mapped_column(
-        Boolean, 
-        computed_column=(ad_referral.isnot(None))
-    )
     
     # Meta 統計
     message_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -101,7 +97,7 @@ class Conversation(db.Model):
         Index('idx_conversations_contact', 'contact_id'),
         Index('idx_conversations_status', 'status', 'last_message_at'),
         Index('idx_conversations_channel', 'channel'),
-        Index('idx_conversations_ad', 'has_ad_referral'),
+        # 注意：has_ad_referral 是 property，不是資料庫欄位，無法建立索引
     )
     
     def __repr__(self) -> str:
@@ -111,6 +107,11 @@ class Conversation(db.Model):
     def is_active(self) -> bool:
         """檢查對話是否仍在活躍狀態"""
         return self.status == 'active'
+    
+    @property
+    def has_ad_referral(self) -> bool:
+        """檢查是否有廣告轉介"""
+        return self.ad_referral is not None
     
     @property
     def is_expired(self) -> bool:

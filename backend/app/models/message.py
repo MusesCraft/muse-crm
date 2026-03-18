@@ -6,8 +6,8 @@ MUSE CRM — Message Model
 
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, Text, DateTime, Boolean, JSONB, Index, CheckConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String, Text, DateTime, Boolean, Index, CheckConstraint
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 import uuid
@@ -46,7 +46,7 @@ class Message(db.Model):
     # 訊息內容
     content: Mapped[Optional[str]] = mapped_column(Text)
     media_url: Mapped[Optional[str]] = mapped_column(Text)
-    metadata: Mapped[Optional[dict]] = mapped_column(JSONB)  # 附件 metadata、貼圖 ID 等
+    message_metadata: Mapped[Optional[dict]] = mapped_column(JSONB)  # 附件 metadata、貼圖 ID 等
     
     # Meta 平台識別（冪等性用）
     meta_message_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True)
@@ -120,7 +120,7 @@ class Message(db.Model):
             'message_type': self.message_type,
             'content': self.content,
             'media_url': self.media_url,
-            'metadata': self.metadata,
+            'metadata': self.message_metadata,
             'meta_message_id': self.meta_message_id,
             'sent_at': self.sent_at.isoformat() if self.sent_at else None,
             'is_read': self.is_read,

@@ -8,7 +8,8 @@ import logging
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from ..models import Contact, ChannelIdentifier, db
+from ..models import Contact, ChannelIdentifier
+from .. import db
 
 logger = logging.getLogger(__name__)
 

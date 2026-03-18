@@ -6,8 +6,8 @@ MUSE CRM — Contact & ChannelIdentifier Models
 
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import String, Text, DateTime, Boolean, JSONB, Index
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String, Text, DateTime, Boolean, Index
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 import uuid

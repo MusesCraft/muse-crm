@@ -6,6 +6,7 @@ MUSE CRM — Services Module
 
 from .contact_service import ContactService
 from .session_service import SessionService
+from .merge_service import MergeService
 
 # TODO: 實作 LLMService 和 AnalysisService
 # from .llm_service import LLMService
@@ -13,5 +14,6 @@ from .session_service import SessionService
 
 __all__ = [
     'ContactService',
-    'SessionService'
+    'SessionService',
+    'MergeService',
 ]

@@ -22,7 +22,7 @@ class SessionService:
         contact: Contact,
         channel: str,
         ad_referral: Optional[Dict[str, Any]] = None,
-        timeout_minutes: int = 1440  # 預設 24 小時
+        timeout_minutes: int = 240  # 預設 4 小時
     ) -> Conversation:
         """
         取得或建立對話 Session

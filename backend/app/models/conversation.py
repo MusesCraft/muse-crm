@@ -49,7 +49,7 @@ class Conversation(db.Model):
         default=func.now()
     )
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    timeout_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=1440)  # 預設 24 小時
+    timeout_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=240)  # 預設 4 小時
     
     # Ad Referral
     ad_referral: Mapped[Optional[dict]] = mapped_column(JSONB)  # { ad_id, campaign_name, creative_id }
@@ -126,7 +126,7 @@ class Conversation(db.Model):
     def close_conversation(self) -> None:
         """關閉對話"""
         self.status = 'closed'
-        self.closed_at = func.now()
+        self.closed_at = datetime.utcnow()
     
     def to_dict(self) -> dict:
         """轉換為字典格式"""

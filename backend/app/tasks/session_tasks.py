@@ -9,7 +9,7 @@ from datetime import datetime
 from celery import current_task
 
 from .. import celery, db
-from ..models import Conversation, AnalysisQueue
+from ..models import Conversation, Message, AnalysisQueue
 from ..services.session_service import SessionService
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 @celery.task(bind=True, max_retries=3)
 def trigger_analysis_task(self, conversation_id: str):
     """
-    觸發對話分析任務
+    觸發對話分析任務（對話層級）
     
     Args:
         conversation_id: 對話 ID
@@ -71,6 +71,63 @@ def trigger_analysis_task(self, conversation_id: str):
             raise self.retry(countdown=60 * (2 ** self.request.retries))
         else:
             logger.error(f"觸發分析達到最大重試次數：{conversation_id}")
+
+
+@celery.task(bind=True, max_retries=3)
+def analyze_message(self, message_id: str):
+    """
+    單一訊息的 LLM 分析觸發（Phase 2 stub）
+    
+    Phase 3 會實作具體的 LLM 分析邏輯。
+    目前僅：
+    1. 驗證訊息存在
+    2. 取得所屬對話
+    3. 觸發對話層級的分析 (trigger_analysis_task)
+    
+    Args:
+        message_id: 訊息 UUID (str)
+    """
+    try:
+        logger.info(f"📝 [analyze_message] 收到訊息分析請求：{message_id}")
+        
+        message = Message.query.get(message_id)
+        if not message:
+            logger.warning(f"[analyze_message] 訊息不存在：{message_id}")
+            return {
+                'success': False,
+                'message_id': message_id,
+                'error': 'Message not found'
+            }
+        
+        # Phase 2: 委託給對話層級分析
+        # Phase 3 會在這裡加入即時的單訊息 NLP 分析（意圖偵測、情感分析等）
+        conversation_id = str(message.conversation_id)
+        logger.info(
+            f"📝 [analyze_message] 訊息 {message_id} 屬於對話 {conversation_id}，"
+            f"觸發對話分析"
+        )
+        
+        trigger_analysis_task.delay(conversation_id)
+        
+        return {
+            'success': True,
+            'message_id': message_id,
+            'conversation_id': conversation_id,
+            'action': 'delegated_to_conversation_analysis',
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"[analyze_message] 分析訊息失敗 {message_id}: {e}", exc_info=True)
+        
+        if self.request.retries < self.max_retries:
+            raise self.retry(countdown=30 * (2 ** self.request.retries))
+        
+        return {
+            'success': False,
+            'message_id': message_id,
+            'error': str(e)
+        }
 
 
 @celery.task

@@ -20,7 +20,7 @@ from .. import db
 from ..services.contact_service import ContactService
 from ..services.session_service import SessionService
 from ..utils.meta_api import meta_api
-from ..tasks.session_tasks import trigger_analysis_task
+from ..tasks.session_tasks import analyze_message
 
 logger = logging.getLogger(__name__)
 
@@ -337,8 +337,8 @@ def _handle_webhook_message(
             
             logger.info(f"✅ [webhook] 訊息已儲存：conversation={conversation.id}, message={message.id}")
             
-            # ── 6. 觸發 LLM 分析任務（Celery 背景處理） ──
-            trigger_analysis_task.delay(str(conversation.id))
+            # ── 6. 觸發 LLM 分析任務（per-message，Celery 背景處理） ──
+            analyze_message.delay(str(message.id))
             
         except IntegrityError as e:
             # 處理 meta_message_id 重複的情況

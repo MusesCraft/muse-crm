@@ -59,7 +59,7 @@ CREATE TABLE conversations (
                     CHECK (status IN ('active', 'closed')),
     started_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     closed_at       TIMESTAMPTZ,
-    timeout_minutes INT NOT NULL DEFAULT 1440,             -- 預設 24 小時
+    timeout_minutes INT NOT NULL DEFAULT 240,              -- 預設 4 小時
     -- Ad Referral
     ad_referral     JSONB,                                 -- { ad_id, campaign_name, creative_id }
     has_ad_referral BOOLEAN GENERATED ALWAYS AS (ad_referral IS NOT NULL) STORED,

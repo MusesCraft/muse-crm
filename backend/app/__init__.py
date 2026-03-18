@@ -64,6 +64,19 @@ def _configure_celery(app: Flask, celery: Celery) -> None:
         accept_content=['json'],
         timezone='Asia/Taipei',
         enable_utc=True,
+        # Celery Beat 定期任務
+        beat_schedule={
+            'cleanup-expired-sessions': {
+                'task': 'app.tasks.session_tasks.cleanup_expired_sessions',
+                'schedule': 3600.0,  # 每小時執行一次
+                'options': {'queue': 'maintenance'},
+            },
+            'retry-failed-analysis': {
+                'task': 'app.tasks.analysis_tasks.retry_failed_analysis',
+                'schedule': 1800.0,  # 每 30 分鐘重試失敗的分析
+                'options': {'queue': 'maintenance'},
+            },
+        },
     )
     
     class ContextTask(celery.Task):

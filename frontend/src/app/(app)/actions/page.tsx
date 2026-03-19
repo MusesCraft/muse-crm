@@ -36,19 +36,19 @@ function isOverdue(dateStr: string | null): boolean {
 // ── Type Badge ─────────────────────────────────────────
 
 const typeConfig: Record<string, { label: string; color: string }> = {
-  quote: { label: '報價', color: 'bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400' },
-  visit: { label: '參觀', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400' },
-  call: { label: '通話', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400' },
-  sample: { label: '寄樣', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20 dark:text-purple-400' },
-  service: { label: '售後', color: 'bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-400' },
-  followup: { label: '跟進', color: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20 dark:text-cyan-400' },
-  delivery: { label: '出貨', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400' },
-  processing: { label: '加工', color: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20 dark:text-indigo-400' },
-  proposal: { label: '提案', color: 'bg-pink-500/10 text-pink-600 border-pink-500/20 dark:text-pink-400' },
+  quote: { label: '報價', color: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
+  visit: { label: '參觀', color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
+  call: { label: '通話', color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
+  sample: { label: '寄樣', color: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' },
+  service: { label: '售後', color: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
+  followup: { label: '跟進', color: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20' },
+  delivery: { label: '出貨', color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
+  processing: { label: '加工', color: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' },
+  proposal: { label: '提案', color: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
 };
 
 function TypeBadge({ type }: { type: string }) {
-  const config = typeConfig[type] || { label: type, color: 'bg-zinc-500/10 text-zinc-600 border-zinc-500/20 dark:text-zinc-400' };
+  const config = typeConfig[type] || { label: type, color: 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20' };
   return (
     <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium', config.color)}>
       {config.label}
@@ -59,9 +59,9 @@ function TypeBadge({ type }: { type: string }) {
 // ── Priority Badge ─────────────────────────────────────
 
 const priorityConfig: Record<string, { label: string; color: string }> = {
-  high: { label: '高', color: 'bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-400' },
-  medium: { label: '中', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400' },
-  low: { label: '低', color: 'bg-zinc-500/10 text-zinc-600 border-zinc-500/20 dark:text-zinc-400' },
+  high: { label: '高', color: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
+  medium: { label: '中', color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
+  low: { label: '低', color: 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20' },
 };
 
 function PriorityBadge({ priority }: { priority: string }) {
@@ -98,14 +98,14 @@ function StatusSelect({
       className={cn(
         'px-2 py-1 rounded-md text-xs font-medium border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer appearance-none bg-no-repeat',
         status === 'completed'
-          ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400'
+          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
           : status === 'cancelled'
-          ? 'bg-zinc-500/10 text-zinc-500 border-zinc-300 dark:border-zinc-600'
+          ? 'bg-zinc-500/10 text-zinc-500 border-zinc-400 dark:border-zinc-600'
           : status === 'in_progress'
-          ? 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400'
+          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
           : status === 'assigned'
-          ? 'bg-purple-500/10 text-purple-600 border-purple-500/20 dark:text-purple-400'
-          : 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400'
+          ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+          : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
       )}
     >
       {statusOptions.map((opt) => (
@@ -135,7 +135,7 @@ function ActionCard({
   return (
     <div
       className={cn(
-        'bg-white border border-zinc-200 shadow-sm rounded-lg p-4 transition-all duration-200 dark:bg-zinc-800/50 dark:border-transparent dark:shadow-none',
+        'bg-white border border-zinc-200 shadow-sm dark:bg-zinc-800/50 dark:border-transparent dark:shadow-none rounded-lg p-4 transition-all duration-200',
         completed && 'opacity-60',
         action.priority === 'high' && !completed && 'border-l-2 border-l-red-500',
         action.priority !== 'high' && 'border-l-2 border-l-transparent'
@@ -148,16 +148,16 @@ function ActionCard({
           className="mt-0.5 flex-shrink-0"
         >
           {completed ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
+            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
           ) : (
-            <Circle className="w-5 h-5 text-zinc-400 dark:text-zinc-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors" />
+            <Circle className="w-5 h-5 text-zinc-400 dark:text-zinc-500 hover:text-blue-400 transition-colors" />
           )}
         </button>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
           <p className={cn(
-            'text-sm text-zinc-800 dark:text-zinc-200',
+            'text-sm text-zinc-700 dark:text-zinc-200',
             completed && 'line-through text-zinc-400 dark:text-zinc-500'
           )}>
             {action.description}
@@ -186,7 +186,7 @@ function ActionCard({
             {action.due_date && (
               <span className={cn(
                 'flex items-center gap-1 text-xs',
-                overdue ? 'text-red-500 dark:text-red-400' : 'text-zinc-500'
+                overdue ? 'text-red-500 dark:text-red-400' : 'text-zinc-400 dark:text-zinc-500'
               )}>
                 <Calendar className="w-3 h-3" />
                 {formatDate(action.due_date)}
@@ -307,7 +307,7 @@ export default function ActionsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-            <CheckSquare className="w-6 h-6 text-blue-500 dark:text-blue-400" />
+            <CheckSquare className="w-6 h-6 text-blue-400" />
             待辦事項
           </h1>
           <p className="text-sm text-zinc-500 mt-1">
@@ -320,7 +320,7 @@ export default function ActionsPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
-        <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+        <div className="flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-500">
           <Filter className="w-3.5 h-3.5" />
           篩選
         </div>
@@ -329,7 +329,7 @@ export default function ActionsPage() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs text-zinc-600 focus:outline-none focus:border-blue-500 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300"
+          className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
         >
           <option value="">全部狀態</option>
           <option value="pending">待處理</option>
@@ -343,7 +343,7 @@ export default function ActionsPage() {
         <select
           value={priorityFilter}
           onChange={(e) => setPriorityFilter(e.target.value)}
-          className="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs text-zinc-600 focus:outline-none focus:border-blue-500 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300"
+          className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
         >
           <option value="">全部優先度</option>
           <option value="high">高</option>
@@ -352,14 +352,14 @@ export default function ActionsPage() {
         </select>
 
         {/* Sort */}
-        <div className="flex items-center gap-1.5 ml-auto text-xs text-zinc-500">
+        <div className="flex items-center gap-1.5 ml-auto text-xs text-zinc-400 dark:text-zinc-500">
           <ArrowUpDown className="w-3.5 h-3.5" />
           排序
         </div>
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as SortKey)}
-          className="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-xs text-zinc-600 focus:outline-none focus:border-blue-500 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300"
+          className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
         >
           <option value="priority">按優先度</option>
           <option value="due_date">按到期日</option>
@@ -371,7 +371,7 @@ export default function ActionsPage() {
       {loading ? (
         <LoadingSpinner />
       ) : error ? (
-        <div className="p-6 text-red-500 dark:text-red-400 text-sm text-center">{error}</div>
+        <div className="p-6 text-red-400 text-sm text-center">{error}</div>
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={ClipboardList}

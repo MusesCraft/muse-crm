@@ -55,7 +55,7 @@ function MessageBubble({ message }: { message: Message }) {
   if (isSystem) {
     return (
       <div className="flex justify-center my-2">
-        <span className="text-xs text-zinc-500 bg-zinc-800/50 rounded-full px-3 py-1">
+        <span className="text-xs text-zinc-500 bg-zinc-100 dark:bg-zinc-800/50 rounded-full px-3 py-1">
           {message.content}
         </span>
       </div>
@@ -68,15 +68,15 @@ function MessageBubble({ message }: { message: Message }) {
         className={cn(
           'max-w-[70%] rounded-2xl px-4 py-2.5',
           isCustomer
-            ? 'bg-zinc-800 text-zinc-100 rounded-bl-md'
+            ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100 rounded-bl-md'
             : 'bg-blue-600 text-white rounded-br-md'
         )}
       >
         {/* Image message */}
         {message.message_type === 'image' && message.media_url && (
           <div className="mb-2">
-            <div className="w-48 h-36 bg-zinc-700 rounded-lg flex items-center justify-center">
-              <ImageIcon className="w-8 h-8 text-zinc-500" />
+            <div className="w-48 h-36 bg-zinc-200 dark:bg-zinc-700 rounded-lg flex items-center justify-center">
+              <ImageIcon className="w-8 h-8 text-zinc-400 dark:text-zinc-500" />
             </div>
           </div>
         )}
@@ -103,14 +103,14 @@ function MessageBubble({ message }: { message: Message }) {
         {message.quick_intent && (
           <span className={cn(
             'inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium border',
-            message.quick_intent === '投訴' && 'bg-red-500/20 text-red-300 border-red-500/30',
-            message.quick_intent === '詢價' && 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-            message.quick_intent === '規格' && 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-            message.quick_intent === '參觀' && 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-            message.quick_intent === '下單' && 'bg-green-500/20 text-green-300 border-green-500/30',
-            message.quick_intent === '招呼' && 'bg-zinc-500/20 text-zinc-300 border-zinc-500/30',
-            message.quick_intent === '跟進' && 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-            !['投訴','詢價','規格','參觀','下單','招呼','跟進'].includes(message.quick_intent) && 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+            message.quick_intent === '投訴' && 'bg-red-500/20 text-red-600 dark:text-red-300 border-red-500/30',
+            message.quick_intent === '詢價' && 'bg-orange-500/20 text-orange-600 dark:text-orange-300 border-orange-500/30',
+            message.quick_intent === '規格' && 'bg-blue-500/20 text-blue-600 dark:text-blue-300 border-blue-500/30',
+            message.quick_intent === '參觀' && 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/30',
+            message.quick_intent === '下單' && 'bg-green-500/20 text-green-600 dark:text-green-300 border-green-500/30',
+            message.quick_intent === '招呼' && 'bg-zinc-500/20 text-zinc-600 dark:text-zinc-300 border-zinc-500/30',
+            message.quick_intent === '跟進' && 'bg-purple-500/20 text-purple-600 dark:text-purple-300 border-purple-500/30',
+            !['投訴','詢價','規格','參觀','下單','招呼','跟進'].includes(message.quick_intent) && 'bg-purple-500/20 text-purple-600 dark:text-purple-300 border-purple-500/30',
           )}>
             {message.quick_intent}
           </span>
@@ -123,7 +123,7 @@ function MessageBubble({ message }: { message: Message }) {
             isCustomer ? 'justify-start' : 'justify-end'
           )}
         >
-          <span className={cn('text-[10px]', isCustomer ? 'text-zinc-500' : 'text-blue-200')}>
+          <span className={cn('text-[10px]', isCustomer ? 'text-zinc-400 dark:text-zinc-500' : 'text-blue-200')}>
             {new Date(message.timestamp).toLocaleTimeString('zh-TW', {
               hour: '2-digit',
               minute: '2-digit',
@@ -146,28 +146,28 @@ function AnalysisCard({ analysis }: { analysis: Analysis }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-3">
+    <div className="bg-zinc-50 border border-zinc-200 dark:bg-zinc-800/50 dark:border-zinc-700/50 rounded-lg p-3">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between text-left"
       >
         <div className="flex items-center gap-2">
           <Brain className="w-4 h-4 text-purple-400" />
-          <span className="text-sm font-medium text-zinc-200">{analysis.analysis_type}</span>
-          <span className="text-xs text-zinc-500">{analysis.model_used}</span>
+          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{analysis.analysis_type}</span>
+          <span className="text-xs text-zinc-400 dark:text-zinc-500">{analysis.model_used}</span>
         </div>
         {expanded ? (
-          <ChevronUp className="w-4 h-4 text-zinc-500" />
+          <ChevronUp className="w-4 h-4 text-zinc-400 dark:text-zinc-500" />
         ) : (
-          <ChevronDown className="w-4 h-4 text-zinc-500" />
+          <ChevronDown className="w-4 h-4 text-zinc-400 dark:text-zinc-500" />
         )}
       </button>
       {expanded && (
-        <div className="mt-3 pt-3 border-t border-zinc-700/50">
-          <pre className="text-xs text-zinc-300 whitespace-pre-wrap overflow-auto max-h-60">
+        <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700/50">
+          <pre className="text-xs text-zinc-600 dark:text-zinc-300 whitespace-pre-wrap overflow-auto max-h-60">
             {JSON.stringify(analysis.result, null, 2)}
           </pre>
-          <p className="text-[10px] text-zinc-500 mt-2">
+          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-2">
             分析於 {formatDateTime(analysis.created_at)}
           </p>
         </div>
@@ -220,7 +220,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   return (
     <>
       {/* Header */}
-      <div className="h-14 border-b border-zinc-800 px-6 flex items-center justify-between flex-shrink-0">
+      <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 px-6 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <Avatar
             name={conv.contact?.name || '未知'}
@@ -228,7 +228,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             size="sm"
           />
           <div>
-            <h2 className="text-sm font-semibold text-white">
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">
               {conv.contact?.name || '未知客戶'}
             </h2>
             <div className="flex items-center gap-2">
@@ -240,7 +240,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
         <div className="flex items-center gap-4">
           {/* Metadata */}
-          <div className="flex items-center gap-4 text-xs text-zinc-500">
+          <div className="flex items-center gap-4 text-xs text-zinc-400 dark:text-zinc-500">
             <span className="flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {formatDateTime(conv.started_at)}
@@ -256,7 +256,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             size="sm"
             onClick={handleAnalyze}
             disabled={analyzing}
-            className="text-zinc-400 hover:text-purple-400"
+            className="text-zinc-500 hover:text-purple-500 dark:text-zinc-400 dark:hover:text-purple-400"
           >
             {analyzing ? (
               <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
@@ -272,7 +272,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               size="sm"
               onClick={handleClose}
               disabled={closing}
-              className="text-zinc-400 hover:text-red-400"
+              className="text-zinc-500 hover:text-red-500 dark:text-zinc-400 dark:hover:text-red-400"
             >
               <XCircle className="w-3.5 h-3.5 mr-1" />
               {closing ? '關閉中...' : '關閉對話'}
@@ -292,7 +292,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
       {/* Analyses */}
       {conv.analyses && conv.analyses.length > 0 && (
-        <div className="border-t border-zinc-800 p-4 space-y-2 max-h-60 overflow-y-auto flex-shrink-0">
+        <div className="border-t border-zinc-200 dark:border-zinc-800 p-4 space-y-2 max-h-60 overflow-y-auto flex-shrink-0">
           <h3 className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">
             🧠 AI 分析摘要
           </h3>

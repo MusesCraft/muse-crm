@@ -82,15 +82,15 @@ function TagSection({
   };
 
   return (
-    <div className="bg-zinc-950/50 border border-zinc-800 rounded-lg p-4">
+    <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
+        <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2">
           <Tag className="w-4 h-4 text-blue-400" />
           標籤
         </h3>
         <button
           onClick={() => setAdding(!adding)}
-          className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+          className="text-xs text-blue-500 dark:text-blue-400 hover:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
         >
           <Plus className="w-3 h-3" />
           新增
@@ -105,7 +105,7 @@ function TagSection({
             onChange={(e) => setNewTag(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
             placeholder="輸入標籤名稱..."
-            className="flex-1 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+            className="flex-1 px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500"
             autoFocus
           />
           <Button size="sm" onClick={handleAdd}>
@@ -116,12 +116,12 @@ function TagSection({
 
       <div className="flex flex-wrap gap-2">
         {tags.length === 0 ? (
-          <span className="text-xs text-zinc-500">尚無標籤</span>
+          <span className="text-xs text-zinc-400 dark:text-zinc-500">尚無標籤</span>
         ) : (
           tags.map((tag) => (
             <span
               key={tag.id}
-              className="inline-flex items-center gap-1 rounded-full bg-zinc-800 border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300"
+              className="inline-flex items-center gap-1 rounded-full bg-zinc-100 border border-zinc-200 dark:bg-zinc-800 dark:border-zinc-700 px-2.5 py-1 text-xs text-zinc-600 dark:text-zinc-300"
             >
               {tag.tag_name}
               <button
@@ -146,30 +146,30 @@ function ConversationTimeline({
   conversations: { id: number; channel: string; status: string; started_at: string; message_count: number }[];
 }) {
   return (
-    <div className="bg-zinc-950/50 border border-zinc-800 rounded-lg p-4">
-      <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2 mb-3">
+    <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg p-4">
+      <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2 mb-3">
         <MessageSquare className="w-4 h-4 text-emerald-400" />
         對話歷史
-        <span className="text-xs text-zinc-500 font-normal">({conversations.length})</span>
+        <span className="text-xs text-zinc-400 dark:text-zinc-500 font-normal">({conversations.length})</span>
       </h3>
 
       {conversations.length === 0 ? (
-        <p className="text-xs text-zinc-500">尚無對話紀錄</p>
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">尚無對話紀錄</p>
       ) : (
         <div className="space-y-2">
           {conversations.map((conv) => (
             <Link
               key={conv.id}
               href={`/inbox?id=${conv.id}`}
-              className="flex items-center justify-between p-3 rounded-lg bg-zinc-800/30 hover:bg-zinc-800/60 transition-colors"
+              className="flex items-center justify-between p-3 rounded-lg bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/60 transition-colors"
             >
               <div className="flex items-center gap-3">
                 <ChannelBadge channel={conv.channel} />
                 <div>
-                  <p className="text-xs text-zinc-400">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     {formatDateTime(conv.started_at)}
                   </p>
-                  <p className="text-xs text-zinc-500">{conv.message_count} 則訊息</p>
+                  <p className="text-xs text-zinc-400 dark:text-zinc-500">{conv.message_count} 則訊息</p>
                 </div>
               </div>
               <StatusBadge status={conv.status} />
@@ -191,39 +191,39 @@ function AnalysisSection({
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   return (
-    <div className="bg-zinc-950/50 border border-zinc-800 rounded-lg p-4">
-      <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2 mb-3">
+    <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg p-4">
+      <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2 mb-3">
         <Brain className="w-4 h-4 text-purple-400" />
         AI 分析結果
-        <span className="text-xs text-zinc-500 font-normal">({analyses.length})</span>
+        <span className="text-xs text-zinc-400 dark:text-zinc-500 font-normal">({analyses.length})</span>
       </h3>
 
       {analyses.length === 0 ? (
-        <p className="text-xs text-zinc-500">尚無分析結果</p>
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">尚無分析結果</p>
       ) : (
         <div className="space-y-2">
           {analyses.map((a) => (
-            <div key={a.id} className="rounded-lg bg-zinc-800/30 overflow-hidden">
+            <div key={a.id} className="rounded-lg bg-zinc-50 dark:bg-zinc-800/30 overflow-hidden">
               <button
                 onClick={() => setExpandedId(expandedId === a.id ? null : a.id)}
                 className="w-full flex items-center justify-between p-3 text-left"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-zinc-200">{a.analysis_type}</span>
-                  <span className="text-[10px] text-zinc-500">{a.model_used}</span>
+                  <span className="text-xs font-medium text-zinc-700 dark:text-zinc-200">{a.analysis_type}</span>
+                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500">{a.model_used}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-zinc-500">{formatDateTime(a.created_at)}</span>
+                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500">{formatDateTime(a.created_at)}</span>
                   {expandedId === a.id ? (
-                    <ChevronUp className="w-3 h-3 text-zinc-500" />
+                    <ChevronUp className="w-3 h-3 text-zinc-400 dark:text-zinc-500" />
                   ) : (
-                    <ChevronDown className="w-3 h-3 text-zinc-500" />
+                    <ChevronDown className="w-3 h-3 text-zinc-400 dark:text-zinc-500" />
                   )}
                 </div>
               </button>
               {expandedId === a.id && (
                 <div className="px-3 pb-3">
-                  <pre className="text-xs text-zinc-400 whitespace-pre-wrap bg-zinc-900/50 rounded p-2 max-h-48 overflow-auto">
+                  <pre className="text-xs text-zinc-500 dark:text-zinc-400 whitespace-pre-wrap bg-zinc-100 dark:bg-zinc-900/50 rounded p-2 max-h-48 overflow-auto">
                     {JSON.stringify(a.result, null, 2)}
                   </pre>
                 </div>
@@ -256,28 +256,28 @@ function ActionsSection({
   };
 
   const priorityColors: Record<string, string> = {
-    high: 'text-red-400',
-    medium: 'text-amber-400',
-    low: 'text-zinc-400',
+    high: 'text-red-500 dark:text-red-400',
+    medium: 'text-amber-500 dark:text-amber-400',
+    low: 'text-zinc-500 dark:text-zinc-400',
   };
 
   return (
-    <div className="bg-zinc-950/50 border border-zinc-800 rounded-lg p-4">
-      <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2 mb-3">
+    <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg p-4">
+      <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2 mb-3">
         <ListTodo className="w-4 h-4 text-amber-400" />
         待辦動作
-        <span className="text-xs text-zinc-500 font-normal">({actions.length})</span>
+        <span className="text-xs text-zinc-400 dark:text-zinc-500 font-normal">({actions.length})</span>
       </h3>
 
       {actions.length === 0 ? (
-        <p className="text-xs text-zinc-500">沒有待辦事項</p>
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">沒有待辦事項</p>
       ) : (
         <div className="space-y-2">
           {actions.map((action) => (
             <div
               key={action.id}
               className={cn(
-                'flex items-start gap-3 p-3 rounded-lg bg-zinc-800/30',
+                'flex items-start gap-3 p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/30',
                 action.status === 'completed' && 'opacity-50'
               )}
             >
@@ -285,26 +285,26 @@ function ActionsSection({
                 {action.status === 'completed' ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                 ) : (
-                  <Circle className="w-4 h-4 text-zinc-500 hover:text-blue-400 transition-colors" />
+                  <Circle className="w-4 h-4 text-zinc-400 dark:text-zinc-500 hover:text-blue-400 transition-colors" />
                 )}
               </button>
               <div className="flex-1 min-w-0">
                 <p
                   className={cn(
-                    'text-sm text-zinc-200',
+                    'text-sm text-zinc-700 dark:text-zinc-200',
                     action.status === 'completed' && 'line-through'
                   )}
                 >
                   {action.description}
                 </p>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] text-zinc-500">{action.action_type}</span>
+                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500">{action.action_type}</span>
                   <span className={cn('text-[10px] font-medium', priorityColors[action.priority] || 'text-zinc-400')}>
                     {action.priority === 'high' && <AlertTriangle className="w-3 h-3 inline mr-0.5" />}
                     {action.priority}
                   </span>
                   {action.due_date && (
-                    <span className="text-[10px] text-zinc-500 flex items-center gap-0.5">
+                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500 flex items-center gap-0.5">
                       <Calendar className="w-3 h-3" />
                       {formatDate(action.due_date)}
                     </span>
@@ -348,8 +348,8 @@ function NotesSection({
   };
 
   return (
-    <div className="bg-zinc-950/50 border border-zinc-800 rounded-lg p-4">
-      <h3 className="text-sm font-semibold text-zinc-200 flex items-center gap-2 mb-3">
+    <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg p-4">
+      <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2 mb-3">
         <StickyNote className="w-4 h-4 text-yellow-400" />
         備註
       </h3>
@@ -362,7 +362,7 @@ function NotesSection({
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
           placeholder="新增備註..."
-          className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+          className="flex-1 px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500"
         />
         <Button size="sm" onClick={handleSubmit} disabled={submitting || !content.trim()}>
           <Send className="w-3.5 h-3.5" />
@@ -371,19 +371,19 @@ function NotesSection({
 
       {/* Notes list */}
       {notes.length === 0 ? (
-        <p className="text-xs text-zinc-500">尚無備註</p>
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">尚無備註</p>
       ) : (
         <div className="space-y-2">
           {notes.map((note) => (
             <div
               key={note.id}
-              className="p-3 rounded-lg bg-zinc-800/30 border-l-2 border-yellow-500/30"
+              className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/30 border-l-2 border-yellow-500/30"
             >
-              <p className="text-sm text-zinc-200 whitespace-pre-wrap">{note.content}</p>
+              <p className="text-sm text-zinc-700 dark:text-zinc-200 whitespace-pre-wrap">{note.content}</p>
               <div className="flex items-center gap-2 mt-2">
-                <span className="text-[10px] text-zinc-500">{note.created_by}</span>
-                <span className="text-[10px] text-zinc-600">·</span>
-                <span className="text-[10px] text-zinc-500">{formatDateTime(note.created_at)}</span>
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500">{note.created_by}</span>
+                <span className="text-[10px] text-zinc-300 dark:text-zinc-600">·</span>
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500">{formatDateTime(note.created_at)}</span>
               </div>
             </div>
           ))}
@@ -421,26 +421,26 @@ export default function ContactDetailPage({
       {/* Back button */}
       <Link
         href="/contacts"
-        className="inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-200 transition-colors mb-6"
+        className="inline-flex items-center gap-1 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors mb-6"
       >
         <ArrowLeft className="w-4 h-4" />
         返回客戶列表
       </Link>
 
       {/* Header */}
-      <div className="bg-zinc-950/50 border border-zinc-800 rounded-lg p-6 mb-6">
+      <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg p-6 mb-6">
         <div className="flex items-start gap-4">
           <Avatar name={contact.name} url={contact.avatar_url} size="lg" />
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-white">{contact.name}</h1>
+            <h1 className="text-xl font-bold text-zinc-900 dark:text-white">{contact.name}</h1>
             {contact.display_name && contact.display_name !== contact.name && (
-              <p className="text-sm text-zinc-400">{contact.display_name}</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">{contact.display_name}</p>
             )}
             <div className="flex items-center gap-3 mt-2">
               <ChannelBadge channel={contact.channel} />
-              <span className="text-xs text-zinc-500">{contact.source_type}</span>
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">{contact.source_type}</span>
             </div>
-            <div className="flex items-center gap-4 mt-3 text-xs text-zinc-500">
+            <div className="flex items-center gap-4 mt-3 text-xs text-zinc-400 dark:text-zinc-500">
               <span className="flex items-center gap-1">
                 <Calendar className="w-3 h-3" />
                 首次互動：{formatDate(contact.first_seen)}

@@ -65,18 +65,18 @@ export function ConversationList({
   return (
     <>
       {/* Header */}
-      <div className="p-4 border-b border-zinc-800 space-y-3">
-        <h1 className="text-lg font-semibold text-white">收件匣</h1>
+      <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 space-y-3">
+        <h1 className="text-lg font-semibold text-zinc-900 dark:text-white">收件匣</h1>
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
           <input
             type="text"
             placeholder="搜尋對話..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition-colors"
+            className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition-colors"
           />
         </div>
 
@@ -85,7 +85,7 @@ export function ConversationList({
           <select
             value={status}
             onChange={(e) => onStatusChange(e.target.value)}
-            className="flex-1 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 focus:outline-none focus:border-blue-500"
+            className="flex-1 px-2 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
           >
             <option value="">全部狀態</option>
             <option value="active">進行中</option>
@@ -94,7 +94,7 @@ export function ConversationList({
           <select
             value={channel}
             onChange={(e) => onChannelChange(e.target.value)}
-            className="flex-1 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 focus:outline-none focus:border-blue-500"
+            className="flex-1 px-2 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
           >
             <option value="">全部渠道</option>
             <option value="messenger">Messenger</option>
@@ -118,8 +118,8 @@ export function ConversationList({
               key={conv.id}
               onClick={() => onSelect(conv.id)}
               className={cn(
-                'w-full flex items-start gap-3 p-4 text-left border-b border-zinc-800/50 transition-colors hover:bg-zinc-800/30',
-                selectedId === conv.id && 'bg-zinc-800/50 border-l-2 border-l-blue-500'
+                'w-full flex items-start gap-3 p-4 text-left border-b border-zinc-100 dark:border-zinc-800/50 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/30',
+                selectedId === conv.id && 'bg-zinc-100 dark:bg-zinc-800/50 border-l-2 border-l-blue-500'
               )}
             >
               <Avatar
@@ -129,10 +129,10 @@ export function ConversationList({
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-zinc-100 truncate">
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
                     {conv.contact?.name || '未知客戶'}
                   </span>
-                  <span className="text-xs text-zinc-500 flex-shrink-0">
+                  <span className="text-xs text-zinc-400 dark:text-zinc-500 flex-shrink-0">
                     {conv.last_message ? formatTime(conv.last_message.timestamp) : ''}
                   </span>
                 </div>
@@ -140,7 +140,7 @@ export function ConversationList({
                   <ChannelIcon channel={conv.channel} size={12} />
                   <StatusBadge status={conv.status} />
                 </div>
-                <p className="text-xs text-zinc-400 mt-1 truncate">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 truncate">
                   {conv.last_message ? truncate(conv.last_message.content, 40) : '尚無訊息'}
                 </p>
               </div>
@@ -151,7 +151,7 @@ export function ConversationList({
 
       {/* Pagination */}
       {pagination && pagination.pages > 1 && (
-        <div className="p-3 border-t border-zinc-800 flex items-center justify-between">
+        <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
           <span className="text-xs text-zinc-500">
             共 {pagination.total} 筆
           </span>
@@ -159,7 +159,7 @@ export function ConversationList({
             <button
               onClick={() => onPageChange(page - 1)}
               disabled={page <= 1}
-              className="p-1 rounded hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-4 h-4 text-zinc-400" />
             </button>
@@ -169,7 +169,7 @@ export function ConversationList({
             <button
               onClick={() => onPageChange(page + 1)}
               disabled={page >= pagination.pages}
-              className="p-1 rounded hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-4 h-4 text-zinc-400" />
             </button>

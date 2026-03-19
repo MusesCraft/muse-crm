@@ -39,26 +39,26 @@ export default function ContactsPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-lg font-semibold text-white">客戶管理</h1>
-        <p className="text-sm text-zinc-400 mt-1">查看和管理所有客戶資訊</p>
+        <h1 className="text-lg font-semibold text-zinc-900 dark:text-white">客戶管理</h1>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">查看和管理所有客戶資訊</p>
       </div>
 
       {/* Filters */}
       <div className="flex items-center gap-3 mb-4">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
           <input
             type="text"
             placeholder="搜尋客戶名稱..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full pl-9 pr-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition-colors"
+            className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition-colors"
           />
         </div>
         <select
           value={channel}
           onChange={(e) => { setChannel(e.target.value); setPage(1); }}
-          className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300 focus:outline-none focus:border-blue-500"
+          className="px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
         >
           <option value="">全部渠道</option>
           <option value="messenger">Messenger</option>
@@ -68,7 +68,7 @@ export default function ContactsPage() {
         <select
           value={sourceType}
           onChange={(e) => { setSourceType(e.target.value); setPage(1); }}
-          className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300 focus:outline-none focus:border-blue-500"
+          className="px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
         >
           <option value="">全部來源</option>
           <option value="organic">自然流量</option>
@@ -78,7 +78,7 @@ export default function ContactsPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-zinc-950/50 border border-zinc-800 rounded-lg overflow-hidden">
+      <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg overflow-hidden">
         {loading && !data ? (
           <LoadingSpinner />
         ) : error ? (
@@ -88,38 +88,38 @@ export default function ContactsPage() {
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-zinc-800">
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+              <tr className="border-b border-zinc-200 dark:border-zinc-800">
+                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
                   客戶
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
                   渠道
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
                   標籤
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
                   最後活躍
                 </th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                <th className="text-center px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
                   對話數
                 </th>
-                <th className="px-4 py-3"></th>
+                <th className="px-4 py-3 bg-zinc-50 dark:bg-zinc-800/50"></th>
               </tr>
             </thead>
             <tbody>
               {data.data.map((contact) => (
                 <tr
                   key={contact.id}
-                  className="border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-colors"
+                  className="border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors"
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <Avatar name={contact.name} url={contact.avatar_url} size="sm" />
                       <div>
-                        <p className="text-sm font-medium text-zinc-100">{contact.name}</p>
+                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{contact.name}</p>
                         {contact.display_name && contact.display_name !== contact.name && (
-                          <p className="text-xs text-zinc-500">{contact.display_name}</p>
+                          <p className="text-xs text-zinc-400 dark:text-zinc-500">{contact.display_name}</p>
                         )}
                       </div>
                     </div>
@@ -133,31 +133,31 @@ export default function ContactsPage() {
                         contact.tags.slice(0, 3).map((tag) => (
                           <span
                             key={tag.id}
-                            className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300"
+                            className="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-xs text-zinc-600 dark:text-zinc-300"
                           >
                             {tag.tag_name}
                           </span>
                         ))
                       ) : (
-                        <span className="text-xs text-zinc-600">—</span>
+                        <span className="text-xs text-zinc-400 dark:text-zinc-600">—</span>
                       )}
                       {contact.tags && contact.tags.length > 3 && (
-                        <span className="text-xs text-zinc-500">
+                        <span className="text-xs text-zinc-400 dark:text-zinc-500">
                           +{contact.tags.length - 3}
                         </span>
                       )}
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-xs text-zinc-400">{formatDate(contact.last_seen)}</span>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">{formatDate(contact.last_seen)}</span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className="text-sm text-zinc-300">{contact.conversation_count}</span>
+                    <span className="text-sm text-zinc-600 dark:text-zinc-300">{contact.conversation_count}</span>
                   </td>
                   <td className="px-4 py-3">
                     <Link
                       href={`/contacts/${contact.id}`}
-                      className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                      className="inline-flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 hover:text-blue-400 dark:hover:text-blue-300 transition-colors"
                     >
                       查看
                       <ExternalLink className="w-3 h-3" />
@@ -171,13 +171,13 @@ export default function ContactsPage() {
 
         {/* Pagination */}
         {data?.pagination && data.pagination.pages > 1 && (
-          <div className="px-4 py-3 border-t border-zinc-800 flex items-center justify-between">
+          <div className="px-4 py-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
             <span className="text-xs text-zinc-500">共 {data.pagination.total} 位客戶</span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setPage(page - 1)}
                 disabled={page <= 1}
-                className="p-1 rounded hover:bg-zinc-800 disabled:opacity-30"
+                className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30"
               >
                 <ChevronLeft className="w-4 h-4 text-zinc-400" />
               </button>
@@ -187,7 +187,7 @@ export default function ContactsPage() {
               <button
                 onClick={() => setPage(page + 1)}
                 disabled={page >= data.pagination.pages}
-                className="p-1 rounded hover:bg-zinc-800 disabled:opacity-30"
+                className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30"
               >
                 <ChevronRight className="w-4 h-4 text-zinc-400" />
               </button>

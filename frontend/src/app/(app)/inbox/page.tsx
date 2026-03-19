@@ -45,7 +45,7 @@ export default function InboxPage() {
   return (
     <div className="flex h-screen">
       {/* Left panel: Conversation list */}
-      <div className="w-80 border-r border-zinc-800 flex flex-col bg-zinc-950/50 flex-shrink-0">
+      <div className="w-80 border-r border-zinc-200 dark:border-zinc-800 flex flex-col bg-zinc-50/50 dark:bg-zinc-950/50 flex-shrink-0">
         <ConversationList
           conversations={data?.data || []}
           pagination={data?.pagination}
@@ -65,7 +65,7 @@ export default function InboxPage() {
       </div>
 
       {/* Center panel: Conversation detail */}
-      <div className="flex-1 flex flex-col bg-zinc-900 min-w-0">
+      <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 min-w-0">
         {selectedId ? (
           <ConversationDetail
             conversationId={selectedId}

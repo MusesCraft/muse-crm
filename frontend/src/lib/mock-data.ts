@@ -915,6 +915,67 @@ export const mockActivity: ActivityPoint[] = Array.from({ length: 30 }, (_, i) =
   };
 });
 
+// ── Quick Replies (預存語錄) ──────────────────────────────
+
+export interface QuickReply {
+  id: number;
+  category: string;
+  title: string;
+  content: string;
+}
+
+export const mockQuickReplies: QuickReply[] = [
+  // 問候語
+  { id: 1, category: '問候語', title: '標準問候', content: '您好！感謝您的詢問，我是繆思精工的客服，很高興為您服務。' },
+  { id: 2, category: '問候語', title: '簡短問候', content: '您好！請問有什麼可以幫您的嗎？' },
+  // 產品介紹
+  { id: 3, category: '產品介紹', title: '品牌總覽', content: '我們有義大利進口 Laminam、西班牙 Dekton 和國產品牌可供選擇，請問您的預算大概在什麼範圍？' },
+  { id: 4, category: '產品介紹', title: '電視牆建議', content: '岩板電視牆建議使用 1600x3200mm 大板，接縫少比較美觀。' },
+  // 報價相關
+  { id: 5, category: '報價相關', title: '報價通知', content: '收到您的需求，我會盡快為您準備正式報價單，預計在 X 個工作天內提供。' },
+  { id: 6, category: '報價相關', title: '報價已發送', content: '報價已發送至您的信箱，如有任何疑問歡迎隨時聯繫。' },
+  // 售後回覆
+  { id: 7, category: '售後回覆', title: '問題處理', content: '非常抱歉造成您的困擾，我們會盡快安排師傅到場處理。' },
+  { id: 8, category: '售後回覆', title: '感謝反饋', content: '感謝您的反饋，我們會立即為您處理，請問您方便的時間是？' },
+];
+
+// ── AI Suggested Replies ───────────────────────────────
+
+export const mockAiSuggestedReplies: Record<number, string> = {
+  // conversationId → suggested reply text
+  // 王設計師 conv 1 (active, has related closed conv 9 with analysis)
+  1: '王設計師您好，電視牆 Laminam 大板的正式報價單已為您準備好，請查收附件。如有需要可安排展間參觀。',
+  // 黃太太 conv 6 (active, has related closed conv 12 with analysis)
+  6: '黃太太您好，非常抱歉造成困擾。已為您安排師傅本週四下午到場勘查，届時會先評估裂縫狀況再決定處理方式。',
+};
+
+// Helper: check if a conversation has been analyzed (directly or via contact's other convs)
+export function getConversationAnalysis(conversationId: number): { hasAnalysis: boolean; suggestedReply: string | null } {
+  const conv = mockConversations.find((c) => c.id === conversationId);
+  if (!conv) return { hasAnalysis: false, suggestedReply: null };
+
+  // Check direct analysis on this conversation
+  if (conv.analyses && conv.analyses.length > 0) {
+    return {
+      hasAnalysis: true,
+      suggestedReply: mockAiSuggestedReplies[conversationId] || null,
+    };
+  }
+
+  // Check if contact has other conversations with analyses
+  const contactConvs = mockConversations.filter((c) => c.contact_id === conv.contact_id);
+  const hasAnyAnalysis = contactConvs.some((c) => c.analyses && c.analyses.length > 0);
+
+  if (hasAnyAnalysis && mockAiSuggestedReplies[conversationId]) {
+    return {
+      hasAnalysis: true,
+      suggestedReply: mockAiSuggestedReplies[conversationId],
+    };
+  }
+
+  return { hasAnalysis: hasAnyAnalysis, suggestedReply: null };
+}
+
 // ── Mock API Functions ─────────────────────────────────
 
 export function getMockConversations(params?: {

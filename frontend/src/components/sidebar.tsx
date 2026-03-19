@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Inbox, Users, LayoutDashboard, Zap, LogOut } from 'lucide-react';
+import { Inbox, Users, LayoutDashboard, CheckSquare, Zap, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 
@@ -10,6 +10,7 @@ const navItems = [
   { href: '/inbox', label: '收件匣', icon: Inbox },
   { href: '/contacts', label: '客戶', icon: Users },
   { href: '/dashboard', label: '儀表板', icon: LayoutDashboard },
+  { href: '/actions', label: '待辦事項', icon: CheckSquare },
 ];
 
 export function Sidebar() {

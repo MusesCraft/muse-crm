@@ -2,9 +2,11 @@
 
 import { useState, useCallback } from 'react';
 import { inboxApi, type Conversation, type PaginatedResponse } from '@/lib/api';
+import { mockConversations } from '@/lib/mock-data';
 import { useAsync } from '@/lib/hooks';
 import { ConversationList } from './conversation-list';
 import { ConversationDetail } from './conversation-detail';
+import { CustomerSidebar } from './customer-sidebar';
 import { Inbox } from 'lucide-react';
 import { EmptyState } from '@/components/loading';
 
@@ -35,10 +37,15 @@ export default function InboxPage() {
     refetch();
   }, [refetch]);
 
+  // Find selected conversation to get contact info
+  const selectedConv = selectedId
+    ? (data?.data || []).find((c) => c.id === selectedId) || mockConversations.find((c) => c.id === selectedId)
+    : null;
+
   return (
     <div className="flex h-screen">
       {/* Left panel: Conversation list */}
-      <div className="w-96 border-r border-zinc-800 flex flex-col bg-zinc-950/50">
+      <div className="w-80 border-r border-zinc-800 flex flex-col bg-zinc-950/50 flex-shrink-0">
         <ConversationList
           conversations={data?.data || []}
           pagination={data?.pagination}
@@ -57,8 +64,8 @@ export default function InboxPage() {
         />
       </div>
 
-      {/* Right panel: Conversation detail */}
-      <div className="flex-1 flex flex-col bg-zinc-900">
+      {/* Center panel: Conversation detail */}
+      <div className="flex-1 flex flex-col bg-zinc-900 min-w-0">
         {selectedId ? (
           <ConversationDetail
             conversationId={selectedId}
@@ -72,6 +79,16 @@ export default function InboxPage() {
           />
         )}
       </div>
+
+      {/* Right panel: Customer sidebar */}
+      {selectedConv && selectedConv.contact_id && (
+        <CustomerSidebar
+          contactId={selectedConv.contact_id}
+          channel={selectedConv.channel}
+          conversationId={selectedId!}
+          onSelectConversation={handleSelect}
+        />
+      )}
     </div>
   );
 }

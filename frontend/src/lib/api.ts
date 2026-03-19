@@ -324,10 +324,12 @@ export const tagsApi = {
 // ── Actions API ────────────────────────────────────────
 
 export const actionsApi = {
-  async getActions(params?: { status?: string; contact_id?: number }) {
+  async getActions(params?: { status?: string; priority?: string; sort?: string; contact_id?: number }) {
     try {
       const searchParams = new URLSearchParams();
       if (params?.status) searchParams.set('status', params.status);
+      if (params?.priority) searchParams.set('priority', params.priority);
+      if (params?.sort) searchParams.set('sort', params.sort);
       if (params?.contact_id) searchParams.set('contact_id', String(params.contact_id));
       const qs = searchParams.toString();
       return await request<Action[]>(`/actions${qs ? `?${qs}` : ''}`);

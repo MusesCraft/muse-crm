@@ -719,6 +719,26 @@ export const mockConversations: Conversation[] = [
   },
 ];
 
+// ── Contact Entity Info (quick extraction: phone, address, email, company) ──
+
+export interface ContactEntityInfo {
+  phone?: string;
+  address?: string;
+  email?: string;
+  company?: string;
+}
+
+export const mockContactEntities: Record<number, ContactEntityInfo> = {
+  1: { phone: '0912-345-678', address: '台北市內湖區' },
+  2: { phone: '0923-456-789', address: '台北市信義區' },
+  3: { phone: '02-2222-3333', address: '新北市中和區中正路XXX號', company: '宏達建材行' },
+  4: { phone: '0934-567-890' },
+  5: { phone: '02-2771-8888', company: 'LI Design Studio' },
+  6: { phone: '0945-678-901', address: '台北市松山區' },
+  7: { phone: '0956-789-012', company: '承恩設計' },
+  8: { email: 'zhao_mimi@gmail.com' },
+};
+
 // ── Quick Triage Data (attached to messages) ───────────
 
 export const mockQuickTriage: Record<number, { quick_intent: string; quick_identity: string }> = {
@@ -994,12 +1014,17 @@ export function getMockContactDetail(id: number): ContactDetail | null {
 
 export function getMockActions(params?: {
   status?: string;
+  priority?: string;
+  sort?: string;
   contact_id?: number;
 }): Action[] {
   let filtered = [...mockActions];
 
   if (params?.status) {
     filtered = filtered.filter((a) => a.status === params.status);
+  }
+  if (params?.priority) {
+    filtered = filtered.filter((a) => a.priority === params.priority);
   }
   if (params?.contact_id) {
     filtered = filtered.filter((a) => a.contact_id === params.contact_id);

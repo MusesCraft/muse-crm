@@ -69,6 +69,7 @@ export const mockContacts: Contact[] = [
     last_seen: minutesAgo(35),
     conversation_count: 2,
     tags: [mockTags[0], mockTags[4], mockTags[8], mockTags[11]],
+    priority: 'medium',
   },
   {
     id: 2,
@@ -82,6 +83,7 @@ export const mockContacts: Contact[] = [
     last_seen: hoursAgo(2),
     conversation_count: 1,
     tags: [mockTags[0], mockTags[5], mockTags[9]],
+    priority: 'low',
   },
   {
     id: 3,
@@ -95,6 +97,7 @@ export const mockContacts: Contact[] = [
     last_seen: hoursAgo(5),
     conversation_count: 3,
     tags: [mockTags[1], mockTags[6], mockTags[3], mockTags[8]],
+    priority: 'high',
   },
   {
     id: 4,
@@ -108,6 +111,7 @@ export const mockContacts: Contact[] = [
     last_seen: daysAgo(1),
     conversation_count: 2,
     tags: [mockTags[7], mockTags[8]],
+    priority: 'low',
   },
   {
     id: 5,
@@ -121,6 +125,7 @@ export const mockContacts: Contact[] = [
     last_seen: hoursAgo(8),
     conversation_count: 1,
     tags: [mockTags[1], mockTags[4], mockTags[8]],
+    priority: 'high',
   },
   {
     id: 6,
@@ -134,6 +139,7 @@ export const mockContacts: Contact[] = [
     last_seen: hoursAgo(1),
     conversation_count: 2,
     tags: [mockTags[2], mockTags[5], mockTags[3], mockTags[8]],
+    priority: 'high',
   },
   {
     id: 7,
@@ -147,6 +153,7 @@ export const mockContacts: Contact[] = [
     last_seen: daysAgo(0, 3),
     conversation_count: 1,
     tags: [mockTags[0], mockTags[4]],
+    priority: 'low',
   },
   {
     id: 8,
@@ -160,6 +167,7 @@ export const mockContacts: Contact[] = [
     last_seen: minutesAgo(15),
     conversation_count: 1,
     tags: [mockTags[0], mockTags[10]],
+    priority: 'low',
   },
 ];
 
@@ -541,7 +549,7 @@ const conv12Messages: Message[] = [
 
 export const mockConversations: Conversation[] = [
   {
-    id: 1, contact_id: 1, channel: 'messenger', status: 'active',
+    id: 1, contact_id: 1, channel: 'messenger', status: 'active', urgency: 'high' as const,
     started_at: daysAgo(2, 4), ended_at: null, message_count: 7,
     platform_conversation_id: null,
     contact: mockContacts[0],
@@ -550,7 +558,7 @@ export const mockConversations: Conversation[] = [
     analyses: [],
   },
   {
-    id: 2, contact_id: 2, channel: 'instagram', status: 'active',
+    id: 2, contact_id: 2, channel: 'instagram', status: 'active', urgency: 'medium' as const,
     started_at: daysAgo(3, 6), ended_at: null, message_count: 7,
     platform_conversation_id: null,
     contact: mockContacts[1],
@@ -559,7 +567,7 @@ export const mockConversations: Conversation[] = [
     analyses: [],
   },
   {
-    id: 3, contact_id: 3, channel: 'line', status: 'active',
+    id: 3, contact_id: 3, channel: 'line', status: 'unanswered', urgency: 'low' as const,
     started_at: daysAgo(1, 8), ended_at: null, message_count: 5,
     platform_conversation_id: null,
     contact: mockContacts[2],
@@ -568,7 +576,7 @@ export const mockConversations: Conversation[] = [
     analyses: [],
   },
   {
-    id: 4, contact_id: 4, channel: 'messenger', status: 'active',
+    id: 4, contact_id: 4, channel: 'messenger', status: 'silent', urgency: 'low' as const,
     started_at: daysAgo(2, 10), ended_at: null, message_count: 7,
     platform_conversation_id: null,
     contact: mockContacts[3],
@@ -577,7 +585,7 @@ export const mockConversations: Conversation[] = [
     analyses: [],
   },
   {
-    id: 5, contact_id: 5, channel: 'instagram', status: 'active',
+    id: 5, contact_id: 5, channel: 'instagram', status: 'silent', urgency: 'high' as const,
     started_at: daysAgo(4, 12), ended_at: null, message_count: 7,
     platform_conversation_id: null,
     contact: mockContacts[4],
@@ -586,7 +594,7 @@ export const mockConversations: Conversation[] = [
     analyses: [],
   },
   {
-    id: 6, contact_id: 6, channel: 'messenger', status: 'active',
+    id: 6, contact_id: 6, channel: 'messenger', status: 'active', urgency: 'high' as const,
     started_at: daysAgo(0, 4), ended_at: null, message_count: 7,
     platform_conversation_id: null,
     contact: mockContacts[5],
@@ -595,7 +603,7 @@ export const mockConversations: Conversation[] = [
     analyses: [],
   },
   {
-    id: 7, contact_id: 7, channel: 'line', status: 'active',
+    id: 7, contact_id: 7, channel: 'line', status: 'unanswered', urgency: 'low' as const,
     started_at: daysAgo(1, 6), ended_at: null, message_count: 5,
     platform_conversation_id: null,
     contact: mockContacts[6],
@@ -604,7 +612,7 @@ export const mockConversations: Conversation[] = [
     analyses: [],
   },
   {
-    id: 8, contact_id: 8, channel: 'instagram', status: 'active',
+    id: 8, contact_id: 8, channel: 'instagram', status: 'active', urgency: 'medium' as const,
     started_at: daysAgo(1, 2), ended_at: null, message_count: 6,
     platform_conversation_id: null,
     contact: mockContacts[7],
@@ -614,7 +622,7 @@ export const mockConversations: Conversation[] = [
   },
   // Closed conversations with analyses
   {
-    id: 9, contact_id: 1, channel: 'messenger', status: 'closed',
+    id: 9, contact_id: 1, channel: 'messenger', status: 'closed', urgency: 'low' as const,
     started_at: daysAgo(10), ended_at: daysAgo(6), message_count: 5,
     platform_conversation_id: null,
     contact: mockContacts[0],
@@ -640,7 +648,7 @@ export const mockConversations: Conversation[] = [
     ],
   },
   {
-    id: 10, contact_id: 3, channel: 'line', status: 'closed',
+    id: 10, contact_id: 3, channel: 'line', status: 'closed', urgency: 'low' as const,
     started_at: daysAgo(8), ended_at: daysAgo(5), message_count: 4,
     platform_conversation_id: null,
     contact: mockContacts[2],
@@ -666,7 +674,7 @@ export const mockConversations: Conversation[] = [
     ],
   },
   {
-    id: 11, contact_id: 4, channel: 'messenger', status: 'closed',
+    id: 11, contact_id: 4, channel: 'messenger', status: 'closed', urgency: 'low' as const,
     started_at: daysAgo(10), ended_at: daysAgo(7), message_count: 3,
     platform_conversation_id: null,
     contact: mockContacts[3],
@@ -692,7 +700,7 @@ export const mockConversations: Conversation[] = [
     ],
   },
   {
-    id: 12, contact_id: 6, channel: 'messenger', status: 'closed',
+    id: 12, contact_id: 6, channel: 'messenger', status: 'closed', urgency: 'low' as const,
     started_at: daysAgo(4, 6), ended_at: daysAgo(4), message_count: 4,
     platform_conversation_id: null,
     contact: mockContacts[5],
@@ -790,7 +798,7 @@ export const mockActions: Action[] = [
   },
   {
     id: 3, contact_id: 6, conversation_id: 6,
-    action_type: 'service', description: '派師傅到場處理裂縫 — 黃太太電視牆保固維修',
+    action_type: 'after_sales', description: '派師傅到場處理裂縫 — 黃太太電視牆保固維修',
     priority: 'high', status: 'pending',
     due_date: (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString(); })(),
     completed_at: null, created_at: hoursAgo(1),
@@ -818,6 +826,22 @@ export const mockActions: Action[] = [
     priority: 'medium', status: 'pending',
     due_date: (() => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString(); })(),
     completed_at: null, created_at: daysAgo(1),
+    contact: mockContacts[3],
+  },
+  {
+    id: 9, contact_id: 2, conversation_id: 2,
+    action_type: 'measure', description: '安排丈量 — 陳先生新房',
+    priority: 'medium', status: 'pending',
+    due_date: (() => { const d = new Date(); d.setDate(d.getDate() + 3); return d.toISOString(); })(),
+    completed_at: null, created_at: hoursAgo(2),
+    contact: mockContacts[1],
+  },
+  {
+    id: 10, contact_id: 4, conversation_id: 4,
+    action_type: 'construction', description: '張工班施工進場',
+    priority: 'high', status: 'pending',
+    due_date: (() => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString(); })(),
+    completed_at: null, created_at: hoursAgo(1),
     contact: mockContacts[3],
   },
   // Some completed actions
@@ -865,8 +889,15 @@ export const mockDashboardStats: DashboardStats = {
   total_conversations: 12,
   active_conversations: 8,
   total_messages: 68,
-  pending_actions: 6,
+  pending_actions: 8,
 };
+
+// ── Extended Dashboard Stats ───────────────────────────
+
+export const mockUrgencyDistribution = { high: 3, medium: 2, low: 7 };
+export const mockStatusDistribution = { active: 4, silent: 2, unanswered: 2 };
+export const mockTodayMessages = { count: 12, yesterdayCount: 9 };
+export const mockSourceAnalysis = { organic: 5, ad: 2, referral: 1 };
 
 export const mockChannelDistribution: ChannelDistribution[] = [
   { channel: 'messenger', count: 5 },
@@ -892,6 +923,7 @@ export function getMockConversations(params?: {
   status?: string;
   channel?: string;
   search?: string;
+  urgency?: string;
 }): PaginatedResponse<Conversation> {
   let filtered = [...mockConversations];
 
@@ -900,6 +932,9 @@ export function getMockConversations(params?: {
   }
   if (params?.channel) {
     filtered = filtered.filter((c) => c.channel === params.channel);
+  }
+  if (params?.urgency) {
+    filtered = filtered.filter((c) => c.urgency === params.urgency);
   }
   if (params?.search) {
     const q = params.search.toLowerCase();

@@ -40,11 +40,16 @@ const typeConfig: Record<string, { label: string; color: string }> = {
   visit: { label: '參觀', color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
   call: { label: '通話', color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
   sample: { label: '寄樣', color: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' },
-  service: { label: '售後', color: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
+  service: { label: '維修', color: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' },
   followup: { label: '跟進', color: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20' },
   delivery: { label: '出貨', color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
   processing: { label: '加工', color: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' },
   proposal: { label: '提案', color: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
+  dispatch: { label: '派工中', color: 'bg-blue-600/10 text-blue-700 dark:text-blue-300 border-blue-600/20' },
+  dispatched: { label: '已派工', color: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20' },
+  construction: { label: '施工中', color: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20' },
+  measure: { label: '待丈量', color: 'bg-yellow-700/10 text-yellow-700 dark:text-yellow-400 border-yellow-700/20' },
+  after_sales: { label: '售後處理', color: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
 };
 
 function TypeBadge({ type }: { type: string }) {
@@ -217,6 +222,7 @@ const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
 export default function ActionsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [priorityFilter, setPriorityFilter] = useState<string>('');
+  const [typeFilter, setTypeFilter] = useState<string>('');
   const [sort, setSort] = useState<SortKey>('priority');
 
   // Local state for optimistic updates
@@ -239,6 +245,9 @@ export default function ActionsPage() {
     if (priorityFilter) {
       result = result.filter((a) => a.priority === priorityFilter);
     }
+    if (typeFilter) {
+      result = result.filter((a) => a.action_type === typeFilter);
+    }
 
     result.sort((a, b) => {
       switch (sort) {
@@ -257,7 +266,7 @@ export default function ActionsPage() {
     });
 
     return result;
-  }, [actions, statusFilter, priorityFilter, sort]);
+  }, [actions, statusFilter, priorityFilter, typeFilter, sort]);
 
   // Stats
   const pendingCount = actions.filter((a) => !['completed', 'cancelled'].includes(a.status)).length;
@@ -351,6 +360,28 @@ export default function ActionsPage() {
           <option value="low">低</option>
         </select>
 
+        {/* Type filter */}
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
+        >
+          <option value="">全部類型</option>
+          <option value="quote">報價</option>
+          <option value="visit">參觀</option>
+          <option value="call">通話</option>
+          <option value="sample">寄樣</option>
+          <option value="dispatch">派工中</option>
+          <option value="dispatched">已派工</option>
+          <option value="construction">施工中</option>
+          <option value="measure">待丈量</option>
+          <option value="after_sales">售後處理</option>
+          <option value="followup">跟進</option>
+          <option value="delivery">出貨</option>
+          <option value="processing">加工</option>
+          <option value="proposal">提案</option>
+        </select>
+
         {/* Sort */}
         <div className="flex items-center gap-1.5 ml-auto text-xs text-zinc-400 dark:text-zinc-500">
           <ArrowUpDown className="w-3.5 h-3.5" />
@@ -375,8 +406,8 @@ export default function ActionsPage() {
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={ClipboardList}
-          title={statusFilter || priorityFilter ? '沒有符合條件的待辦事項' : '目前沒有待辦事項'}
-          description={statusFilter || priorityFilter ? '試試調整篩選條件' : '🎉 所有工作都完成了！'}
+          title={statusFilter || priorityFilter || typeFilter ? '沒有符合條件的待辦事項' : '目前沒有待辦事項'}
+          description={statusFilter || priorityFilter || typeFilter ? '試試調整篩選條件' : '🎉 所有工作都完成了！'}
         />
       ) : (
         <div className="space-y-3">

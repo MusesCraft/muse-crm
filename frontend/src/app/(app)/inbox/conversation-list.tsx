@@ -29,6 +29,25 @@ function truncate(str: string, len: number): string {
   return str.length > len ? str.slice(0, len) + '…' : str;
 }
 
+function UrgencyBadge({ urgency }: { urgency?: string }) {
+  if (!urgency || urgency === 'low') return null;
+  if (urgency === 'high') {
+    return (
+      <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white dark:bg-red-600">
+        急
+      </span>
+    );
+  }
+  if (urgency === 'medium') {
+    return (
+      <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-orange-500 text-white dark:bg-orange-600">
+        中
+      </span>
+    );
+  }
+  return null;
+}
+
 interface ConversationListProps {
   conversations: Conversation[];
   pagination?: { page: number; pages: number; total: number };
@@ -88,7 +107,9 @@ export function ConversationList({
             className="flex-1 px-2 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
           >
             <option value="">全部狀態</option>
-            <option value="active">進行中</option>
+            <option value="active">活躍</option>
+            <option value="silent">沉默</option>
+            <option value="unanswered">未回</option>
             <option value="closed">已關閉</option>
           </select>
           <select
@@ -139,6 +160,7 @@ export function ConversationList({
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <ChannelIcon channel={conv.channel} size={12} />
                   <StatusBadge status={conv.status} />
+                  <UrgencyBadge urgency={conv.urgency} />
                 </div>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 truncate">
                   {conv.last_message ? truncate(conv.last_message.content, 40) : '尚無訊息'}

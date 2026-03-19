@@ -35,7 +35,7 @@ export function Sidebar() {
     : 'U';
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-60 bg-white border-r border-zinc-200 dark:bg-zinc-950 dark:border-zinc-800 flex flex-col z-50">
+    <aside className="fixed left-0 top-0 bottom-0 w-[200px] bg-white border-r border-zinc-200 dark:bg-zinc-950 dark:border-zinc-800 flex flex-col z-50">
       {/* Logo */}
       <div className="h-14 flex items-center gap-2 px-5 border-b border-zinc-200 dark:border-zinc-800">
         <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center">

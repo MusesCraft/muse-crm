@@ -80,6 +80,7 @@ export interface Contact {
   last_seen: string;
   conversation_count: number;
   tags?: Tag[];
+  priority?: 'high' | 'medium' | 'low';
 }
 
 export interface Tag {
@@ -117,6 +118,7 @@ export interface Conversation {
   contact_id: number;
   channel: string;
   status: string;
+  urgency?: 'high' | 'medium' | 'low';
   started_at: string;
   ended_at: string | null;
   message_count: number;

@@ -4,6 +4,8 @@ import { cn } from '@/lib/utils';
 
 const statusStyles: Record<string, string> = {
   active: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400',
+  silent: 'bg-zinc-500/10 text-zinc-500 border-zinc-400/20 dark:text-zinc-400',
+  unanswered: 'bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400',
   closed: 'bg-zinc-500/10 text-zinc-600 border-zinc-500/20 dark:text-zinc-400',
   pending: 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400',
   completed: 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400',
@@ -11,7 +13,9 @@ const statusStyles: Record<string, string> = {
 };
 
 const statusLabels: Record<string, string> = {
-  active: '進行中',
+  active: '活躍',
+  silent: '沉默',
+  unanswered: '未回',
   closed: '已關閉',
   pending: '待處理',
   completed: '已完成',

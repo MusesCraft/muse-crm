@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { contactsApi, type Contact, type PaginatedResponse } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { Avatar } from '@/components/avatar';
 import { ChannelBadge } from '@/components/channel-icon';
 import { LoadingSpinner, EmptyState } from '@/components/loading';
-import { Search, ChevronLeft, ChevronRight, Users, ExternalLink } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Users, ExternalLink, ArrowUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('zh-TW', {
@@ -18,11 +19,30 @@ function formatDate(dateStr: string): string {
   });
 }
 
+const priorityConfig: Record<string, { label: string; color: string }> = {
+  high: { label: '高', color: 'bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-400' },
+  medium: { label: '中', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400' },
+  low: { label: '低', color: 'bg-zinc-500/10 text-zinc-600 border-zinc-500/20 dark:text-zinc-400' },
+};
+
+function PriorityBadge({ priority }: { priority?: string }) {
+  const config = priorityConfig[priority || 'low'] || priorityConfig.low;
+  return (
+    <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium', config.color)}>
+      {config.label}
+    </span>
+  );
+}
+
+type SortKey = 'last_seen' | 'priority' | 'conversation_count' | 'name';
+const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
 export default function ContactsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [channel, setChannel] = useState('');
   const [sourceType, setSourceType] = useState('');
+  const [sort, setSort] = useState<SortKey>('last_seen');
 
   const { data, loading, error } = useAsync<PaginatedResponse<Contact>>(
     () =>
@@ -35,6 +55,25 @@ export default function ContactsPage() {
       }),
     [page, search, channel, sourceType]
   );
+
+  const sortedContacts = useMemo(() => {
+    if (!data?.data) return [];
+    const list = [...data.data];
+    list.sort((a, b) => {
+      switch (sort) {
+        case 'priority':
+          return (priorityOrder[a.priority || 'low'] ?? 2) - (priorityOrder[b.priority || 'low'] ?? 2);
+        case 'conversation_count':
+          return b.conversation_count - a.conversation_count;
+        case 'name':
+          return a.name.localeCompare(b.name, 'zh-TW');
+        case 'last_seen':
+        default:
+          return new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime();
+      }
+    });
+    return list;
+  }, [data, sort]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -75,6 +114,21 @@ export default function ContactsPage() {
           <option value="ad">廣告</option>
           <option value="referral">推薦</option>
         </select>
+
+        {/* Sort */}
+        <div className="flex items-center gap-1.5 ml-auto text-xs text-zinc-400 dark:text-zinc-500">
+          <ArrowUpDown className="w-3.5 h-3.5" />
+        </div>
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortKey)}
+          className="px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
+        >
+          <option value="last_seen">按最後活躍</option>
+          <option value="priority">按優先級</option>
+          <option value="conversation_count">按對話數</option>
+          <option value="name">按名稱</option>
+        </select>
       </div>
 
       {/* Table */}
@@ -95,6 +149,9 @@ export default function ContactsPage() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
                   渠道
                 </th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
+                  優先級
+                </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
                   標籤
                 </th>
@@ -108,7 +165,7 @@ export default function ContactsPage() {
               </tr>
             </thead>
             <tbody>
-              {data.data.map((contact) => (
+              {sortedContacts.map((contact) => (
                 <tr
                   key={contact.id}
                   className="border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors"
@@ -126,6 +183,9 @@ export default function ContactsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <ChannelBadge channel={contact.channel} />
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <PriorityBadge priority={contact.priority} />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">

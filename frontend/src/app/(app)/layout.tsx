@@ -31,7 +31,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen">
       <Sidebar />
-      <main className="ml-60 min-h-screen">{children}</main>
+      <main className="ml-[200px] min-h-screen">{children}</main>
     </div>
   );
 }

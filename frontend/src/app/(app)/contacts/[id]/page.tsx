@@ -432,7 +432,16 @@ export default function ContactDetailPage({
         <div className="flex items-start gap-4">
           <Avatar name={contact.name} url={contact.avatar_url} size="lg" />
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-zinc-900 dark:text-white">{contact.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-zinc-900 dark:text-white">{contact.name}</h1>
+              {(() => {
+                const activeConvs = contact.conversations
+                  .filter((c) => c.status !== 'closed')
+                  .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
+                const latestStatus = activeConvs.length > 0 ? activeConvs[0].status : null;
+                return latestStatus ? <StatusBadge status={latestStatus} /> : null;
+              })()}
+            </div>
             {contact.display_name && contact.display_name !== contact.name && (
               <p className="text-sm text-zinc-500 dark:text-zinc-400">{contact.display_name}</p>
             )}

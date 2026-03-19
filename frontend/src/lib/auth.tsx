@@ -131,10 +131,17 @@ export function useAuth(): AuthContextType {
 }
 
 async function fetchMe(token: string): Promise<AuthUser> {
-  const res = await fetch(`${API_BASE}/auth/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error('Token invalid');
-  const data = await res.json();
-  return data.user;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+  try {
+    const res = await fetch(`${API_BASE}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error('Token invalid');
+    const data = await res.json();
+    return data.user;
+  } finally {
+    clearTimeout(timeout);
+  }
 }

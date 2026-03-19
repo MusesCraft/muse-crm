@@ -4,15 +4,22 @@ MUSE CRM — Inbox API
 對話收件匣相關 API 端點。
 """
 
+import logging
+
 from flask import jsonify, request
 from sqlalchemy import desc
 
 from . import api_bp
 from ..models import Conversation, Message, Contact
 from .. import db
+from ..tasks.analysis_tasks import analyze_conversation
+from ..utils.auth import login_required
+
+logger = logging.getLogger(__name__)
 
 
 @api_bp.route('/inbox/conversations', methods=['GET'])
+@login_required
 def list_conversations():
     """
     列出對話列表（分頁）
@@ -77,6 +84,7 @@ def list_conversations():
 
 
 @api_bp.route('/inbox/conversations/<conversation_id>', methods=['GET'])
+@login_required
 def get_conversation_detail(conversation_id):
     """取得對話詳情（包含所有訊息）"""
     conversation = Conversation.query.get_or_404(conversation_id)
@@ -97,7 +105,47 @@ def get_conversation_detail(conversation_id):
     })
 
 
+@api_bp.route('/inbox/conversations/<conversation_id>/analyze', methods=['POST'])
+@login_required
+def trigger_manual_analysis(conversation_id):
+    """
+    手動觸發深度分析（Phase 5A）
+    
+    內部用戶點擊「分析」按鈕時呼叫此端點。
+    使用進階模型（Claude 3.5 Sonnet + GPT-4 fallback）做完整 full_analysis。
+    
+    Returns:
+        202 Accepted（非同步處理）
+    """
+    conversation = Conversation.query.get_or_404(conversation_id)
+    
+    # 檢查是否有訊息
+    message_count = (
+        Message.query
+        .filter_by(conversation_id=conversation.id)
+        .count()
+    )
+    
+    if message_count == 0:
+        return jsonify({
+            'error': '此對話沒有訊息，無法進行分析'
+        }), 400
+    
+    # 觸發非同步深度分析
+    task = analyze_conversation.delay(str(conversation.id), trigger_type='manual')
+    
+    logger.info(f"🔍 手動分析已觸發: conversation={conversation_id}, task={task.id}")
+    
+    return jsonify({
+        'message': '分析任務已提交',
+        'conversation_id': str(conversation.id),
+        'task_id': task.id,
+        'trigger_type': 'manual'
+    }), 202
+
+
 @api_bp.route('/inbox/conversations/<conversation_id>/close', methods=['POST'])
+@login_required
 def close_conversation(conversation_id):
     """手動關閉對話"""
     conversation = Conversation.query.get_or_404(conversation_id)

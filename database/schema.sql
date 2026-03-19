@@ -92,6 +92,10 @@ CREATE TABLE messages (
     meta_message_id VARCHAR(255) UNIQUE,                   -- Meta 平台訊息 ID（冪等性）
     sent_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     is_read         BOOLEAN NOT NULL DEFAULT FALSE,
+    -- 快速分類欄位（Phase 5A: 輕量 per-message triage）
+    quick_intent    VARCHAR(50),                           -- pricing/spec/visit/complaint/greeting/order/followup/other
+    quick_identity  VARCHAR(50),                           -- 設計師/屋主/建材行/工班/unknown
+    quick_analyzed_at TIMESTAMPTZ,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -198,14 +202,15 @@ CREATE INDEX idx_contact_tags_tag ON contact_tags(tag_id);
 -- 9. users（使用者，預留權限系統）
 -- ============================================================
 CREATE TABLE users (
-    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name        VARCHAR(255) NOT NULL,
-    email       VARCHAR(255) UNIQUE,
-    role        VARCHAR(20) NOT NULL DEFAULT 'agent'
-                CHECK (role IN ('admin', 'supervisor', 'agent', 'readonly')),
-    avatar_url  TEXT,
-    is_active   BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name            VARCHAR(255) NOT NULL,
+    email           VARCHAR(255) UNIQUE,
+    password_hash   VARCHAR(255),
+    role            VARCHAR(20) NOT NULL DEFAULT 'agent'
+                    CHECK (role IN ('admin', 'supervisor', 'agent', 'readonly')),
+    avatar_url      TEXT,
+    is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ============================================================

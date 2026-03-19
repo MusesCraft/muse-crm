@@ -195,6 +195,39 @@ FULL_ANALYSIS_USER = """對以下對話進行全面分析：
 # Helper Functions
 # ============================================================
 
+# ============================================================
+# 6. 快速分類 Prompt（輕量 per-message triage）
+# ============================================================
+
+QUICK_TRIAGE_SYSTEM = """你是建材/石材產業客服分類器。只輸出JSON，不要任何其他文字。"""
+
+QUICK_TRIAGE_USER = """分類這則客戶訊息：
+"{message_content}"
+
+JSON格式回覆：
+{{"intent":"pricing|spec|visit|complaint|greeting|order|followup|other","identity":"設計師|屋主|建材行|工班|unknown"}}"""
+
+
+def build_quick_triage_prompt(message_content: str) -> List[Dict[str, str]]:
+    """
+    建構快速分類的 prompt messages（輕量模型用）。
+    
+    只做意圖分類 + 客戶身分辨識，要求極短 JSON 回覆。
+    
+    Args:
+        message_content: 客戶訊息內容
+        
+    Returns:
+        OpenAI-compatible messages 列表
+    """
+    return [
+        {"role": "system", "content": QUICK_TRIAGE_SYSTEM},
+        {"role": "user", "content": QUICK_TRIAGE_USER.format(
+            message_content=message_content
+        )}
+    ]
+
+
 def format_conversation_for_prompt(messages: List[Dict[str, Any]]) -> str:
     """
     將訊息列表格式化為 Prompt 可讀的對話文字。

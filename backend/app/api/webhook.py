@@ -21,6 +21,7 @@ from ..services.contact_service import ContactService
 from ..services.session_service import SessionService
 from ..utils.meta_api import meta_api
 from ..tasks.session_tasks import analyze_message
+from ..tasks.analysis_tasks import quick_triage_message
 
 logger = logging.getLogger(__name__)
 
@@ -337,7 +338,16 @@ def _handle_webhook_message(
             
             logger.info(f"✅ [webhook] 訊息已儲存：conversation={conversation.id}, message={message.id}")
             
-            # ── 6. LLM 分析在 Session 關閉時觸發（PRD §3.4），非 per-message ──
+            # ── 6. 輕量即時分類（Phase 5A: per-message quick triage） ──
+            if message.has_text_content and message.is_from_customer:
+                try:
+                    quick_triage_message.delay(str(message.id))
+                    logger.debug(f"[webhook] 已觸發快速分類：message={message.id}")
+                except Exception as triage_err:
+                    # 快速分類失敗不影響主流程
+                    logger.warning(f"[webhook] 觸發快速分類失敗：{triage_err}")
+            
+            # ── 7. 深度分析在 Session 關閉時觸發（PRD §3.4），非 per-message ──
             # 分析觸發由 SessionService.close_expired_sessions() 和
             # cleanup_expired_sessions celery beat 負責
             

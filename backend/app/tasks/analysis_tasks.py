@@ -32,6 +32,81 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================
+# 0. 快速分類（輕量 per-message triage）
+# ============================================================
+
+@celery.task(
+    bind=True,
+    max_retries=0,  # 失敗不重試（輕量分析失敗不嚴重）
+)
+def quick_triage_message(self, message_id: str):
+    """
+    對單條訊息做快速分類（意圖 + 客戶身分）。
+    
+    使用輕量模型（Gemini Flash Lite），成本 <0.001 USD/message。
+    失敗不重試，不影響主流程。
+
+    Args:
+        message_id: Message UUID
+
+    Returns:
+        分類結果字典
+    """
+    try:
+        message = db.session.get(Message, message_id)
+        if not message:
+            logger.warning(f"[quick_triage] 訊息不存在：{message_id}")
+            return {"success": False, "error": "Message not found"}
+
+        if not message.has_text_content:
+            logger.debug(f"[quick_triage] 訊息無文字內容，跳過：{message_id}")
+            return {"success": True, "skipped": True}
+
+        if message.has_quick_analysis:
+            logger.debug(f"[quick_triage] 訊息已分類，跳過：{message_id}")
+            return {"success": True, "skipped": True}
+
+        llm = get_llm_service()
+        result, usage = llm.quick_triage(message.content)
+
+        # 寫回 message 欄位
+        intent = result.get("intent", "other")
+        identity = result.get("identity", "unknown")
+
+        # 驗證值在允許範圍內
+        valid_intents = {"pricing", "spec", "visit", "complaint", "greeting", "order", "followup", "other"}
+        valid_identities = {"設計師", "屋主", "建材行", "工班", "unknown"}
+
+        message.quick_intent = intent if intent in valid_intents else "other"
+        message.quick_identity = identity if identity in valid_identities else "unknown"
+        message.quick_analyzed_at = datetime.utcnow()
+
+        db.session.commit()
+
+        logger.info(
+            f"[quick_triage] ✅ {message_id}: intent={message.quick_intent}, "
+            f"identity={message.quick_identity}, tokens={usage.get('tokens_used', 0)}"
+        )
+
+        return {
+            "success": True,
+            "message_id": message_id,
+            "intent": message.quick_intent,
+            "identity": message.quick_identity,
+            "tokens_used": usage.get("tokens_used", 0),
+        }
+
+    except LLMServiceError as e:
+        logger.warning(f"[quick_triage] LLM 錯誤 {message_id}: {e}")
+        return {"success": False, "message_id": message_id, "error": str(e)}
+
+    except Exception as e:
+        logger.error(f"[quick_triage] 失敗 {message_id}: {e}", exc_info=True)
+        db.session.rollback()
+        return {"success": False, "message_id": message_id, "error": str(e)}
+
+
+# ============================================================
 # 1. 單條訊息分析
 # ============================================================
 

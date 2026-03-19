@@ -59,6 +59,11 @@ class Message(db.Model):
     )
     is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     
+    # 快速分類欄位（Phase 5A: 輕量 per-message triage）
+    quick_intent: Mapped[Optional[str]] = mapped_column(String(50))
+    quick_identity: Mapped[Optional[str]] = mapped_column(String(50))
+    quick_analyzed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    
     # 審計欄位
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 
@@ -101,6 +106,11 @@ class Message(db.Model):
         return self.sender_type == 'system'
     
     @property
+    def has_quick_analysis(self) -> bool:
+        """檢查是否已完成快速分類"""
+        return self.quick_analyzed_at is not None
+    
+    @property
     def has_text_content(self) -> bool:
         """檢查是否包含文字內容"""
         return bool(self.content and self.content.strip())
@@ -124,5 +134,8 @@ class Message(db.Model):
             'meta_message_id': self.meta_message_id,
             'sent_at': self.sent_at.isoformat() if self.sent_at else None,
             'is_read': self.is_read,
+            'quick_intent': self.quick_intent,
+            'quick_identity': self.quick_identity,
+            'quick_analyzed_at': self.quick_analyzed_at.isoformat() if self.quick_analyzed_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }

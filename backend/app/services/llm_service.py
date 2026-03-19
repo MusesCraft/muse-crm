@@ -27,6 +27,7 @@ from .prompts import (
     build_summary_prompt,
     build_action_prompt,
     build_full_analysis_prompt,
+    build_quick_triage_prompt,
     format_conversation_for_prompt,
 )
 
@@ -41,6 +42,9 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 # 模型優先順序：主要 → fallback
 MODEL_PRIMARY = "anthropic/claude-3.5-sonnet"
 MODEL_FALLBACK = "openai/gpt-4"
+
+# 輕量分類模型（per-message triage，成本 <0.001 USD/message）
+TRIAGE_MODEL = "google/gemini-2.0-flash-lite-001"
 
 # 請求設定
 DEFAULT_TIMEOUT = 30  # 秒
@@ -450,6 +454,38 @@ class LLMService:
             max_tokens=512,
         )
     
+    def quick_triage(
+        self, message_content: str
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """
+        快速分類單條訊息（輕量模型，per-message 自動觸發）。
+        
+        只做意圖分類 + 客戶身分辨識，成本極低。
+        使用輕量模型，timeout 10s，max_tokens 128。
+        不走 fallback（失敗就算了，不嚴重）。
+        
+        Args:
+            message_content: 訊息文字內容
+            
+        Returns:
+            Tuple[分類結果 {"intent": ..., "identity": ...}, 使用資訊]
+        """
+        messages = build_quick_triage_prompt(message_content)
+        
+        # 直接呼叫 _call_with_retry，指定輕量模型，不走 fallback
+        try:
+            result, usage = self._call_with_retry(
+                messages=messages,
+                model=TRIAGE_MODEL,
+                temperature=0.0,
+                max_tokens=128,
+                response_format=None,
+            )
+            return result, usage
+        except LLMServiceError:
+            # 輕量分析不走 fallback，直接拋出
+            raise
+
     def full_analysis(
         self,
         conversation_messages: List[Dict[str, Any]],

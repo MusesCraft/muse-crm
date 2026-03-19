@@ -6,6 +6,7 @@ MUSE CRM — Celery Tasks Module
 
 from .session_tasks import trigger_analysis_task, cleanup_expired_sessions
 from .analysis_tasks import (
+    quick_triage_message,
     analyze_message,
     analyze_conversation,
     batch_analyze_pending,
@@ -16,6 +17,7 @@ from .analysis_tasks import (
 __all__ = [
     'trigger_analysis_task',
     'cleanup_expired_sessions',
+    'quick_triage_message',
     'analyze_message',
     'analyze_conversation',
     'batch_analyze_pending',

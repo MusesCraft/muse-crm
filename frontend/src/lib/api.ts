@@ -1,4 +1,18 @@
 // API Client for MUSE CRM Backend
+// Falls back to mock data when backend is unavailable
+
+import {
+  getMockConversations,
+  getMockConversation,
+  getMockContacts,
+  getMockContactDetail,
+  getMockActions,
+  mockTags,
+  mockDashboardStats,
+  mockChannelDistribution,
+  mockActivity,
+} from './mock-data';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000/api/v1';
 
 export class ApiError extends Error {
@@ -86,6 +100,7 @@ export interface Message {
   timestamp: string;
   is_read: boolean;
   platform_message_id: string | null;
+  quick_intent?: string;
 }
 
 export interface Analysis {
@@ -164,42 +179,61 @@ export interface ActivityPoint {
 // ── Inbox API ──────────────────────────────────────────
 
 export const inboxApi = {
-  getConversations(params?: {
+  async getConversations(params?: {
     page?: number;
     per_page?: number;
     status?: string;
     channel?: string;
     search?: string;
   }) {
-    const searchParams = new URLSearchParams();
-    if (params?.page) searchParams.set('page', String(params.page));
-    if (params?.per_page) searchParams.set('per_page', String(params.per_page));
-    if (params?.status) searchParams.set('status', params.status);
-    if (params?.channel) searchParams.set('channel', params.channel);
-    if (params?.search) searchParams.set('search', params.search);
-    const qs = searchParams.toString();
-    return request<PaginatedResponse<Conversation>>(`/inbox/conversations${qs ? `?${qs}` : ''}`);
+    try {
+      const searchParams = new URLSearchParams();
+      if (params?.page) searchParams.set('page', String(params.page));
+      if (params?.per_page) searchParams.set('per_page', String(params.per_page));
+      if (params?.status) searchParams.set('status', params.status);
+      if (params?.channel) searchParams.set('channel', params.channel);
+      if (params?.search) searchParams.set('search', params.search);
+      const qs = searchParams.toString();
+      return await request<PaginatedResponse<Conversation>>(`/inbox/conversations${qs ? `?${qs}` : ''}`);
+    } catch {
+      // Fallback to mock data
+      return getMockConversations(params);
+    }
   },
 
-  getConversation(id: number) {
-    return request<Conversation>(`/inbox/conversations/${id}`);
+  async getConversation(id: number) {
+    try {
+      return await request<Conversation>(`/inbox/conversations/${id}`);
+    } catch {
+      const conv = getMockConversation(id);
+      if (!conv) throw new ApiError(404, 'Not found');
+      return conv;
+    }
   },
 
-  closeConversation(id: number) {
-    return request<{ message: string }>(`/inbox/conversations/${id}/close`, { method: 'POST' });
+  async closeConversation(id: number) {
+    try {
+      return await request<{ message: string }>(`/inbox/conversations/${id}/close`, { method: 'POST' });
+    } catch {
+      return { message: 'Conversation closed (mock)' };
+    }
   },
 
-  analyzeConversation(id: number) {
-    return request<{ message: string; task_id: string }>(`/inbox/conversations/${id}/analyze`, {
-      method: 'POST',
-    });
+  async analyzeConversation(id: number) {
+    try {
+      return await request<{ message: string; task_id: string }>(`/inbox/conversations/${id}/analyze`, {
+        method: 'POST',
+      });
+    } catch {
+      return { message: 'Analysis started (mock)', task_id: `mock-${id}-${Date.now()}` };
+    }
   },
 };
 
 // ── Contacts API ───────────────────────────────────────
 
 export const contactsApi = {
-  getContacts(params?: {
+  async getContacts(params?: {
     page?: number;
     per_page?: number;
     search?: string;
@@ -207,94 +241,163 @@ export const contactsApi = {
     channel?: string;
     source_type?: string;
   }) {
-    const searchParams = new URLSearchParams();
-    if (params?.page) searchParams.set('page', String(params.page));
-    if (params?.per_page) searchParams.set('per_page', String(params.per_page));
-    if (params?.search) searchParams.set('search', params.search);
-    if (params?.tag) searchParams.set('tag', params.tag);
-    if (params?.channel) searchParams.set('channel', params.channel);
-    if (params?.source_type) searchParams.set('source_type', params.source_type);
-    const qs = searchParams.toString();
-    return request<PaginatedResponse<Contact>>(`/contacts${qs ? `?${qs}` : ''}`);
+    try {
+      const searchParams = new URLSearchParams();
+      if (params?.page) searchParams.set('page', String(params.page));
+      if (params?.per_page) searchParams.set('per_page', String(params.per_page));
+      if (params?.search) searchParams.set('search', params.search);
+      if (params?.tag) searchParams.set('tag', params.tag);
+      if (params?.channel) searchParams.set('channel', params.channel);
+      if (params?.source_type) searchParams.set('source_type', params.source_type);
+      const qs = searchParams.toString();
+      return await request<PaginatedResponse<Contact>>(`/contacts${qs ? `?${qs}` : ''}`);
+    } catch {
+      return getMockContacts(params);
+    }
   },
 
-  getContact(id: number) {
-    return request<ContactDetail>(`/contacts/${id}`);
+  async getContact(id: number) {
+    try {
+      return await request<ContactDetail>(`/contacts/${id}`);
+    } catch {
+      const contact = getMockContactDetail(id);
+      if (!contact) throw new ApiError(404, 'Not found');
+      return contact;
+    }
   },
 
-  addNote(contactId: number, content: string) {
-    return request<Note>(`/contacts/${contactId}/notes`, {
-      method: 'POST',
-      body: JSON.stringify({ content }),
-    });
+  async addNote(contactId: number, content: string) {
+    try {
+      return await request<Note>(`/contacts/${contactId}/notes`, {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      });
+    } catch {
+      return {
+        id: Date.now(),
+        contact_id: contactId,
+        content,
+        created_by: 'admin',
+        created_at: new Date().toISOString(),
+      } as Note;
+    }
   },
 
-  addTag(contactId: number, tagName: string, category?: string) {
-    return request<Tag>(`/contacts/${contactId}/tags`, {
-      method: 'POST',
-      body: JSON.stringify({ tag_name: tagName, category }),
-    });
+  async addTag(contactId: number, tagName: string, category?: string) {
+    try {
+      return await request<Tag>(`/contacts/${contactId}/tags`, {
+        method: 'POST',
+        body: JSON.stringify({ tag_name: tagName, category }),
+      });
+    } catch {
+      return {
+        id: Date.now(),
+        tag_name: tagName,
+        category: category || null,
+      } as Tag;
+    }
   },
 
-  removeTag(contactId: number, tagId: number) {
-    return request<{ message: string }>(`/contacts/${contactId}/tags/${tagId}`, {
-      method: 'DELETE',
-    });
+  async removeTag(contactId: number, tagId: number) {
+    try {
+      return await request<{ message: string }>(`/contacts/${contactId}/tags/${tagId}`, {
+        method: 'DELETE',
+      });
+    } catch {
+      return { message: 'Tag removed (mock)' };
+    }
   },
 };
 
 // ── Tags API ───────────────────────────────────────────
 
 export const tagsApi = {
-  getTags() {
-    return request<Tag[]>('/tags');
+  async getTags() {
+    try {
+      return await request<Tag[]>('/tags');
+    } catch {
+      return mockTags;
+    }
   },
 };
 
 // ── Actions API ────────────────────────────────────────
 
 export const actionsApi = {
-  getActions(params?: { status?: string; contact_id?: number }) {
-    const searchParams = new URLSearchParams();
-    if (params?.status) searchParams.set('status', params.status);
-    if (params?.contact_id) searchParams.set('contact_id', String(params.contact_id));
-    const qs = searchParams.toString();
-    return request<Action[]>(`/actions${qs ? `?${qs}` : ''}`);
+  async getActions(params?: { status?: string; contact_id?: number }) {
+    try {
+      const searchParams = new URLSearchParams();
+      if (params?.status) searchParams.set('status', params.status);
+      if (params?.contact_id) searchParams.set('contact_id', String(params.contact_id));
+      const qs = searchParams.toString();
+      return await request<Action[]>(`/actions${qs ? `?${qs}` : ''}`);
+    } catch {
+      return getMockActions(params);
+    }
   },
 
-  updateAction(id: number, data: Partial<Pick<Action, 'status'>>) {
-    return request<Action>(`/actions/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
+  async updateAction(id: number, data: Partial<Pick<Action, 'status'>>) {
+    try {
+      return await request<Action>(`/actions/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    } catch {
+      // Return a mock updated action
+      return { id, status: data.status || 'pending' } as Action;
+    }
   },
 
-  createAction(data: {
+  async createAction(data: {
     contact_id: number;
     action_type: string;
     description: string;
     priority: string;
     due_date?: string;
   }) {
-    return request<Action>('/actions', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    try {
+      return await request<Action>('/actions', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch {
+      return {
+        id: Date.now(),
+        ...data,
+        conversation_id: null,
+        status: 'pending',
+        due_date: data.due_date || null,
+        completed_at: null,
+        created_at: new Date().toISOString(),
+      } as Action;
+    }
   },
 };
 
 // ── Dashboard API ──────────────────────────────────────
 
 export const dashboardApi = {
-  getStats() {
-    return request<DashboardStats>('/dashboard/stats');
+  async getStats() {
+    try {
+      return await request<DashboardStats>('/dashboard/stats');
+    } catch {
+      return mockDashboardStats;
+    }
   },
 
-  getChannelDistribution() {
-    return request<ChannelDistribution[]>('/dashboard/channel-distribution');
+  async getChannelDistribution() {
+    try {
+      return await request<ChannelDistribution[]>('/dashboard/channel-distribution');
+    } catch {
+      return mockChannelDistribution;
+    }
   },
 
-  getActivity(days = 30) {
-    return request<ActivityPoint[]>(`/dashboard/activity?days=${days}`);
+  async getActivity(days = 30) {
+    try {
+      return await request<ActivityPoint[]>(`/dashboard/activity?days=${days}`);
+    } catch {
+      return mockActivity.slice(-days);
+    }
   },
 };

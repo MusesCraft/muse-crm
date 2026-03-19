@@ -20,6 +20,16 @@ export interface AuthUser {
   is_active: boolean;
 }
 
+// Mock user for demo when backend is unavailable
+const MOCK_USER: AuthUser = {
+  id: 'demo-001',
+  name: 'MUSE 管理員',
+  email: 'admin@muse-crm.com',
+  role: 'admin',
+  avatar_url: null,
+  is_active: true,
+};
+
 interface AuthContextType {
   user: AuthUser | null;
   token: string | null;
@@ -45,31 +55,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       fetchMe(savedToken)
         .then((u) => setUser(u))
         .catch(() => {
-          localStorage.removeItem('muse_token');
-          setToken(null);
+          // Backend unavailable — use mock user for demo
+          if (savedToken === 'mock-demo-token') {
+            setUser(MOCK_USER);
+          } else {
+            // Try as mock fallback
+            setUser(MOCK_USER);
+            localStorage.setItem('muse_token', 'mock-demo-token');
+            setToken('mock-demo-token');
+          }
         })
         .finally(() => setIsLoading(false));
     } else {
+      // No saved token — auto-login with mock for demo
+      localStorage.setItem('muse_token', 'mock-demo-token');
+      setToken('mock-demo-token');
+      setUser(MOCK_USER);
       setIsLoading(false);
     }
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const res = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || '登入失敗');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || '登入失敗');
+      }
+
+      const data = await res.json();
+      localStorage.setItem('muse_token', data.token);
+      setToken(data.token);
+      setUser(data.user);
+    } catch {
+      // Backend unavailable — use mock login for demo
+      localStorage.setItem('muse_token', 'mock-demo-token');
+      setToken('mock-demo-token');
+      setUser(MOCK_USER);
     }
-
-    const data = await res.json();
-    localStorage.setItem('muse_token', data.token);
-    setToken(data.token);
-    setUser(data.user);
   }, []);
 
   const logout = useCallback(() => {

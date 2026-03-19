@@ -100,9 +100,19 @@ function MessageBubble({ message }: { message: Message }) {
         )}
 
         {/* Quick Intent Badge */}
-        {(message as Message & { quick_intent?: string }).quick_intent && (
-          <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30">
-            {(message as Message & { quick_intent?: string }).quick_intent}
+        {message.quick_intent && (
+          <span className={cn(
+            'inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium border',
+            message.quick_intent === '投訴' && 'bg-red-500/20 text-red-300 border-red-500/30',
+            message.quick_intent === '詢價' && 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+            message.quick_intent === '規格' && 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+            message.quick_intent === '參觀' && 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+            message.quick_intent === '下單' && 'bg-green-500/20 text-green-300 border-green-500/30',
+            message.quick_intent === '招呼' && 'bg-zinc-500/20 text-zinc-300 border-zinc-500/30',
+            message.quick_intent === '跟進' && 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+            !['投訴','詢價','規格','參觀','下單','招呼','跟進'].includes(message.quick_intent) && 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+          )}>
+            {message.quick_intent}
           </span>
         )}
 

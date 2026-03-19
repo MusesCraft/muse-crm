@@ -10,9 +10,11 @@ from sqlalchemy import desc, or_, func
 from . import api_bp
 from ..models import Contact, ContactTag, Tag, UserNote
 from .. import db
+from ..utils.auth import login_required
 
 
 @api_bp.route('/contacts', methods=['GET'])
+@login_required
 def list_contacts():
     """
     列出客戶列表（分頁）
@@ -95,6 +97,7 @@ def list_contacts():
 
 
 @api_bp.route('/contacts/<contact_id>', methods=['GET'])
+@login_required
 def get_contact_detail(contact_id):
     """取得客戶 360 檢視"""
     contact = Contact.query.get_or_404(contact_id)
@@ -147,6 +150,7 @@ def get_contact_detail(contact_id):
 
 
 @api_bp.route('/contacts/<contact_id>/notes', methods=['POST'])
+@login_required
 def add_contact_note(contact_id):
     """新增客戶備註"""
     contact = Contact.query.get_or_404(contact_id)
@@ -171,6 +175,7 @@ def add_contact_note(contact_id):
 
 
 @api_bp.route('/contacts/<contact_id>/tags', methods=['POST'])
+@login_required
 def add_contact_tag(contact_id):
     """為客戶新增標籤"""
     contact = Contact.query.get_or_404(contact_id)
@@ -218,6 +223,7 @@ def add_contact_tag(contact_id):
 
 
 @api_bp.route('/contacts/<contact_id>/tags/<tag_id>', methods=['DELETE'])
+@login_required
 def remove_contact_tag(contact_id, tag_id):
     """移除客戶標籤"""
     contact_tag = ContactTag.query.filter_by(

@@ -19,6 +19,8 @@ import {
   Paperclip,
   Check,
   CheckCheck,
+  Search,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -97,6 +99,13 @@ function MessageBubble({ message }: { message: Message }) {
           <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
         )}
 
+        {/* Quick Intent Badge */}
+        {(message as Message & { quick_intent?: string }).quick_intent && (
+          <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30">
+            {(message as Message & { quick_intent?: string }).quick_intent}
+          </span>
+        )}
+
         {/* Meta */}
         <div
           className={cn(
@@ -159,6 +168,7 @@ function AnalysisCard({ analysis }: { analysis: Analysis }) {
 
 export function ConversationDetail({ conversationId, onClose }: ConversationDetailProps) {
   const [closing, setClosing] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
 
   const { data: conv, loading, error, refetch } = useAsync<Conversation>(
     () => inboxApi.getConversation(conversationId),
@@ -176,6 +186,20 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
       // ignore
     } finally {
       setClosing(false);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!conv || analyzing) return;
+    setAnalyzing(true);
+    try {
+      await inboxApi.analyzeConversation(conv.id);
+      // 等待一下再刷新（分析可能需要時間）
+      setTimeout(() => refetch(), 2000);
+    } catch {
+      // ignore
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -216,6 +240,21 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               {conv.message_count} 則訊息
             </span>
           </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAnalyze}
+            disabled={analyzing}
+            className="text-zinc-400 hover:text-purple-400"
+          >
+            {analyzing ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+            ) : (
+              <Search className="w-3.5 h-3.5 mr-1" />
+            )}
+            {analyzing ? '分析中...' : '🔍 深度分析'}
+          </Button>
 
           {conv.status === 'active' && (
             <Button

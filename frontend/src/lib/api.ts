@@ -8,15 +8,31 @@ export class ApiError extends Error {
   }
 }
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  const token = localStorage.getItem('muse_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
   const res = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
       ...options?.headers,
     },
   });
+
+  // 401 → redirect to login
+  if (res.status === 401) {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('muse_token');
+      window.location.href = '/login';
+    }
+    throw new ApiError(401, 'Unauthorized');
+  }
 
   if (!res.ok) {
     const body = await res.text();
@@ -171,6 +187,12 @@ export const inboxApi = {
 
   closeConversation(id: number) {
     return request<{ message: string }>(`/inbox/conversations/${id}/close`, { method: 'POST' });
+  },
+
+  analyzeConversation(id: number) {
+    return request<{ message: string; task_id: string }>(`/inbox/conversations/${id}/analyze`, {
+      method: 'POST',
+    });
   },
 };
 

@@ -10,9 +10,11 @@ from sqlalchemy import desc, and_
 from . import api_bp
 from ..models import Action, Contact
 from .. import db
+from ..utils.auth import login_required
 
 
 @api_bp.route('/actions', methods=['GET'])
+@login_required
 def list_actions():
     """
     列出待辦動作列表（分頁）
@@ -80,6 +82,7 @@ def list_actions():
 
 
 @api_bp.route('/actions/<action_id>/status', methods=['PATCH'])
+@login_required
 def update_action_status(action_id):
     """更新動作狀態"""
     action = Action.query.get_or_404(action_id)
@@ -113,6 +116,7 @@ def update_action_status(action_id):
 
 
 @api_bp.route('/actions', methods=['POST'])
+@login_required
 def create_action():
     """建立新的待辦動作"""
     data = request.get_json()

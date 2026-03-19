@@ -11,9 +11,11 @@ from sqlalchemy import func, and_, distinct
 from . import api_bp
 from ..models import Contact, Conversation, Message, Action, Tag, ContactTag, Analysis
 from .. import db
+from ..utils.auth import login_required
 
 
 @api_bp.route('/dashboard/overview', methods=['GET'])
+@login_required
 def dashboard_overview():
     """
     Dashboard 總覽數據
@@ -94,6 +96,7 @@ def dashboard_overview():
 
 
 @api_bp.route('/dashboard/trends', methods=['GET'])
+@login_required
 def conversation_trends():
     """
     對話量趨勢數據（按日統計）
@@ -131,6 +134,7 @@ def conversation_trends():
 
 
 @api_bp.route('/dashboard/channels', methods=['GET'])
+@login_required
 def channel_distribution():
     """渠道分布統計"""
     results = (
@@ -156,6 +160,7 @@ def channel_distribution():
 
 
 @api_bp.route('/dashboard/tags', methods=['GET'])
+@login_required
 def tag_distribution():
     """標籤分布統計（Top 10）"""
     results = (
@@ -184,6 +189,7 @@ def tag_distribution():
 
 
 @api_bp.route('/dashboard/actions/completion', methods=['GET'])
+@login_required
 def action_completion_rate():
     """待辦動作完成率統計"""
     total_actions = Action.query.count()
@@ -218,6 +224,7 @@ def action_completion_rate():
 
 
 @api_bp.route('/dashboard/export', methods=['GET'])
+@login_required
 def export_dashboard_csv():
     """匯出 Dashboard 數據為 CSV"""
     # TODO: 實作 CSV 匯出功能

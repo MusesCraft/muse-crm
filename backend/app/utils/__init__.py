@@ -6,9 +6,13 @@ MUSE CRM — Utils Module
 
 from .error_handler import register_error_handlers, handle_llm_error
 from .meta_api import MetaGraphAPI
+from .auth import login_required, admin_required, generate_token
 
 __all__ = [
     'register_error_handlers',
     'handle_llm_error',
-    'MetaGraphAPI'
+    'MetaGraphAPI',
+    'login_required',
+    'admin_required',
+    'generate_token',
 ]

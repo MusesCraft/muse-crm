@@ -10,9 +10,11 @@ from sqlalchemy import func
 from . import api_bp
 from ..models import Tag, ContactTag, Contact
 from .. import db
+from ..utils.auth import login_required
 
 
 @api_bp.route('/tags', methods=['GET'])
+@login_required
 def list_tags():
     """
     列出所有標籤
@@ -56,6 +58,7 @@ def list_tags():
 
 
 @api_bp.route('/tags/categories', methods=['GET'])
+@login_required
 def list_tag_categories():
     """列出所有標籤分類"""
     categories = (
@@ -70,6 +73,7 @@ def list_tag_categories():
 
 
 @api_bp.route('/tags', methods=['POST'])
+@login_required
 def create_tag():
     """建立新標籤"""
     data = request.get_json()
@@ -99,6 +103,7 @@ def create_tag():
 
 
 @api_bp.route('/tags/<tag_id>', methods=['PATCH'])
+@login_required
 def update_tag(tag_id):
     """更新標籤資訊"""
     tag = Tag.query.get_or_404(tag_id)
@@ -135,6 +140,7 @@ def update_tag(tag_id):
 
 
 @api_bp.route('/tags/<tag_id>', methods=['DELETE'])
+@login_required
 def delete_tag(tag_id):
     """刪除標籤"""
     tag = Tag.query.get_or_404(tag_id)
@@ -156,6 +162,7 @@ def delete_tag(tag_id):
 
 
 @api_bp.route('/tags/<tag_id>/contacts', methods=['GET'])
+@login_required
 def list_contacts_by_tag(tag_id):
     """列出使用特定標籤的客戶"""
     tag = Tag.query.get_or_404(tag_id)

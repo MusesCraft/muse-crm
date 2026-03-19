@@ -37,6 +37,10 @@ class BaseConfig:
     META_VERIFY_TOKEN = os.environ.get('META_VERIFY_TOKEN', 'muse_crm_verify')
     META_PAGE_TOKEN = os.environ.get('META_PAGE_TOKEN')
     
+    # JWT Authentication
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET', 'dev-secret-key')
+    JWT_EXPIRY_HOURS = int(os.environ.get('JWT_EXPIRY_HOURS', '24'))
+    
     # Celery
     CELERY_BROKER_URL = REDIS_URL
     CELERY_RESULT_BACKEND = REDIS_URL

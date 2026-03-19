@@ -10,6 +10,7 @@ from sqlalchemy import String, Text, DateTime, Boolean, CheckConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
+from werkzeug.security import generate_password_hash, check_password_hash
 import uuid
 
 from .. import db
@@ -30,6 +31,9 @@ class User(db.Model):
     # 基本資訊
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[Optional[str]] = mapped_column(String(255), unique=True)
+    
+    # 認證
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255))
     
     # 權限和狀態
     role: Mapped[str] = mapped_column(String(20), nullable=False, default='agent')  # admin/supervisor/agent/readonly
@@ -57,6 +61,16 @@ class User(db.Model):
     
     def __repr__(self) -> str:
         return f"<User {self.name} ({self.role})>"
+    
+    def set_password(self, password: str) -> None:
+        """設定密碼（hash 儲存）"""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password: str) -> bool:
+        """驗證密碼"""
+        if not self.password_hash:
+            return False
+        return check_password_hash(self.password_hash, password)
     
     @property
     def is_admin(self) -> bool:

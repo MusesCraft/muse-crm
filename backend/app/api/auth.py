@@ -16,7 +16,7 @@ from ..utils.auth import generate_token, login_required, admin_required
 logger = logging.getLogger(__name__)
 
 
-@api_bp.route('/v1/auth/login', methods=['POST'])
+@api_bp.route('/auth/login', methods=['POST'])
 def auth_login():
     """
     用戶登入
@@ -52,7 +52,7 @@ def auth_login():
     })
 
 
-@api_bp.route('/v1/auth/register', methods=['POST'])
+@api_bp.route('/auth/register', methods=['POST'])
 def auth_register():
     """
     用戶註冊
@@ -123,7 +123,7 @@ def auth_register():
     }), 201
 
 
-@api_bp.route('/v1/auth/me', methods=['GET'])
+@api_bp.route('/auth/me', methods=['GET'])
 @login_required
 def auth_me():
     """
@@ -136,7 +136,7 @@ def auth_me():
     })
 
 
-@api_bp.route('/v1/auth/change-password', methods=['POST'])
+@api_bp.route('/auth/change-password', methods=['POST'])
 @login_required
 def auth_change_password():
     """

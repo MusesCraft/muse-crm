@@ -5,6 +5,7 @@ MUSE CRM — Flask Application Factory
 """
 
 from flask import Flask
+from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from celery import Celery
@@ -34,13 +35,14 @@ def create_app(config_name: str = 'development') -> Flask:
     # 初始化擴展
     db.init_app(app)
     migrate.init_app(app, db)
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
     
     # 配置 Celery
     _configure_celery(app, celery)
     
     # 註冊 API Blueprint
     from .api import api_bp
-    app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(api_bp, url_prefix='/api/v1')
     
     # Health check endpoint
     @app.route('/api/health')

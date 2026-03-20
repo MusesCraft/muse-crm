@@ -84,7 +84,7 @@ def list_contacts():
         contacts.append(contact_dict)
     
     return jsonify({
-        'contacts': contacts,
+        'data': contacts,
         'pagination': {
             'page': page,
             'per_page': per_page,

@@ -223,6 +223,89 @@ def action_completion_rate():
     })
 
 
+@api_bp.route('/dashboard/stats', methods=['GET'])
+@login_required
+def dashboard_stats():
+    """
+    Dashboard 統計數據（簡化版，供前端 DashboardStats 使用）
+    
+    Returns flat object:
+        { total_contacts, total_conversations, active_conversations, total_messages, pending_actions }
+    """
+    total_contacts = Contact.query.filter(Contact.is_merged == False).count()
+    total_conversations = Conversation.query.count()
+    active_conversations = Conversation.query.filter(
+        Conversation.status == 'active'
+    ).count()
+    total_messages = Message.query.count()
+    pending_actions = Action.query.filter(
+        Action.status.in_(['pending', 'assigned', 'in_progress'])
+    ).count()
+    
+    return jsonify({
+        'total_contacts': total_contacts,
+        'total_conversations': total_conversations,
+        'active_conversations': active_conversations,
+        'total_messages': total_messages,
+        'pending_actions': pending_actions,
+    })
+
+
+@api_bp.route('/dashboard/channel-distribution', methods=['GET'])
+@login_required
+def channel_distribution_compat():
+    """渠道分布統計（前端相容別名）"""
+    return channel_distribution()
+
+
+@api_bp.route('/dashboard/activity', methods=['GET'])
+@login_required
+def dashboard_activity():
+    """
+    活動趨勢（前端相容格式）
+    
+    Returns: [{ date, messages, conversations }]
+    """
+    days = request.args.get('days', 30, type=int)
+    start_date = datetime.utcnow() - timedelta(days=days)
+    
+    # 按日統計對話數
+    conv_results = dict(
+        db.session.query(
+            func.date(Conversation.created_at).label('date'),
+            func.count(Conversation.id).label('count')
+        )
+        .filter(Conversation.created_at >= start_date)
+        .group_by(func.date(Conversation.created_at))
+        .all()
+    )
+    
+    # 按日統計訊息數
+    msg_results = dict(
+        db.session.query(
+            func.date(Message.sent_at).label('date'),
+            func.count(Message.id).label('count')
+        )
+        .filter(Message.sent_at >= start_date)
+        .group_by(func.date(Message.sent_at))
+        .all()
+    )
+    
+    # 合併所有日期
+    all_dates = sorted(set(list(conv_results.keys()) + list(msg_results.keys())))
+    
+    activity = [
+        {
+            'date': d.isoformat() if hasattr(d, 'isoformat') else str(d),
+            'messages': msg_results.get(d, 0),
+            'conversations': conv_results.get(d, 0),
+        }
+        for d in all_dates
+    ]
+    
+    return jsonify(activity)
+
+
 @api_bp.route('/dashboard/export', methods=['GET'])
 @login_required
 def export_dashboard_csv():

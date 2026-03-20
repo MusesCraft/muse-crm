@@ -65,6 +65,7 @@ class Tag(db.Model):
         return {
             'id': str(self.id),
             'name': self.name,
+            'tag_name': self.name,          # 前端相容欄位
             'category': self.category,
             'is_system': self.is_system,
             'created_at': self.created_at.isoformat() if self.created_at else None,

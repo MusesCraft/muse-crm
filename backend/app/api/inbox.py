@@ -71,7 +71,7 @@ def list_conversations():
         conversations.append(conv_dict)
     
     return jsonify({
-        'conversations': conversations,
+        'data': conversations,
         'pagination': {
             'page': page,
             'per_page': per_page,

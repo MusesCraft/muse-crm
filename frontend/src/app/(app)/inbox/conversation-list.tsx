@@ -25,7 +25,8 @@ function formatTime(dateStr: string): string {
   return d.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' });
 }
 
-function truncate(str: string, len: number): string {
+function truncate(str: string | null | undefined, len: number): string {
+  if (!str) return '';
   return str.length > len ? str.slice(0, len) + '…' : str;
 }
 
@@ -154,7 +155,7 @@ export function ConversationList({
                     {conv.contact?.name || '未知客戶'}
                   </span>
                   <span className="text-xs text-zinc-400 dark:text-zinc-500 flex-shrink-0">
-                    {conv.last_message ? formatTime(conv.last_message.timestamp) : ''}
+                    {conv.last_message?.timestamp ? formatTime(conv.last_message.timestamp) : ''}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">

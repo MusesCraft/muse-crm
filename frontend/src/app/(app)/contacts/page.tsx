@@ -10,8 +10,11 @@ import { LoadingSpinner, EmptyState } from '@/components/loading';
 import { Search, ChevronLeft, ChevronRight, Users, ExternalLink, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('zh-TW', {
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('zh-TW', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -69,7 +72,7 @@ export default function ContactsPage() {
           return a.name.localeCompare(b.name, 'zh-TW');
         case 'last_seen':
         default:
-          return new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime();
+          return (new Date(b.last_seen || 0).getTime()) - (new Date(a.last_seen || 0).getTime());
       }
     });
     return list;

@@ -1,4 +1,5 @@
 // API Client for MUSE CRM Backend
+// Transforms backend response fields to frontend types
 // Falls back to mock data when backend is unavailable
 
 import {
@@ -174,6 +175,140 @@ export interface ActivityPoint {
   conversations: number;
 }
 
+// ── Backend → Frontend Transformers ───────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformContact(raw: any): Contact {
+  return {
+    id: raw.id,
+    platform_id: raw.id?.toString() || '',
+    name: raw.name || raw.display_name || '',
+    display_name: raw.display_name ?? null,
+    channel: raw.source_channel || raw.channel || '',
+    avatar_url: raw.avatar_url ?? null,
+    source_type: raw.source_type || 'organic',
+    first_seen: raw.first_seen_at || raw.first_seen || raw.created_at || '',
+    last_seen: raw.last_active_at || raw.last_seen || raw.updated_at || '',
+    conversation_count: raw.conversation_count ?? 0,
+    tags: raw.tags?.map(transformTag) || [],
+    priority: raw.priority || undefined,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformTag(raw: any): Tag {
+  return {
+    id: raw.id,
+    tag_name: raw.tag_name || raw.name || '',
+    category: raw.category ?? null,
+    contact_count: raw.contact_count,
+    created_at: raw.created_at,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformMessage(raw: any): Message {
+  return {
+    id: raw.id,
+    conversation_id: raw.conversation_id,
+    sender_type: raw.sender_type,
+    message_type: raw.message_type || 'text',
+    content: raw.content || '',
+    media_url: raw.media_url ?? null,
+    timestamp: raw.sent_at || raw.timestamp || raw.created_at || '',
+    is_read: raw.is_read ?? false,
+    platform_message_id: raw.meta_message_id || raw.platform_message_id || null,
+    quick_intent: raw.quick_intent || undefined,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformAnalysis(raw: any): Analysis {
+  // Backend returns separate fields; pack them into a unified `result` object
+  const result: Record<string, unknown> = raw.result || {};
+  if (!raw.result) {
+    if (raw.demand_summary) result.demand_summary = raw.demand_summary;
+    if (raw.mentioned_products) result.mentioned_products = raw.mentioned_products;
+    if (raw.suggested_tags) result.suggested_tags = raw.suggested_tags;
+    if (raw.conversation_summary) result.conversation_summary = raw.conversation_summary;
+    if (raw.suggested_action) result.suggested_action = raw.suggested_action;
+    if (raw.sentiment) result.sentiment = raw.sentiment;
+    if (raw.intent) result.intent = raw.intent;
+    if (raw.urgency) result.urgency = raw.urgency;
+    if (raw.customer_stage) result.customer_stage = raw.customer_stage;
+    if (raw.customer_name) result.customer_name = raw.customer_name;
+  }
+
+  return {
+    id: raw.id,
+    conversation_id: raw.conversation_id,
+    analysis_type: raw.analysis_type || raw.trigger_type || 'full_analysis',
+    result,
+    model_used: raw.model_used || '',
+    created_at: raw.created_at || '',
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformConversation(raw: any): Conversation {
+  return {
+    id: raw.id,
+    contact_id: raw.contact_id,
+    channel: raw.channel || '',
+    status: raw.status || 'active',
+    urgency: raw.urgency || undefined,
+    started_at: raw.started_at || raw.created_at || '',
+    ended_at: raw.closed_at || raw.ended_at || null,
+    message_count: raw.message_count ?? 0,
+    platform_conversation_id: raw.platform_conversation_id || null,
+    contact: raw.contact ? transformContact(raw.contact) : undefined,
+    last_message: raw.last_message ? transformMessage(raw.last_message) : undefined,
+    messages: raw.messages?.map(transformMessage),
+    analyses: raw.analyses?.map(transformAnalysis),
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformAction(raw: any): Action {
+  return {
+    id: raw.id,
+    contact_id: raw.contact_id,
+    conversation_id: raw.conversation_id ?? null,
+    action_type: raw.action_type || raw.source || 'followup',
+    description: raw.description || '',
+    priority: raw.priority || 'medium',
+    status: raw.status || 'pending',
+    due_date: raw.due_date ?? null,
+    completed_at: raw.completed_at ?? null,
+    created_at: raw.created_at || '',
+    contact: raw.contact ? transformContact(raw.contact) : undefined,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformNote(raw: any): Note {
+  return {
+    id: raw.id,
+    contact_id: raw.contact_id,
+    content: raw.content || '',
+    created_by: raw.created_by || raw.author_id || 'system',
+    created_at: raw.created_at || '',
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformContactDetail(raw: any): ContactDetail {
+  const base = transformContact(raw);
+  return {
+    ...base,
+    tags: raw.tags?.map(transformTag) || [],
+    conversations: raw.conversations?.map(transformConversation) || [],
+    analyses: raw.analyses?.map(transformAnalysis) || [],
+    actions: raw.actions?.map(transformAction) || [],
+    notes: raw.notes?.map(transformNote) || [],
+  };
+}
+
 // ── Inbox API ──────────────────────────────────────────
 
 export const inboxApi = {
@@ -192,16 +327,34 @@ export const inboxApi = {
       if (params?.channel) searchParams.set('channel', params.channel);
       if (params?.search) searchParams.set('search', params.search);
       const qs = searchParams.toString();
-      return await request<PaginatedResponse<Conversation>>(`/inbox/conversations${qs ? `?${qs}` : ''}`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = await request<any>(`/inbox/conversations${qs ? `?${qs}` : ''}`);
+      return {
+        data: (raw.data || []).map(transformConversation),
+        pagination: raw.pagination,
+      } as PaginatedResponse<Conversation>;
     } catch {
-      // Fallback to mock data
       return getMockConversations(params);
     }
   },
 
   async getConversation(id: string | number) {
     try {
-      return await request<Conversation>(`/inbox/conversations/${id}`);
+      // Backend returns { conversation, contact, messages, analyses }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = await request<any>(`/inbox/conversations/${id}`);
+
+      // Handle nested response format from backend
+      if (raw.conversation) {
+        const conv = transformConversation(raw.conversation);
+        conv.contact = raw.contact ? transformContact(raw.contact) : conv.contact;
+        conv.messages = raw.messages?.map(transformMessage) || conv.messages;
+        conv.analyses = raw.analyses?.map(transformAnalysis) || conv.analyses;
+        return conv;
+      }
+
+      // Handle flat format (if backend returns flat conversation)
+      return transformConversation(raw);
     } catch {
       const conv = getMockConversation(id);
       if (!conv) throw new ApiError(404, 'Not found');
@@ -248,7 +401,12 @@ export const contactsApi = {
       if (params?.channel) searchParams.set('channel', params.channel);
       if (params?.source_type) searchParams.set('source_type', params.source_type);
       const qs = searchParams.toString();
-      return await request<PaginatedResponse<Contact>>(`/contacts${qs ? `?${qs}` : ''}`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = await request<any>(`/contacts${qs ? `?${qs}` : ''}`);
+      return {
+        data: (raw.data || []).map(transformContact),
+        pagination: raw.pagination,
+      } as PaginatedResponse<Contact>;
     } catch {
       return getMockContacts(params);
     }
@@ -256,7 +414,9 @@ export const contactsApi = {
 
   async getContact(id: string | number) {
     try {
-      return await request<ContactDetail>(`/contacts/${id}`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = await request<any>(`/contacts/${id}`);
+      return transformContactDetail(raw);
     } catch {
       const contact = getMockContactDetail(id);
       if (!contact) throw new ApiError(404, 'Not found');
@@ -266,10 +426,14 @@ export const contactsApi = {
 
   async addNote(contactId: string | number, content: string) {
     try {
-      return await request<Note>(`/contacts/${contactId}/notes`, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = await request<any>(`/contacts/${contactId}/notes`, {
         method: 'POST',
         body: JSON.stringify({ content }),
       });
+      // Backend wraps in { message, note }
+      const noteData = raw.note || raw;
+      return transformNote(noteData);
     } catch {
       return {
         id: Date.now(),
@@ -283,10 +447,14 @@ export const contactsApi = {
 
   async addTag(contactId: string | number, tagName: string, category?: string) {
     try {
-      return await request<Tag>(`/contacts/${contactId}/tags`, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = await request<any>(`/contacts/${contactId}/tags`, {
         method: 'POST',
         body: JSON.stringify({ tag_name: tagName, category }),
       });
+      // Backend wraps in { message, tag }
+      const tagData = raw.tag || raw;
+      return transformTag(tagData);
     } catch {
       return {
         id: Date.now(),
@@ -312,7 +480,9 @@ export const contactsApi = {
 export const tagsApi = {
   async getTags() {
     try {
-      return await request<Tag[]>('/tags');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = await request<any[]>('/tags');
+      return (raw || []).map(transformTag);
     } catch {
       return mockTags;
     }
@@ -330,7 +500,9 @@ export const actionsApi = {
       if (params?.sort) searchParams.set('sort', params.sort);
       if (params?.contact_id) searchParams.set('contact_id', String(params.contact_id));
       const qs = searchParams.toString();
-      return await request<Action[]>(`/actions${qs ? `?${qs}` : ''}`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = await request<any[]>(`/actions${qs ? `?${qs}` : ''}`);
+      return (raw || []).map(transformAction);
     } catch {
       return getMockActions(params);
     }
@@ -338,10 +510,14 @@ export const actionsApi = {
 
   async updateAction(id: string | number, data: Partial<Pick<Action, 'status'>>) {
     try {
-      return await request<Action>(`/actions/${id}`, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = await request<any>(`/actions/${id}/status`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       });
+      // Backend wraps in { message, action }
+      const actionData = raw.action || raw;
+      return transformAction(actionData);
     } catch {
       // Return a mock updated action
       return { id, status: data.status || 'pending' } as Action;
@@ -356,10 +532,14 @@ export const actionsApi = {
     due_date?: string;
   }) {
     try {
-      return await request<Action>('/actions', {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = await request<any>('/actions', {
         method: 'POST',
         body: JSON.stringify(data),
       });
+      // Backend wraps in { message, action }
+      const actionData = raw.action || raw;
+      return transformAction(actionData);
     } catch {
       return {
         id: Date.now(),

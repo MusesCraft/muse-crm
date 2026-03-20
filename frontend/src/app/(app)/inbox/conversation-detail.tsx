@@ -124,10 +124,10 @@ function MessageBubble({ message }: { message: Message }) {
           )}
         >
           <span className={cn('text-[10px]', isCustomer ? 'text-zinc-400 dark:text-zinc-500' : 'text-indigo-200')}>
-            {new Date(message.timestamp).toLocaleTimeString('zh-TW', {
+            {message.timestamp ? new Date(message.timestamp).toLocaleTimeString('zh-TW', {
               hour: '2-digit',
               minute: '2-digit',
-            })}
+            }) : ''}
           </span>
           {!isCustomer && (
             message.is_read ? (

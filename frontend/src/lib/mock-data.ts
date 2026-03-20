@@ -1008,9 +1008,9 @@ export function getMockConversations(params?: {
 
   // Sort by last message time (most recent first)
   filtered.sort((a, b) => {
-    const aTime = a.last_message?.timestamp || a.started_at;
-    const bTime = b.last_message?.timestamp || b.started_at;
-    return new Date(bTime).getTime() - new Date(aTime).getTime();
+    const aTime = a.last_message?.timestamp || a.started_at || '';
+    const bTime = b.last_message?.timestamp || b.started_at || '';
+    return new Date(bTime || 0).getTime() - new Date(aTime || 0).getTime();
   });
 
   const page = params?.page || 1;

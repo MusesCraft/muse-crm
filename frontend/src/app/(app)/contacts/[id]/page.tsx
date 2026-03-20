@@ -29,16 +29,22 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('zh-TW', {
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('zh-TW', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   });
 }
 
-function formatDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString('zh-TW', {
+function formatDateTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleString('zh-TW', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',

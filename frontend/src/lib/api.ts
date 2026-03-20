@@ -39,12 +39,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     },
   });
 
-  // 401 → redirect to login
+  // 401 → throw error (callers catch and fall back to mock data)
   if (res.status === 401) {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('muse_token');
-      window.location.href = '/login';
-    }
     throw new ApiError(401, 'Unauthorized');
   }
 

@@ -49,29 +49,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 初始化：從 localStorage 讀取 token
   useEffect(() => {
     const savedToken = localStorage.getItem('muse_token');
-    if (savedToken) {
+    if (savedToken && savedToken !== 'mock-demo-token') {
       setToken(savedToken);
-      // 驗證 token 有效性
+      // 驗證 real token 有效性
       fetchMe(savedToken)
         .then((u) => setUser(u))
-        .catch(() => {
-          // Backend unavailable — use mock user for demo
-          if (savedToken === 'mock-demo-token') {
+        .catch((err) => {
+          if (err.message === 'BACKEND_OFFLINE') {
+            // Backend unreachable — use mock user for offline dev
             setUser(MOCK_USER);
           } else {
-            // Try as mock fallback
-            setUser(MOCK_USER);
-            localStorage.setItem('muse_token', 'mock-demo-token');
+            // Token invalid (401) — clear and show login
+            localStorage.removeItem('muse_token');
+            setToken(null);
+          }
+        })
+        .finally(() => setIsLoading(false));
+    } else if (savedToken === 'mock-demo-token') {
+      // Had mock token — check if backend is now available
+      checkBackendAvailable()
+        .then((available) => {
+          if (available) {
+            // Backend is up — clear mock, show login for real auth
+            localStorage.removeItem('muse_token');
+          } else {
+            // Backend still down — keep mock
             setToken('mock-demo-token');
+            setUser(MOCK_USER);
           }
         })
         .finally(() => setIsLoading(false));
     } else {
-      // No saved token — auto-login with mock for demo
-      localStorage.setItem('muse_token', 'mock-demo-token');
-      setToken('mock-demo-token');
-      setUser(MOCK_USER);
-      setIsLoading(false);
+      // No saved token — check backend, show login or use mock
+      checkBackendAvailable()
+        .then((available) => {
+          if (!available) {
+            // Backend offline — auto-mock for demo
+            localStorage.setItem('muse_token', 'mock-demo-token');
+            setToken('mock-demo-token');
+            setUser(MOCK_USER);
+          }
+          // If backend available, user stays null → login page
+        })
+        .finally(() => setIsLoading(false));
     }
   }, []);
 
@@ -92,11 +112,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('muse_token', data.token);
       setToken(data.token);
       setUser(data.user);
-    } catch {
-      // Backend unavailable — use mock login for demo
-      localStorage.setItem('muse_token', 'mock-demo-token');
-      setToken('mock-demo-token');
-      setUser(MOCK_USER);
+    } catch (err) {
+      // Distinguish network error (backend offline) from auth error
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        // Network error — backend unavailable, use mock
+        localStorage.setItem('muse_token', 'mock-demo-token');
+        setToken('mock-demo-token');
+        setUser(MOCK_USER);
+      } else {
+        // Real auth error from backend — re-throw to show in UI
+        throw err;
+      }
     }
   }, []);
 
@@ -141,7 +167,27 @@ async function fetchMe(token: string): Promise<AuthUser> {
     if (!res.ok) throw new Error('Token invalid');
     const data = await res.json();
     return data.user;
+  } catch (err) {
+    // Network/abort error → backend is offline
+    if (err instanceof TypeError || (err instanceof DOMException && err.name === 'AbortError')) {
+      throw new Error('BACKEND_OFFLINE');
+    }
+    throw err;
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+async function checkBackendAvailable(): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch(`${API_BASE.replace('/api/v1', '')}/api/health`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    return res.ok;
+  } catch {
+    return false;
   }
 }

@@ -65,7 +65,7 @@ export interface PaginatedResponse<T> {
 }
 
 export interface Contact {
-  id: number;
+  id: string | number;
   platform_id: string;
   name: string;
   display_name: string | null;
@@ -80,7 +80,7 @@ export interface Contact {
 }
 
 export interface Tag {
-  id: number;
+  id: string | number;
   tag_name: string;
   category: string | null;
   contact_count?: number;
@@ -88,8 +88,8 @@ export interface Tag {
 }
 
 export interface Message {
-  id: number;
-  conversation_id: number;
+  id: string | number;
+  conversation_id: string | number;
   sender_type: 'customer' | 'business' | 'system';
   message_type: string;
   content: string;
@@ -101,8 +101,8 @@ export interface Message {
 }
 
 export interface Analysis {
-  id: number;
-  conversation_id: number;
+  id: string | number;
+  conversation_id: string | number;
   analysis_type: string;
   result: Record<string, unknown>;
   model_used: string;
@@ -110,8 +110,8 @@ export interface Analysis {
 }
 
 export interface Conversation {
-  id: number;
-  contact_id: number;
+  id: string | number;
+  contact_id: string | number;
   channel: string;
   status: string;
   urgency?: 'high' | 'medium' | 'low';
@@ -126,9 +126,9 @@ export interface Conversation {
 }
 
 export interface Action {
-  id: number;
-  contact_id: number;
-  conversation_id: number | null;
+  id: string | number;
+  contact_id: string | number;
+  conversation_id: string | number | null;
   action_type: string;
   description: string;
   priority: string;
@@ -140,8 +140,8 @@ export interface Action {
 }
 
 export interface Note {
-  id: number;
-  contact_id: number;
+  id: string | number;
+  contact_id: string | number;
   content: string;
   created_by: string;
   created_at: string;
@@ -199,7 +199,7 @@ export const inboxApi = {
     }
   },
 
-  async getConversation(id: number) {
+  async getConversation(id: string | number) {
     try {
       return await request<Conversation>(`/inbox/conversations/${id}`);
     } catch {
@@ -209,7 +209,7 @@ export const inboxApi = {
     }
   },
 
-  async closeConversation(id: number) {
+  async closeConversation(id: string | number) {
     try {
       return await request<{ message: string }>(`/inbox/conversations/${id}/close`, { method: 'POST' });
     } catch {
@@ -217,7 +217,7 @@ export const inboxApi = {
     }
   },
 
-  async analyzeConversation(id: number) {
+  async analyzeConversation(id: string | number) {
     try {
       return await request<{ message: string; task_id: string }>(`/inbox/conversations/${id}/analyze`, {
         method: 'POST',
@@ -254,7 +254,7 @@ export const contactsApi = {
     }
   },
 
-  async getContact(id: number) {
+  async getContact(id: string | number) {
     try {
       return await request<ContactDetail>(`/contacts/${id}`);
     } catch {
@@ -264,7 +264,7 @@ export const contactsApi = {
     }
   },
 
-  async addNote(contactId: number, content: string) {
+  async addNote(contactId: string | number, content: string) {
     try {
       return await request<Note>(`/contacts/${contactId}/notes`, {
         method: 'POST',
@@ -281,7 +281,7 @@ export const contactsApi = {
     }
   },
 
-  async addTag(contactId: number, tagName: string, category?: string) {
+  async addTag(contactId: string | number, tagName: string, category?: string) {
     try {
       return await request<Tag>(`/contacts/${contactId}/tags`, {
         method: 'POST',
@@ -296,7 +296,7 @@ export const contactsApi = {
     }
   },
 
-  async removeTag(contactId: number, tagId: number) {
+  async removeTag(contactId: string | number, tagId: string | number) {
     try {
       return await request<{ message: string }>(`/contacts/${contactId}/tags/${tagId}`, {
         method: 'DELETE',
@@ -322,7 +322,7 @@ export const tagsApi = {
 // ── Actions API ────────────────────────────────────────
 
 export const actionsApi = {
-  async getActions(params?: { status?: string; priority?: string; sort?: string; contact_id?: number }) {
+  async getActions(params?: { status?: string; priority?: string; sort?: string; contact_id?: string | number }) {
     try {
       const searchParams = new URLSearchParams();
       if (params?.status) searchParams.set('status', params.status);
@@ -336,7 +336,7 @@ export const actionsApi = {
     }
   },
 
-  async updateAction(id: number, data: Partial<Pick<Action, 'status'>>) {
+  async updateAction(id: string | number, data: Partial<Pick<Action, 'status'>>) {
     try {
       return await request<Action>(`/actions/${id}`, {
         method: 'PATCH',
@@ -349,7 +349,7 @@ export const actionsApi = {
   },
 
   async createAction(data: {
-    contact_id: number;
+    contact_id: string | number;
     action_type: string;
     description: string;
     priority: string;

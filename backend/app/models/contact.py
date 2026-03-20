@@ -126,6 +126,7 @@ class Contact(db.Model):
         """轉換為字典格式"""
         return {
             'id': str(self.id),
+            'name': self.display_name or 'Unknown',     # 前端相容欄位
             'display_name': self.display_name,
             'avatar_url': self.avatar_url,
             'locale': self.locale,

@@ -11,7 +11,7 @@ import { Inbox } from 'lucide-react';
 import { EmptyState } from '@/components/loading';
 
 export default function InboxPage() {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<string | number | null>(null);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<string>('');
   const [channel, setChannel] = useState<string>('');
@@ -29,7 +29,7 @@ export default function InboxPage() {
     [page, status, channel, search]
   );
 
-  const handleSelect = useCallback((id: number) => {
+  const handleSelect = useCallback((id: string | number) => {
     setSelectedId(id);
   }, []);
 

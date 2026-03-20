@@ -47,10 +47,10 @@ import {
 } from 'lucide-react';
 
 interface CustomerSidebarProps {
-  contactId: number;
+  contactId: string | number;
   channel: string;
-  conversationId: number;
-  onSelectConversation: (id: number) => void;
+  conversationId: string | number;
+  onSelectConversation: (id: string | number) => void;
 }
 
 function formatDate(dateStr: string): string {
@@ -252,7 +252,7 @@ export function CustomerSidebar({
     ?? null;
 
   // Handle tag removal
-  const handleRemoveTag = async (tagId: number) => {
+  const handleRemoveTag = async (tagId: string | number) => {
     try {
       await contactsApi.removeTag(contactId, tagId);
       refetch();

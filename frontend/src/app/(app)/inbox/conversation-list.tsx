@@ -53,8 +53,8 @@ interface ConversationListProps {
   pagination?: { page: number; pages: number; total: number };
   loading: boolean;
   error: string | null;
-  selectedId: number | null;
-  onSelect: (id: number) => void;
+  selectedId: string | number | null;
+  onSelect: (id: string | number) => void;
   page: number;
   onPageChange: (p: number) => void;
   status: string;

@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils';
 
 interface AvatarProps {
-  name: string;
+  name: string | null | undefined;
   url?: string | null;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -43,7 +43,9 @@ function getColor(name: string): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
-export function Avatar({ name, url, size = 'md', className }: AvatarProps) {
+export function Avatar({ name: rawName, url, size = 'md', className }: AvatarProps) {
+  const name = rawName || 'Unknown';
+
   if (url) {
     return (
       <img

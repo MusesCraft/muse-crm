@@ -30,7 +30,7 @@ import {
 import { cn } from '@/lib/utils';
 
 interface ConversationDetailProps {
-  conversationId: number;
+  conversationId: string | number;
   onClose: () => void;
 }
 
@@ -249,7 +249,7 @@ function AiSuggestionCard({
   conversationId,
   onUse,
 }: {
-  conversationId: number;
+  conversationId: string | number;
   onUse: (text: string) => void;
 }) {
   const [dismissed, setDismissed] = useState(false);

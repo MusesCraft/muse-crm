@@ -736,7 +736,7 @@ export interface ContactEntityInfo {
   company?: string;
 }
 
-export const mockContactEntities: Record<number, ContactEntityInfo> = {
+export const mockContactEntities: Record<string | number, ContactEntityInfo> = {
   1: { phone: '0912-345-678', address: '台北市內湖區' },
   2: { phone: '0923-456-789', address: '台北市信義區' },
   3: { phone: '02-2222-3333', address: '新北市中和區中正路XXX號', company: '宏達建材行' },
@@ -749,7 +749,7 @@ export const mockContactEntities: Record<number, ContactEntityInfo> = {
 
 // ── Quick Triage Data (attached to messages) ───────────
 
-export const mockQuickTriage: Record<number, { quick_intent: string; quick_identity: string }> = {
+export const mockQuickTriage: Record<string | number, { quick_intent: string; quick_identity: string }> = {
   101: { quick_intent: '詢價', quick_identity: '設計師' },
   103: { quick_intent: '規格', quick_identity: '設計師' },
   105: { quick_intent: '參觀', quick_identity: '設計師' },
@@ -865,7 +865,7 @@ export const mockActions: Action[] = [
 
 // ── Notes ──────────────────────────────────────────────
 
-export const mockNotes: Record<number, Note[]> = {
+export const mockNotes: Record<string | number, Note[]> = {
   1: [
     { id: 1, contact_id: 1, content: '王設計師很專業，熟悉各品牌岩板，決策速度快。預算 3-5 萬可推 Laminam。', created_by: 'admin', created_at: daysAgo(2) },
     { id: 2, contact_id: 1, content: '已加 LINE，後續大案可直接聯繫。', created_by: 'admin', created_at: daysAgo(6) },
@@ -941,7 +941,7 @@ export const mockQuickReplies: QuickReply[] = [
 
 // ── AI Suggested Replies ───────────────────────────────
 
-export const mockAiSuggestedReplies: Record<number, string> = {
+export const mockAiSuggestedReplies: Record<string | number, string> = {
   // conversationId → suggested reply text
   // 王設計師 conv 1 (active, has related closed conv 9 with analysis)
   1: '王設計師您好，電視牆 Laminam 大板的正式報價單已為您準備好，請查收附件。如有需要可安排展間參觀。',
@@ -950,7 +950,7 @@ export const mockAiSuggestedReplies: Record<number, string> = {
 };
 
 // Helper: check if a conversation has been analyzed (directly or via contact's other convs)
-export function getConversationAnalysis(conversationId: number): { hasAnalysis: boolean; suggestedReply: string | null } {
+export function getConversationAnalysis(conversationId: string | number): { hasAnalysis: boolean; suggestedReply: string | null } {
   const conv = mockConversations.find((c) => c.id === conversationId);
   if (!conv) return { hasAnalysis: false, suggestedReply: null };
 
@@ -1029,7 +1029,7 @@ export function getMockConversations(params?: {
   };
 }
 
-export function getMockConversation(id: number): Conversation | null {
+export function getMockConversation(id: string | number): Conversation | null {
   const conv = mockConversations.find((c) => c.id === id);
   if (!conv) return null;
 
@@ -1089,7 +1089,7 @@ export function getMockContacts(params?: {
   };
 }
 
-export function getMockContactDetail(id: number): ContactDetail | null {
+export function getMockContactDetail(id: string | number): ContactDetail | null {
   const contact = mockContacts.find((c) => c.id === id);
   if (!contact) return null;
 
@@ -1112,7 +1112,7 @@ export function getMockActions(params?: {
   status?: string;
   priority?: string;
   sort?: string;
-  contact_id?: number;
+  contact_id?: string | number;
 }): Action[] {
   let filtered = [...mockActions];
 

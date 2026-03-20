@@ -53,8 +53,8 @@ function TagSection({
   tags,
   onUpdate,
 }: {
-  contactId: number;
-  tags: { id: number; tag_name: string; category: string | null }[];
+  contactId: string | number;
+  tags: { id: string | number; tag_name: string; category: string | null }[];
   onUpdate: () => void;
 }) {
   const [adding, setAdding] = useState(false);
@@ -72,7 +72,7 @@ function TagSection({
     }
   };
 
-  const handleRemove = async (tagId: number) => {
+  const handleRemove = async (tagId: string | number) => {
     try {
       await contactsApi.removeTag(contactId, tagId);
       onUpdate();
@@ -143,7 +143,7 @@ function TagSection({
 function ConversationTimeline({
   conversations,
 }: {
-  conversations: { id: number; channel: string; status: string; started_at: string; message_count: number }[];
+  conversations: { id: string | number; channel: string; status: string; started_at: string; message_count: number }[];
 }) {
   return (
     <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg p-4">
@@ -186,9 +186,9 @@ function ConversationTimeline({
 function AnalysisSection({
   analyses,
 }: {
-  analyses: { id: number; analysis_type: string; result: Record<string, unknown>; model_used: string; created_at: string }[];
+  analyses: { id: string | number; analysis_type: string; result: Record<string, unknown>; model_used: string; created_at: string }[];
 }) {
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<string | number | null>(null);
 
   return (
     <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg p-4">
@@ -326,8 +326,8 @@ function NotesSection({
   notes,
   onUpdate,
 }: {
-  contactId: number;
-  notes: { id: number; content: string; created_by: string; created_at: string }[];
+  contactId: string | number;
+  notes: { id: string | number; content: string; created_by: string; created_at: string }[];
   onUpdate: () => void;
 }) {
   const [content, setContent] = useState('');
@@ -401,7 +401,8 @@ export default function ContactDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const contactId = parseInt(id, 10);
+  // Support both numeric IDs (mock) and UUID strings (backend)
+  const contactId: string | number = /^\d+$/.test(id) ? parseInt(id, 10) : id;
 
   const { data: contact, loading, error, refetch } = useAsync<ContactDetail>(
     () => contactsApi.getContact(contactId),

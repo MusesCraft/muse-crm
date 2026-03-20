@@ -1,21 +1,26 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Zap, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, isLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // 已登入 → redirect
-  if (isAuthenticated) {
-    router.replace('/inbox');
+  // 已登入 → redirect (use useEffect to avoid setState during render)
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.replace('/inbox');
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading || isAuthenticated) {
     return null;
   }
 

@@ -38,14 +38,14 @@ function isOverdue(dateStr: string | null): boolean {
 const typeConfig: Record<string, { label: string; color: string }> = {
   quote: { label: '報價', color: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
   visit: { label: '參觀', color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
-  call: { label: '通話', color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
+  call: { label: '通話', color: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' },
   sample: { label: '寄樣', color: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' },
   service: { label: '維修', color: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' },
   followup: { label: '跟進', color: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20' },
   delivery: { label: '出貨', color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
   processing: { label: '加工', color: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' },
   proposal: { label: '提案', color: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
-  dispatch: { label: '派工中', color: 'bg-blue-600/10 text-blue-700 dark:text-blue-300 border-blue-600/20' },
+  dispatch: { label: '派工中', color: 'bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border-indigo-600/20' },
   dispatched: { label: '已派工', color: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20' },
   construction: { label: '施工中', color: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20' },
   measure: { label: '待丈量', color: 'bg-yellow-700/10 text-yellow-700 dark:text-yellow-400 border-yellow-700/20' },
@@ -101,13 +101,13 @@ function StatusSelect({
       value={status}
       onChange={(e) => onChange(e.target.value)}
       className={cn(
-        'px-2 py-1 rounded-md text-xs font-medium border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer appearance-none bg-no-repeat',
+        'px-2 py-1 rounded-md text-xs font-medium border focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer appearance-none bg-no-repeat',
         status === 'completed'
           ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
           : status === 'cancelled'
           ? 'bg-zinc-500/10 text-zinc-500 border-zinc-400 dark:border-zinc-600'
           : status === 'in_progress'
-          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+          ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20'
           : status === 'assigned'
           ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
           : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
@@ -155,7 +155,7 @@ function ActionCard({
           {completed ? (
             <CheckCircle2 className="w-5 h-5 text-emerald-400" />
           ) : (
-            <Circle className="w-5 h-5 text-zinc-400 dark:text-zinc-500 hover:text-blue-400 transition-colors" />
+            <Circle className="w-5 h-5 text-zinc-400 dark:text-zinc-500 hover:text-indigo-400 transition-colors" />
           )}
         </button>
 
@@ -182,7 +182,7 @@ function ActionCard({
                 className="flex items-center gap-1.5 group"
               >
                 <Avatar name={action.contact.name} url={action.contact.avatar_url} size="sm" className="!w-5 !h-5 !text-[8px]" />
-                <span className="text-xs text-zinc-500 dark:text-zinc-400 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors">
+                <span className="text-xs text-zinc-500 dark:text-zinc-400 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors">
                   {action.contact.name}
                 </span>
               </Link>
@@ -316,7 +316,7 @@ export default function ActionsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-            <CheckSquare className="w-6 h-6 text-blue-400" />
+            <CheckSquare className="w-6 h-6 text-indigo-400" />
             待辦事項
           </h1>
           <p className="text-sm text-zinc-500 mt-1">
@@ -338,7 +338,7 @@ export default function ActionsPage() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
+          className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
         >
           <option value="">全部狀態</option>
           <option value="pending">待處理</option>
@@ -352,7 +352,7 @@ export default function ActionsPage() {
         <select
           value={priorityFilter}
           onChange={(e) => setPriorityFilter(e.target.value)}
-          className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
+          className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
         >
           <option value="">全部優先度</option>
           <option value="high">高</option>
@@ -364,7 +364,7 @@ export default function ActionsPage() {
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
-          className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
+          className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
         >
           <option value="">全部類型</option>
           <option value="quote">報價</option>
@@ -390,7 +390,7 @@ export default function ActionsPage() {
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as SortKey)}
-          className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
+          className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
         >
           <option value="priority">按優先度</option>
           <option value="due_date">按到期日</option>

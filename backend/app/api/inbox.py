@@ -144,6 +144,51 @@ def trigger_manual_analysis(conversation_id):
     }), 202
 
 
+@api_bp.route('/inbox/conversations/<conversation_id>/send-image', methods=['POST'])
+@login_required
+def send_image_message(conversation_id):
+    """
+    發送圖片訊息
+    
+    Request body:
+        - image_url: 圖片 URL（必填）
+        - caption: 圖片說明文字（選填）
+    """
+    conversation = Conversation.query.get_or_404(conversation_id)
+    data = request.get_json() or {}
+    
+    image_url = data.get('image_url')
+    if not image_url:
+        return jsonify({'error': '請提供 image_url'}), 400
+    
+    caption = data.get('caption', '')
+    
+    # 嘗試透過 Meta API 發送圖片
+    from ..utils.meta_api import meta_api
+    contact = conversation.contact
+    
+    success = False
+    if contact and contact.platform_id:
+        success = meta_api.send_image(contact.platform_id, image_url)
+    
+    # 建立訊息記錄
+    msg = Message(
+        conversation_id=conversation.id,
+        sender_type='business',
+        message_type='image',
+        content=caption,
+        media_url=image_url,
+    )
+    db.session.add(msg)
+    db.session.commit()
+    
+    return jsonify({
+        'message': '圖片已發送' if success else '圖片已記錄（Meta API 未連接）',
+        'sent_via_api': success,
+        'message_id': str(msg.id),
+    })
+
+
 @api_bp.route('/inbox/conversations/<conversation_id>/close', methods=['POST'])
 @login_required
 def close_conversation(conversation_id):

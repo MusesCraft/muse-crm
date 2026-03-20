@@ -95,7 +95,7 @@ export function ConversationList({
             placeholder="搜尋對話..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition-colors"
+            className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition-colors"
           />
         </div>
 
@@ -104,7 +104,7 @@ export function ConversationList({
           <select
             value={status}
             onChange={(e) => onStatusChange(e.target.value)}
-            className="flex-1 px-2 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
+            className="flex-1 px-2 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
           >
             <option value="">全部狀態</option>
             <option value="active">活躍</option>
@@ -115,7 +115,7 @@ export function ConversationList({
           <select
             value={channel}
             onChange={(e) => onChannelChange(e.target.value)}
-            className="flex-1 px-2 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
+            className="flex-1 px-2 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
           >
             <option value="">全部渠道</option>
             <option value="messenger">Messenger</option>
@@ -140,7 +140,7 @@ export function ConversationList({
               onClick={() => onSelect(conv.id)}
               className={cn(
                 'w-full flex items-start gap-3 p-4 text-left border-b border-zinc-100 dark:border-zinc-800/50 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/30',
-                selectedId === conv.id && 'bg-zinc-100 dark:bg-zinc-800/50 border-l-2 border-l-blue-500'
+                selectedId === conv.id && 'bg-zinc-100 dark:bg-zinc-800/50 border-l-2 border-l-indigo-500'
               )}
             >
               <Avatar

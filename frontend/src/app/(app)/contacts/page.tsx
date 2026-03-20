@@ -91,13 +91,13 @@ export default function ContactsPage() {
             placeholder="搜尋客戶名稱..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition-colors"
+            className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition-colors"
           />
         </div>
         <select
           value={channel}
           onChange={(e) => { setChannel(e.target.value); setPage(1); }}
-          className="px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
+          className="px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
         >
           <option value="">全部渠道</option>
           <option value="messenger">Messenger</option>
@@ -107,7 +107,7 @@ export default function ContactsPage() {
         <select
           value={sourceType}
           onChange={(e) => { setSourceType(e.target.value); setPage(1); }}
-          className="px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
+          className="px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
         >
           <option value="">全部來源</option>
           <option value="organic">自然流量</option>
@@ -122,7 +122,7 @@ export default function ContactsPage() {
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as SortKey)}
-          className="px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-blue-500"
+          className="px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
         >
           <option value="last_seen">按最後活躍</option>
           <option value="priority">按優先級</option>
@@ -217,7 +217,7 @@ export default function ContactsPage() {
                   <td className="px-4 py-3">
                     <Link
                       href={`/contacts/${contact.id}`}
-                      className="inline-flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 hover:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                      className="inline-flex items-center gap-1 text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
                     >
                       查看
                       <ExternalLink className="w-3 h-3" />

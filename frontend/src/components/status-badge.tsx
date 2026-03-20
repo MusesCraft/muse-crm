@@ -8,7 +8,7 @@ const statusStyles: Record<string, string> = {
   unanswered: 'bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400',
   closed: 'bg-zinc-500/10 text-zinc-600 border-zinc-500/20 dark:text-zinc-400',
   pending: 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400',
-  completed: 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400',
+  completed: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20 dark:text-indigo-400',
   overdue: 'bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-400',
 };
 

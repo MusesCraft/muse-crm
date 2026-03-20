@@ -101,6 +101,55 @@ class MetaGraphAPI:
             logger.error(f"訊息發送處理失敗 {recipient_id}: {e}")
             return False
     
+    def send_image(self, recipient_id: str, image_url: str) -> bool:
+        """
+        發送圖片給使用者
+        
+        Args:
+            recipient_id: 收件人 ID
+            image_url: 圖片 URL
+            
+        Returns:
+            是否發送成功
+        """
+        if not self.access_token:
+            logger.warning("Missing META_PAGE_TOKEN")
+            return False
+        
+        try:
+            url = f"{self.base_url}/me/messages"
+            params = {'access_token': self.access_token}
+            payload = {
+                'recipient': {'id': recipient_id},
+                'message': {
+                    'attachment': {
+                        'type': 'image',
+                        'payload': {
+                            'url': image_url,
+                            'is_reusable': True
+                        }
+                    }
+                }
+            }
+            
+            response = requests.post(
+                url,
+                params=params,
+                json=payload,
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+            
+            logger.info(f"圖片發送成功：{recipient_id}")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"圖片發送失敗 {recipient_id}: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"圖片發送處理失敗 {recipient_id}: {e}")
+            return False
+
     def get_page_info(self) -> Optional[Dict[str, Any]]:
         """
         取得粉絲專頁資訊

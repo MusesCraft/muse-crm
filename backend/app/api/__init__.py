@@ -17,6 +17,7 @@ from . import actions
 from . import dashboard
 from . import tags
 from . import auth
+from . import quick_replies
 
 # 註冊錯誤處理器
 from ..utils.error_handler import register_error_handlers

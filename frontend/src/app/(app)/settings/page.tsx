@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { mockQuickReplies, type QuickReply } from '@/lib/mock-data';
+import { quickRepliesApi, type QuickReplyItem } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import {
   Settings,
@@ -13,9 +14,230 @@ import {
   Clock,
   AlertTriangle,
   Zap,
+  Link2,
+  Brain,
+  Bell,
+  Copy,
+  CheckCircle,
 } from 'lucide-react';
 
-// ── Types ──────────────────────────────────────────────
+// ── Tab system ─────────────────────────────────────────
+
+type TabId = 'integration' | 'ai' | 'quick-replies' | 'notifications' | 'status' | 'urgency';
+
+const tabs: { id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'integration', label: 'LINE 整合', icon: Link2 },
+  { id: 'ai', label: 'AI 模型', icon: Brain },
+  { id: 'quick-replies', label: '快捷回覆', icon: Zap },
+  { id: 'notifications', label: '通知偏好', icon: Bell },
+  { id: 'status', label: '客戶狀態', icon: Clock },
+  { id: 'urgency', label: '緊急度規則', icon: AlertTriangle },
+];
+
+// ── LINE Integration Card ──────────────────────────────
+
+function IntegrationCard() {
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const configs = [
+    { label: 'Webhook URL', value: 'https://crm.musecraft.com/api/v1/webhook/line', readonly: true },
+    { label: 'Channel Access Token', value: '••••••••••••••••••••••••Abc123', readonly: true },
+    { label: 'Channel Secret', value: '••••••••••••def456', readonly: true },
+    { label: '狀態', value: '✅ 已連接', readonly: true, isStatus: true },
+  ];
+
+  const handleCopy = (label: string, value: string) => {
+    navigator.clipboard.writeText(value);
+    setCopied(label);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-zinc-400 dark:text-zinc-500">LINE 官方帳號整合設定，Webhook 資訊為唯讀。</p>
+      {configs.map((config) => (
+        <div key={config.label} className="flex items-center gap-3">
+          <div className="flex-1">
+            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">{config.label}</label>
+            {config.isStatus ? (
+              <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">{config.value}</span>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={config.value}
+                  readOnly
+                  className="flex-1 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-zinc-600 dark:text-zinc-300 font-mono"
+                />
+                <button
+                  onClick={() => handleCopy(config.label, config.value)}
+                  className="p-2 rounded-lg text-zinc-400 hover:text-indigo-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  {copied === config.label ? <CheckCircle className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── AI Model Card ──────────────────────────────────────
+
+function AIModelCard() {
+  const [model, setModel] = useState('gpt-4o');
+  const [temperature, setTemperature] = useState(0.3);
+  const [autoAnalysis, setAutoAnalysis] = useState(true);
+
+  return (
+    <div className="space-y-5">
+      <p className="text-xs text-zinc-400 dark:text-zinc-500">配置 AI 分析模型與參數。</p>
+
+      <div>
+        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-200 mb-1.5 block">分析模型</label>
+        <select
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          className="w-full text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2.5 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+        >
+          <option value="gpt-4o">GPT-4o（推薦）</option>
+          <option value="gpt-4o-mini">GPT-4o Mini（快速）</option>
+          <option value="claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+          <option value="claude-3-haiku">Claude 3 Haiku（經濟）</option>
+        </select>
+      </div>
+
+      <div>
+        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-200 mb-1.5 block">
+          溫度（Temperature）: {temperature}
+        </label>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.1}
+          value={temperature}
+          onChange={(e) => setTemperature(Number(e.target.value))}
+          className="w-full accent-indigo-500"
+        />
+        <div className="flex justify-between text-[10px] text-zinc-400">
+          <span>精確 (0)</span>
+          <span>創意 (1)</span>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between py-2">
+        <div>
+          <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">自動分析</p>
+          <p className="text-xs text-zinc-400 dark:text-zinc-500">對話結束後自動觸發 AI 分析</p>
+        </div>
+        <button
+          onClick={() => setAutoAnalysis(!autoAnalysis)}
+          className={cn(
+            'w-11 h-6 rounded-full transition-colors relative',
+            autoAnalysis ? 'bg-indigo-500' : 'bg-zinc-300 dark:bg-zinc-600'
+          )}
+        >
+          <div className={cn(
+            'w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform shadow-sm',
+            autoAnalysis ? 'translate-x-[22px]' : 'translate-x-0.5'
+          )} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Notifications Card ─────────────────────────────────
+
+function NotificationsCard() {
+  const [settings, setSettings] = useState({
+    newMessage: true,
+    urgentOnly: false,
+    dailyDigest: true,
+    sound: true,
+  });
+
+  const toggle = (key: keyof typeof settings) => {
+    setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const items = [
+    { key: 'newMessage' as const, label: '新訊息通知', desc: '收到新客戶訊息時通知' },
+    { key: 'urgentOnly' as const, label: '僅緊急通知', desc: '只在高緊急度訊息時通知' },
+    { key: 'dailyDigest' as const, label: '每日摘要', desc: '每天上午 9:00 發送摘要' },
+    { key: 'sound' as const, label: '通知音效', desc: '啟用通知音效' },
+  ];
+
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-4">自定義通知方式與頻率。</p>
+      {items.map((item) => (
+        <div key={item.key} className="flex items-center justify-between py-3 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+          <div>
+            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{item.label}</p>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500">{item.desc}</p>
+          </div>
+          <button
+            onClick={() => toggle(item.key)}
+            className={cn(
+              'w-11 h-6 rounded-full transition-colors relative',
+              settings[item.key] ? 'bg-indigo-500' : 'bg-zinc-300 dark:bg-zinc-600'
+            )}
+          >
+            <div className={cn(
+              'w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform shadow-sm',
+              settings[item.key] ? 'translate-x-[22px]' : 'translate-x-0.5'
+            )} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Customer Status Card ───────────────────────────────
+
+function CustomerStatusCard() {
+  const [activeDays, setActiveDays] = useState(3);
+  const [silentDays, setSilentDays] = useState(3);
+  const [unansweredHours, setUnansweredHours] = useState(24);
+
+  const items = [
+    { label: '活躍門檻', desc: '最後互動在 X 天內視為「活躍」', value: activeDays, onChange: setActiveDays, unit: '天', min: 1, max: 30 },
+    { label: '沉默門檻', desc: '超過 X 天未互動視為「沉默」', value: silentDays, onChange: setSilentDays, unit: '天', min: 1, max: 30 },
+    { label: '未回定義', desc: '我方最後訊息後客戶 X 小時未回', value: unansweredHours, onChange: setUnansweredHours, unit: '小時', min: 1, max: 168 },
+  ];
+
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-4">定義客戶活躍狀態的時間門檻。</p>
+      {items.map((item) => (
+        <div key={item.label} className="flex items-center justify-between py-3 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+          <div>
+            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{item.label}</p>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500">{item.desc}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={item.min}
+              max={item.max}
+              value={item.value}
+              onChange={(e) => item.onChange(Number(e.target.value))}
+              className="w-16 text-sm text-center bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">{item.unit}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Urgency Rules Card ─────────────────────────────────
 
 interface UrgencyRule {
   id: number;
@@ -23,84 +245,6 @@ interface UrgencyRule {
   keyword: string;
   urgency: 'high' | 'medium' | 'low';
 }
-
-// ── Customer Status Settings ───────────────────────────
-
-function CustomerStatusCard() {
-  const [activeDays, setActiveDays] = useState(3);
-  const [silentDays, setSilentDays] = useState(3);
-  const [unansweredHours, setUnansweredHours] = useState(24);
-
-  return (
-    <div className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 p-6">
-      <div className="flex items-center gap-2 mb-5">
-        <Clock className="w-4 h-4 text-blue-500" />
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">客戶狀態定義</h3>
-      </div>
-
-      <div className="space-y-4">
-        {/* 活躍門檻 */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">活躍門檻</p>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500">最後互動在 X 天內視為「活躍」</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              max={30}
-              value={activeDays}
-              onChange={(e) => setActiveDays(Number(e.target.value))}
-              className="w-16 text-sm text-center bg-zinc-50 dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">天</span>
-          </div>
-        </div>
-
-        {/* 沉默門檻 */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">沉默門檻</p>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500">超過 X 天未互動視為「沉默」</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              max={30}
-              value={silentDays}
-              onChange={(e) => setSilentDays(Number(e.target.value))}
-              className="w-16 text-sm text-center bg-zinc-50 dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">天</span>
-          </div>
-        </div>
-
-        {/* 未回定義 */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">未回定義</p>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500">我方最後訊息後客戶 X 小時未回</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              max={168}
-              value={unansweredHours}
-              onChange={(e) => setUnansweredHours(Number(e.target.value))}
-              className="w-16 text-sm text-center bg-zinc-50 dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">小時</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Urgency Rules Card ─────────────────────────────────
 
 function UrgencyRulesCard() {
   const [rules, setRules] = useState<UrgencyRule[]>([
@@ -120,250 +264,164 @@ function UrgencyRulesCard() {
   };
 
   const addRule = () => {
-    setRules((prev) => [
-      ...prev,
-      { id: Date.now(), condition: '包含關鍵字', keyword: '', urgency: 'medium' },
-    ]);
+    setRules((prev) => [...prev, { id: Date.now(), condition: '包含關鍵字', keyword: '', urgency: 'medium' }]);
   };
-
-  const removeRule = (id: number) => {
-    setRules((prev) => prev.filter((r) => r.id !== id));
-  };
-
+  const removeRule = (id: number) => setRules((prev) => prev.filter((r) => r.id !== id));
   const updateRule = (id: number, field: keyof UrgencyRule, value: string) => {
-    setRules((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
-    );
+    setRules((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
   };
 
   return (
-    <div className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 p-6">
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-500" />
-          <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">緊急度規則</h3>
-        </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">定義訊息緊急度自動判定規則。</p>
         <button
           onClick={addRule}
-          className="flex items-center gap-1 text-xs font-medium text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+          className="flex items-center gap-1 text-xs font-medium text-indigo-500 hover:text-indigo-600 dark:text-indigo-400"
         >
-          <Plus className="w-3.5 h-3.5" />
-          新增規則
+          <Plus className="w-3.5 h-3.5" /> 新增規則
         </button>
       </div>
 
       <div className="space-y-3">
         {rules.map((rule) => (
-          <div
-            key={rule.id}
-            className="flex items-center gap-2 p-3 bg-zinc-50 dark:bg-zinc-700/30 rounded-lg"
-          >
-            {/* Condition */}
+          <div key={rule.id} className="flex items-center gap-2 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
             <select
               value={rule.condition}
               onChange={(e) => updateRule(rule.id, 'condition', e.target.value)}
-              className="text-xs bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             >
-              {conditions.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              {conditions.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
-
-            {/* Keyword */}
             <input
               type="text"
               value={rule.keyword}
               onChange={(e) => updateRule(rule.id, 'keyword', e.target.value)}
               placeholder="關鍵字..."
-              className="flex-1 text-xs bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="flex-1 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
-
-            {/* Urgency */}
-            <span className="text-xs text-zinc-400 dark:text-zinc-500">→</span>
+            <span className="text-xs text-zinc-400">→</span>
             <select
               value={rule.urgency}
               onChange={(e) => updateRule(rule.id, 'urgency', e.target.value)}
-              className={cn(
-                'text-xs border-0 rounded-lg px-2 py-1.5 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500',
-                urgencyColors[rule.urgency]
-              )}
+              className={cn('text-xs border-0 rounded-lg px-2 py-1.5 font-medium', urgencyColors[rule.urgency])}
             >
-              {urgencies.map((u) => (
-                <option key={u} value={u}>{urgencyLabels[u]}</option>
-              ))}
+              {urgencies.map((u) => <option key={u} value={u}>{urgencyLabels[u]}</option>)}
             </select>
-
-            {/* Delete */}
-            <button
-              onClick={() => removeRule(rule.id)}
-              className="p-1 text-zinc-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-            >
+            <button onClick={() => removeRule(rule.id)} className="p-1 text-zinc-400 hover:text-red-500 transition-colors">
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
         ))}
-
-        {rules.length === 0 && (
-          <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center py-4">尚無規則，點擊上方「+ 新增規則」開始</p>
-        )}
+        {rules.length === 0 && <p className="text-xs text-zinc-400 text-center py-4">尚無規則</p>}
       </div>
     </div>
   );
 }
 
-// ── Quick Replies Management Card ──────────────────────
+// ── Quick Replies Management ───────────────────────────
 
 function QuickRepliesManagementCard() {
   const [replies, setReplies] = useState<QuickReply[]>([...mockQuickReplies]);
+  const [apiReplies, setApiReplies] = useState<QuickReplyItem[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [formCategory, setFormCategory] = useState('問候語');
   const [formTitle, setFormTitle] = useState('');
   const [formContent, setFormContent] = useState('');
 
+  // Try to load from API
+  useEffect(() => {
+    quickRepliesApi.getAll().then((res) => {
+      if (res.data.length > 0) {
+        setApiReplies(res.data);
+      }
+    });
+  }, []);
+
   const categories = ['問候語', '產品介紹', '報價相關', '售後回覆'];
 
   const handleAdd = () => {
     if (!formTitle.trim() || !formContent.trim()) return;
-    const newReply: QuickReply = {
-      id: Date.now(),
-      category: formCategory,
-      title: formTitle.trim(),
-      content: formContent.trim(),
-    };
-    setReplies((prev) => [...prev, newReply]);
-    setFormTitle('');
-    setFormContent('');
-    setShowAddForm(false);
+    setReplies((prev) => [...prev, { id: Date.now(), category: formCategory, title: formTitle.trim(), content: formContent.trim() }]);
+    setFormTitle(''); setFormContent(''); setShowAddForm(false);
   };
 
-  const handleDelete = (id: number) => {
-    setReplies((prev) => prev.filter((r) => r.id !== id));
-  };
+  const handleDelete = (id: number) => setReplies((prev) => prev.filter((r) => r.id !== id));
 
   const handleEdit = (reply: QuickReply) => {
-    setEditingId(reply.id);
-    setFormCategory(reply.category);
-    setFormTitle(reply.title);
-    setFormContent(reply.content);
+    setEditingId(reply.id); setFormCategory(reply.category); setFormTitle(reply.title); setFormContent(reply.content);
   };
 
   const handleSaveEdit = () => {
     if (!formTitle.trim() || !formContent.trim() || !editingId) return;
-    setReplies((prev) =>
-      prev.map((r) =>
-        r.id === editingId
-          ? { ...r, category: formCategory, title: formTitle.trim(), content: formContent.trim() }
-          : r
-      )
-    );
-    setEditingId(null);
-    setFormTitle('');
-    setFormContent('');
+    setReplies((prev) => prev.map((r) => r.id === editingId ? { ...r, category: formCategory, title: formTitle.trim(), content: formContent.trim() } : r));
+    setEditingId(null); setFormTitle(''); setFormContent('');
   };
 
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setFormTitle('');
-    setFormContent('');
-    setShowAddForm(false);
-  };
+  const handleCancelEdit = () => { setEditingId(null); setFormTitle(''); setFormContent(''); setShowAddForm(false); };
+
+  // Show API replies if available, otherwise mock
+  const displayReplies = apiReplies.length > 0 ? apiReplies.map((r, i) => ({
+    id: i + 10000,
+    category: r.category,
+    title: r.title,
+    content: r.content,
+  })) : replies;
 
   return (
-    <div className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 p-6">
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <Zap className="w-4 h-4 text-amber-500" />
-          <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">預存語錄管理</h3>
-        </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">
+          管理預存語錄，供收件匣快速回覆使用。
+          {apiReplies.length > 0 && <span className="text-emerald-500 ml-1">（已連接 API，{apiReplies.length} 條語錄）</span>}
+        </p>
         <button
           onClick={() => { setShowAddForm(true); setEditingId(null); setFormTitle(''); setFormContent(''); }}
-          className="flex items-center gap-1 text-xs font-medium text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+          className="flex items-center gap-1 text-xs font-medium text-indigo-500 hover:text-indigo-600 dark:text-indigo-400"
         >
-          <Plus className="w-3.5 h-3.5" />
-          新增語錄
+          <Plus className="w-3.5 h-3.5" /> 新增語錄
         </button>
       </div>
 
-      {/* Add/Edit Form */}
       {(showAddForm || editingId) && (
-        <div className="mb-4 p-4 bg-zinc-50 dark:bg-zinc-700/30 rounded-lg border border-zinc-200 dark:border-zinc-600 space-y-3">
+        <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-zinc-700 space-y-3">
           <div className="flex items-center gap-3">
-            <select
-              value={formCategory}
-              onChange={(e) => setFormCategory(e.target.value)}
-              className="text-xs bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              {categories.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+            <select value={formCategory} onChange={(e) => setFormCategory(e.target.value)}
+              className="text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
-            <input
-              type="text"
-              value={formTitle}
-              onChange={(e) => setFormTitle(e.target.value)}
-              placeholder="標題..."
-              className="flex-1 text-xs bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-1.5 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+            <input type="text" value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="標題..."
+              className="flex-1 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
           </div>
-          <textarea
-            value={formContent}
-            onChange={(e) => setFormContent(e.target.value)}
-            placeholder="內容..."
-            rows={2}
-            className="w-full text-xs bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
-          />
+          <textarea value={formContent} onChange={(e) => setFormContent(e.target.value)} placeholder="內容..." rows={2}
+            className="w-full text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" />
           <div className="flex items-center gap-2 justify-end">
-            <button
-              onClick={handleCancelEdit}
-              className="text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 px-3 py-1.5 rounded-md transition-colors"
-            >
-              取消
-            </button>
-            <button
-              onClick={editingId ? handleSaveEdit : handleAdd}
-              disabled={!formTitle.trim() || !formContent.trim()}
-              className="flex items-center gap-1 text-xs font-medium bg-blue-500 text-white px-3 py-1.5 rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <Save className="w-3 h-3" />
-              {editingId ? '儲存' : '新增'}
+            <button onClick={handleCancelEdit} className="text-xs font-medium text-zinc-500 px-3 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-700">取消</button>
+            <button onClick={editingId ? handleSaveEdit : handleAdd} disabled={!formTitle.trim() || !formContent.trim()}
+              className="flex items-center gap-1 text-xs font-medium bg-indigo-500 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors">
+              <Save className="w-3 h-3" /> {editingId ? '儲存' : '新增'}
             </button>
           </div>
         </div>
       )}
 
-      {/* Replies List */}
       <div className="space-y-2">
         {categories.map((cat) => {
-          const items = replies.filter((r) => r.category === cat);
+          const items = displayReplies.filter((r) => r.category === cat);
           if (items.length === 0) return null;
           return (
             <div key={cat}>
-              <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
-                {cat}
-              </p>
+              <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">{cat}</p>
               {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700/30 transition-colors group"
-                >
+                <div key={item.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-zinc-700 dark:text-zinc-200">{item.title}</p>
                     <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">{item.content}</p>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                    <button
-                      onClick={() => handleEdit(item)}
-                      className="p-1 text-zinc-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      className="p-1 text-zinc-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                    <button onClick={() => handleEdit(item as QuickReply)} className="p-1 text-zinc-400 hover:text-indigo-500"><Pencil className="w-3 h-3" /></button>
+                    <button onClick={() => handleDelete(item.id)} className="p-1 text-zinc-400 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
                   </div>
                 </div>
               ))}
@@ -378,25 +436,66 @@ function QuickRepliesManagementCard() {
 // ── Main Settings Page ─────────────────────────────────
 
 export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState<TabId>('integration');
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'integration': return <IntegrationCard />;
+      case 'ai': return <AIModelCard />;
+      case 'quick-replies': return <QuickRepliesManagementCard />;
+      case 'notifications': return <NotificationsCard />;
+      case 'status': return <CustomerStatusCard />;
+      case 'urgency': return <UrgencyRulesCard />;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-6">
-      <div className="max-w-3xl mx-auto">
-        {/* Page Header */}
+    <div className="min-h-screen p-6">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+          <div className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
             <Settings className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
           </div>
           <div>
             <h1 className="text-lg font-bold text-zinc-900 dark:text-white">設定</h1>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">管理客戶狀態、緊急度規則與預存語錄</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">管理系統整合、AI 模型與偏好設定</p>
           </div>
         </div>
 
-        {/* Cards */}
-        <div className="space-y-6">
-          <CustomerStatusCard />
-          <UrgencyRulesCard />
-          <QuickRepliesManagementCard />
+        {/* Tabs + Content */}
+        <div className="flex gap-6">
+          {/* Tab Navigation */}
+          <div className="w-48 flex-shrink-0">
+            <nav className="space-y-0.5">
+              {tabs.map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={cn(
+                      'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left',
+                      isActive
+                        ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400'
+                        : 'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800'
+                    )}
+                  >
+                    <tab.icon className="w-4 h-4" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Tab Content */}
+          <div className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
+              {tabs.find((t) => t.id === activeTab)?.label}
+            </h2>
+            {renderTabContent()}
+          </div>
         </div>
       </div>
     </div>

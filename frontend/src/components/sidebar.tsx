@@ -2,16 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Inbox, Users, LayoutDashboard, CheckSquare, Settings, Zap, LogOut, Sun, Moon } from 'lucide-react';
+import { Inbox, Users, LayoutDashboard, CheckSquare, Settings, Zap, LogOut, Sun, Moon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
+import { useState, useEffect } from 'react';
 
 const navItems = [
-  { href: '/inbox', label: '收件匣', icon: Inbox },
+  { href: '/inbox', label: '收件匣', icon: Inbox, badge: 12 },
   { href: '/contacts', label: '客戶', icon: Users },
   { href: '/dashboard', label: '儀表板', icon: LayoutDashboard },
-  { href: '/actions', label: '待辦事項', icon: CheckSquare },
+  { href: '/actions', label: '待辦事項', icon: CheckSquare, badge: 3 },
   { href: '/settings', label: '設定', icon: Settings },
 ];
 
@@ -20,6 +21,20 @@ export function Sidebar() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('muse_sidebar_collapsed');
+      if (saved === 'true') setCollapsed(true);
+    }
+  }, []);
+
+  const toggleCollapsed = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem('muse_sidebar_collapsed', String(next));
+  };
 
   const handleLogout = () => {
     logout();
@@ -35,63 +50,118 @@ export function Sidebar() {
         .toUpperCase()
     : 'U';
 
+  const sidebarWidth = collapsed ? 'w-[68px]' : 'w-[220px]';
+
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-[200px] bg-white border-r border-zinc-200 dark:bg-zinc-950 dark:border-zinc-800 flex flex-col z-50">
+    <aside className={cn(
+      'fixed left-0 top-0 bottom-0 bg-white border-r border-zinc-200 dark:bg-zinc-950 dark:border-zinc-800 flex flex-col z-50 transition-all duration-200',
+      sidebarWidth
+    )}>
       {/* Logo */}
-      <div className="h-14 flex items-center gap-2 px-5 border-b border-zinc-200 dark:border-zinc-800">
-        <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center">
+      <div className="h-14 flex items-center gap-2.5 px-4 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center flex-shrink-0">
           <Zap className="w-4 h-4 text-white" />
         </div>
-        <span className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">MUSE CRM</span>
+        {!collapsed && (
+          <span className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">MUSE</span>
+        )}
+        <button
+          onClick={toggleCollapsed}
+          className={cn(
+            'p-1 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 transition-colors',
+            collapsed ? 'ml-auto' : 'ml-auto'
+          )}
+        >
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4 px-3 space-y-1">
+      {!collapsed && (
+        <p className="px-4 pt-4 pb-1 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">主選單</p>
+      )}
+      <nav className={cn('flex-1 py-2 space-y-0.5', collapsed ? 'px-2' : 'px-3')}>
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
+              title={collapsed ? item.label : undefined}
               className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                'flex items-center gap-3 rounded-lg text-sm font-medium transition-colors',
+                collapsed ? 'justify-center p-2.5' : 'px-3 py-2.5',
                 isActive
-                  ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
+                  ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400'
                   : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/50'
               )}
             >
-              <item.icon className="w-4 h-4" />
-              {item.label}
+              <item.icon className={cn('w-[18px] h-[18px] flex-shrink-0', isActive && 'text-indigo-500 dark:text-indigo-400')} />
+              {!collapsed && (
+                <>
+                  <span className="flex-1">{item.label}</span>
+                  {item.badge && (
+                    <span className={cn(
+                      'text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5',
+                      isActive
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300'
+                    )}>
+                      {item.badge}
+                    </span>
+                  )}
+                </>
+              )}
             </Link>
           );
         })}
       </nav>
 
-      {/* Footer: Current user + Theme Toggle + Logout */}
-      <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs text-zinc-600 dark:text-zinc-300 font-medium">
-            {initials}
+      {/* Footer */}
+      <div className="p-3 border-t border-zinc-200 dark:border-zinc-800">
+        {/* Theme + Logout buttons */}
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              title={theme === 'dark' ? '切換至淺色模式' : '切換至深色模式'}
+              className="p-2 rounded-lg text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={handleLogout}
+              title="登出"
+              className="p-2 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-red-400 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">{user?.name || '使用者'}</p>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 truncate">{user?.email || ''}</p>
+        ) : (
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center text-xs text-indigo-600 dark:text-indigo-400 font-semibold flex-shrink-0">
+              {initials}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">{user?.name || '使用者'}</p>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500 truncate">{user?.email || ''}</p>
+            </div>
+            <button
+              onClick={toggleTheme}
+              title={theme === 'dark' ? '切換至淺色模式' : '切換至深色模式'}
+              className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={handleLogout}
+              title="登出"
+              className="p-1.5 rounded-md text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-red-400 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            onClick={toggleTheme}
-            title={theme === 'dark' ? '切換至淺色模式' : '切換至深色模式'}
-            className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={handleLogout}
-            title="登出"
-            className="p-1.5 rounded-md text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-red-400 dark:hover:bg-zinc-800 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
+        )}
       </div>
     </aside>
   );

@@ -1,14 +1,17 @@
 'use client';
 
+import Link from 'next/link';
 import { dashboardApi, type DashboardStats } from '@/lib/api';
 import {
   mockUrgencyDistribution,
   mockStatusDistribution,
   mockTodayMessages,
   mockSourceAnalysis,
+  mockContacts,
 } from '@/lib/mock-data';
 import { useAsync } from '@/lib/hooks';
 import { LoadingSpinner } from '@/components/loading';
+import { Avatar } from '@/components/avatar';
 import {
   Users,
   MessagesSquare,
@@ -17,6 +20,9 @@ import {
   Activity,
   Mail,
   BarChart3,
+  CheckSquare,
+  ArrowUpRight,
+  ArrowDownRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -24,24 +30,33 @@ function StatCard({
   icon: Icon,
   label,
   value,
+  change,
   color,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number | string;
+  change?: { value: string; positive: boolean };
   color: string;
 }) {
   return (
-    <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg p-5">
-      <div className="flex items-center gap-3">
-        <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', color)}>
+    <div className="bg-white border border-zinc-200/80 dark:bg-zinc-900 dark:border-zinc-800 rounded-xl p-5 hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between">
+        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', color)}>
           <Icon className="w-5 h-5 text-white" />
         </div>
-        <div>
-          <p className="text-xs text-zinc-500">{label}</p>
-          <p className="text-2xl font-bold text-zinc-900 dark:text-white">{value}</p>
-        </div>
+        {change && (
+          <span className={cn(
+            'flex items-center gap-0.5 text-xs font-semibold',
+            change.positive ? 'text-emerald-500' : 'text-red-500'
+          )}>
+            {change.value}
+            {change.positive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+          </span>
+        )}
       </div>
+      <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-3">{value}</p>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{label}</p>
     </div>
   );
 }
@@ -49,29 +64,27 @@ function StatCard({
 function UrgencyCard({ data }: { data: { high: number; medium: number; low: number } }) {
   const total = data.high + data.medium + data.low || 1;
   return (
-    <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg p-5">
-      <div className="flex items-center gap-2 mb-3">
+    <div className="bg-white border border-zinc-200/80 dark:bg-zinc-900 dark:border-zinc-800 rounded-xl p-5">
+      <div className="flex items-center gap-2 mb-4">
         <AlertTriangle className="w-4 h-4 text-red-400" />
         <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">緊急度分布</h3>
       </div>
-      <div className="h-3 rounded-full overflow-hidden flex bg-zinc-200 dark:bg-zinc-800 mb-3">
-        <div className="h-full bg-red-500" style={{ width: `${(data.high / total) * 100}%` }} />
-        <div className="h-full bg-orange-500" style={{ width: `${(data.medium / total) * 100}%` }} />
-        <div className="h-full bg-zinc-400 dark:bg-zinc-600" style={{ width: `${(data.low / total) * 100}%` }} />
+      <div className="h-3 rounded-full overflow-hidden flex bg-zinc-100 dark:bg-zinc-800 mb-3">
+        <div className="h-full bg-red-500 rounded-l-full" style={{ width: `${(data.high / total) * 100}%` }} />
+        <div className="h-full bg-amber-500" style={{ width: `${(data.medium / total) * 100}%` }} />
+        <div className="h-full bg-zinc-300 dark:bg-zinc-600 rounded-r-full" style={{ width: `${(data.low / total) * 100}%` }} />
       </div>
       <div className="flex gap-4">
-        <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">高 {data.high}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">中 {data.medium}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-zinc-400 dark:bg-zinc-600" />
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">低 {data.low}</span>
-        </div>
+        {[
+          { label: '高', count: data.high, color: 'bg-red-500' },
+          { label: '中', count: data.medium, color: 'bg-amber-500' },
+          { label: '低', count: data.low, color: 'bg-zinc-300 dark:bg-zinc-600' },
+        ].map((item) => (
+          <div key={item.label} className="flex items-center gap-1.5">
+            <div className={cn('w-2.5 h-2.5 rounded-full', item.color)} />
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">{item.label} {item.count}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -79,24 +92,22 @@ function UrgencyCard({ data }: { data: { high: number; medium: number; low: numb
 
 function StatusCard({ data }: { data: { active: number; silent: number; unanswered: number } }) {
   return (
-    <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg p-5">
-      <div className="flex items-center gap-2 mb-3">
+    <div className="bg-white border border-zinc-200/80 dark:bg-zinc-900 dark:border-zinc-800 rounded-xl p-5">
+      <div className="flex items-center gap-2 mb-4">
         <Activity className="w-4 h-4 text-emerald-400" />
         <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">活躍 vs 沉默</h3>
       </div>
       <div className="flex gap-3">
-        <div className="flex-1 text-center p-2 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/5">
-          <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{data.active}</p>
-          <p className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70">活躍</p>
-        </div>
-        <div className="flex-1 text-center p-2 rounded-lg bg-zinc-500/10 dark:bg-zinc-500/5">
-          <p className="text-lg font-bold text-zinc-500 dark:text-zinc-400">{data.silent}</p>
-          <p className="text-[10px] text-zinc-500/70 dark:text-zinc-400/70">沉默</p>
-        </div>
-        <div className="flex-1 text-center p-2 rounded-lg bg-orange-500/10 dark:bg-orange-500/5">
-          <p className="text-lg font-bold text-orange-600 dark:text-orange-400">{data.unanswered}</p>
-          <p className="text-[10px] text-orange-600/70 dark:text-orange-400/70">未回</p>
-        </div>
+        {[
+          { label: '活躍', value: data.active, color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
+          { label: '沉默', value: data.silent, color: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' },
+          { label: '未回', value: data.unanswered, color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
+        ].map((item) => (
+          <div key={item.label} className={cn('flex-1 text-center p-3 rounded-xl', item.color)}>
+            <p className="text-lg font-bold">{item.value}</p>
+            <p className="text-[10px] opacity-70">{item.label}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -108,16 +119,16 @@ function TodayMessagesCard({ data }: { data: { count: number; yesterdayCount: nu
   const isUp = diff >= 0;
 
   return (
-    <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg p-5">
-      <div className="flex items-center gap-2 mb-3">
-        <Mail className="w-4 h-4 text-blue-400" />
+    <div className="bg-white border border-zinc-200/80 dark:bg-zinc-900 dark:border-zinc-800 rounded-xl p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <Mail className="w-4 h-4 text-indigo-400" />
         <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">今日新訊息</h3>
       </div>
       <div className="flex items-end gap-2">
         <p className="text-3xl font-bold text-zinc-900 dark:text-white">{data.count}</p>
         <span className="text-xs text-zinc-400 dark:text-zinc-500 mb-1">則</span>
       </div>
-      <p className={cn('text-xs mt-1', isUp ? 'text-emerald-500 dark:text-emerald-400' : 'text-red-500 dark:text-red-400')}>
+      <p className={cn('text-xs mt-1 font-medium', isUp ? 'text-emerald-500' : 'text-red-500')}>
         {isUp ? '↑' : '↓'} {Math.abs(pct)}% 對比昨天
       </p>
     </div>
@@ -126,24 +137,68 @@ function TodayMessagesCard({ data }: { data: { count: number; yesterdayCount: nu
 
 function SourceCard({ data }: { data: { organic: number; ad: number; referral: number } }) {
   return (
-    <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg p-5">
-      <div className="flex items-center gap-2 mb-3">
+    <div className="bg-white border border-zinc-200/80 dark:bg-zinc-900 dark:border-zinc-800 rounded-xl p-5">
+      <div className="flex items-center gap-2 mb-4">
         <BarChart3 className="w-4 h-4 text-purple-400" />
         <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">來源分析</h3>
       </div>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">自然流量</span>
-          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{data.organic}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">廣告</span>
-          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{data.ad}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">推薦</span>
-          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{data.referral}</span>
-        </div>
+      <div className="space-y-3">
+        {[
+          { label: '自然流量', value: data.organic, total: data.organic + data.ad + data.referral, color: 'bg-indigo-500' },
+          { label: '廣告', value: data.ad, total: data.organic + data.ad + data.referral, color: 'bg-purple-500' },
+          { label: '推薦', value: data.referral, total: data.organic + data.ad + data.referral, color: 'bg-cyan-500' },
+        ].map((item) => (
+          <div key={item.label}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">{item.label}</span>
+              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">{item.value}</span>
+            </div>
+            <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+              <div className={cn('h-full rounded-full', item.color)} style={{ width: `${(item.value / (item.total || 1)) * 100}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RecentCustomersCard() {
+  const recentContacts = mockContacts.slice(0, 4);
+  const statusLabels: Record<string, { label: string; color: string }> = {
+    high: { label: '活躍', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' },
+    medium: { label: '洽談中', color: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' },
+    low: { label: '成交', color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400' },
+  };
+
+  return (
+    <div className="bg-white border border-zinc-200/80 dark:bg-zinc-900 dark:border-zinc-800 rounded-xl p-5 col-span-full">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">最近客戶</h3>
+        <Link href="/contacts" className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 font-medium">
+          查看全部 →
+        </Link>
+      </div>
+      <div className="space-y-3">
+        {recentContacts.map((contact) => {
+          const status = statusLabels[contact.priority || 'low'];
+          return (
+            <Link
+              key={contact.id}
+              href={`/contacts/${contact.id}`}
+              className="flex items-center gap-3 p-2 -mx-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+            >
+              <Avatar name={contact.name} url={contact.avatar_url} size="md" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{contact.name}</p>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 truncate">{contact.display_name}</p>
+              </div>
+              <span className={cn('text-[10px] font-medium rounded-full px-2.5 py-1', status.color)}>
+                {status.label}
+              </span>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
@@ -157,31 +212,45 @@ export default function DashboardPage() {
 
   if (loadingStats) return <LoadingSpinner className="min-h-screen" />;
 
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('zh-TW', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  });
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      {/* Header */}
       <div className="mb-6">
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-blue-400" />
-          儀表板
+        <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-1">{dateStr}</p>
+        <h1 className="text-xl font-bold text-zinc-900 dark:text-white">
+          歡迎回來 👋
         </h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">系統總覽與統計數據</p>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">以下是您今天的業務總覽</p>
       </div>
 
-      {/* Top stats: total contacts + total conversations */}
+      {/* Top stats */}
       {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          <StatCard icon={Users} label="總客戶數" value={stats.total_contacts} color="bg-blue-500" />
-          <StatCard icon={MessagesSquare} label="總對話數" value={stats.total_conversations} color="bg-emerald-500" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <StatCard icon={Users} label="本月新客戶" value={stats.total_contacts} color="bg-indigo-500" change={{ value: '+12%', positive: true }} />
+          <StatCard icon={TrendingUp} label="成交率" value="68%" color="bg-emerald-500" change={{ value: '+4.5%', positive: true }} />
+          <StatCard icon={CheckSquare} label="待辦事項" value={stats.pending_actions} color="bg-amber-500" change={{ value: '-2', positive: false }} />
+          <StatCard icon={MessagesSquare} label="活躍案件" value={stats.active_conversations} color="bg-indigo-500" change={{ value: '+8', positive: true }} />
         </div>
       )}
 
-      {/* New 4-card grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Detail cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <UrgencyCard data={mockUrgencyDistribution} />
         <StatusCard data={mockStatusDistribution} />
         <TodayMessagesCard data={mockTodayMessages} />
         <SourceCard data={mockSourceAnalysis} />
       </div>
+
+      {/* Recent customers */}
+      <RecentCustomersCard />
     </div>
   );
 }

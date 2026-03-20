@@ -111,7 +111,7 @@ function SourceBadge({ source }: { source: string }) {
   const label = source === 'ad_referral' ? '廣告導流' : '自然流入';
   const color = source === 'ad_referral'
     ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25'
-    : 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/25';
+    : 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/25';
 
   return (
     <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium', color)}>
@@ -150,7 +150,7 @@ function AnalysisDisplay({ data }: { data: Record<string, unknown> }) {
           </div>
           <div className="flex flex-wrap gap-1">
             {mentionedProducts.map((p, i) => (
-              <span key={i} className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 rounded-full px-2 py-0.5">
+              <span key={i} className="text-[10px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 rounded-full px-2 py-0.5">
                 {p}
               </span>
             ))}
@@ -468,7 +468,7 @@ export function CustomerSidebar({
             </h4>
             <Link
               href={`/contacts/${contactId}`}
-              className="text-[10px] text-blue-500 dark:text-blue-400 hover:text-blue-400 dark:hover:text-blue-300 flex items-center gap-0.5"
+              className="text-[10px] text-indigo-500 dark:text-indigo-400 hover:text-indigo-400 dark:hover:text-indigo-300 flex items-center gap-0.5"
             >
               查看全部
               <ExternalLink className="w-2.5 h-2.5" />

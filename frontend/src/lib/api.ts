@@ -374,6 +374,75 @@ export const actionsApi = {
   },
 };
 
+// ── Quick Replies API ──────────────────────────────────
+
+export interface QuickReplyItem {
+  id: string;
+  title: string;
+  category: string;
+  priority: string;
+  trigger: string;
+  trigger_keywords: string[];
+  user_identity: string | null;
+  channel: string;
+  content: string;
+  attachments: { type: string; label: string; value: string }[];
+}
+
+export const quickRepliesApi = {
+  async getAll(category?: string) {
+    try {
+      const params = new URLSearchParams();
+      if (category) params.set('category', category);
+      const qs = params.toString();
+      return await request<{ data: QuickReplyItem[]; total: number; categories: string[] }>(
+        `/quick-replies${qs ? `?${qs}` : ''}`
+      );
+    } catch {
+      // Fallback: return empty
+      return { data: [], total: 0, categories: [] };
+    }
+  },
+
+  async search(q: string, category?: string) {
+    try {
+      const params = new URLSearchParams({ q });
+      if (category) params.set('category', category);
+      return await request<{ data: QuickReplyItem[]; total: number; query: string }>(
+        `/quick-replies/search?${params.toString()}`
+      );
+    } catch {
+      return { data: [], total: 0, query: q };
+    }
+  },
+
+  async getById(id: string) {
+    try {
+      return await request<QuickReplyItem>(`/quick-replies/${id}`);
+    } catch {
+      return null;
+    }
+  },
+};
+
+// ── Inbox Image API ────────────────────────────────────
+
+export const inboxImageApi = {
+  async sendImage(conversationId: string | number, imageUrl: string, caption?: string) {
+    try {
+      return await request<{ message: string; sent_via_api: boolean; message_id: string }>(
+        `/inbox/conversations/${conversationId}/send-image`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ image_url: imageUrl, caption }),
+        }
+      );
+    } catch {
+      return { message: '圖片已記錄（離線模式）', sent_via_api: false, message_id: `mock-${Date.now()}` };
+    }
+  },
+};
+
 // ── Dashboard API ──────────────────────────────────────
 
 export const dashboardApi = {

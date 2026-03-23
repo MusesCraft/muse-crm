@@ -58,13 +58,22 @@ def create_app(config_name: str = 'development') -> Flask:
     # 配置 Celery
     _configure_celery(app, celery)
 
-    # 初始化 SocketIO
-    socketio.init_app(
-        app,
-        cors_allowed_origins='*',
-        async_mode='threading',
-        message_queue=app.config.get('REDIS_URL'),
-    )
+    # 初始化 SocketIO（Redis message_queue 為可選，連不上也不阻塞啟動）
+    try:
+        socketio.init_app(
+            app,
+            cors_allowed_origins='*',
+            async_mode='threading',
+            message_queue=app.config.get('REDIS_URL'),
+        )
+    except Exception as _socketio_err:
+        import logging
+        logging.getLogger(__name__).warning(f"SocketIO message_queue 初始化失敗，改用無 queue 模式: {_socketio_err}")
+        socketio.init_app(
+            app,
+            cors_allowed_origins='*',
+            async_mode='threading',
+        )
     # 匯入事件處理器（確保註冊到 socketio）
     from .realtime import events  # noqa: F401
 
@@ -80,7 +89,15 @@ def create_app(config_name: str = 'development') -> Flask:
             'service': 'muse-crm',
             'version': '1.0.0'
         }
-    
+
+    # 自動建立 DB tables（如果不存在）
+    with app.app_context():
+        try:
+            db.create_all()
+        except Exception as _db_err:
+            import logging
+            logging.getLogger(__name__).warning(f"DB create_all 失敗（可能表已存在）: {_db_err}")
+
     return app
 
 

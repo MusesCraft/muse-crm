@@ -132,43 +132,36 @@ class MergeService:
     
     @staticmethod
     def query_id_match(
-        user_id: str, 
+        user_id: str,
         source_app_id: str,
         target_app_id: str
     ) -> Optional[str]:
         """
         透過 Meta Graph API 的 id_match endpoint 查詢跨 App 身份對應。
-        
-        Phase 2: Stub — 僅記錄呼叫，不實際請求 API。
-        Phase 3: 實作實際的 API 呼叫。
-        
+
         API Endpoint: GET /{app-id}/id_matches
         Docs: https://developers.facebook.com/docs/messenger-platform/identity/id-matching/
-        
+
         Args:
             user_id: 使用者在來源 App 的 ID
             source_app_id: 來源 App ID
             target_app_id: 目標 App ID（要查詢對應 ID 的 App）
-            
+
         Returns:
             目標 App 中的使用者 ID，或 None
         """
         logger.info(
-            f"🔍 [id_match] Stub 呼叫："
+            f"🔍 [id_match] 查詢："
             f"user={user_id}, source_app={source_app_id}, target_app={target_app_id}"
         )
-        
-        # TODO Phase 3: 實作 Meta Graph API 呼叫
-        # url = f"https://graph.facebook.com/v21.0/{source_app_id}/id_matches"
-        # params = {
-        #     'id': user_id,
-        #     'app_id': target_app_id,
-        #     'access_token': access_token,
-        # }
-        # response = requests.get(url, params=params)
-        # matched_id = response.json().get('data', [{}])[0].get('id')
-        
-        return None
+
+        matched_id = meta_api.get_id_match(
+            user_id=user_id,
+            source_app_id=source_app_id,
+            target_app_id=target_app_id
+        )
+
+        return matched_id
     
     # ──────────────────────────────────────────────
     # 3. 批量合併掃描（定期任務用）
@@ -279,20 +272,22 @@ class MergeService:
 def _fetch_asid_from_meta(channel: str, external_id: str) -> Optional[str]:
     """
     從 Meta Graph API 取得 App-Scoped User ID。
-    
-    Phase 2: Stub — 返回 None。
-    Phase 3: 實作 API 呼叫。
-    
+
+    透過 /{user-id}?fields=ids_for_apps 取得 ASID。
+
     Args:
         channel: 渠道名稱
         external_id: 平台外部 ID
-        
+
     Returns:
         ASID 或 None
     """
-    logger.debug(f"[merge] _fetch_asid_from_meta stub: channel={channel}, id={external_id}")
-    
-    # TODO Phase 3: 透過 Meta Graph API 取得 ASID
-    # 可能需要呼叫 /{user-id}?fields=ids_for_apps
-    
-    return None
+    logger.debug(f"[merge] _fetch_asid_from_meta: channel={channel}, id={external_id}")
+
+    if channel not in ('messenger', 'instagram'):
+        return None
+
+    asid = meta_api.get_ids_for_apps(external_id)
+    if asid:
+        logger.info(f"[merge] 成功取得 ASID：channel={channel}, id={external_id}, asid={asid}")
+    return asid

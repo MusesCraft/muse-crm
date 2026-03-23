@@ -183,6 +183,101 @@ class MetaGraphAPI:
             logger.error(f"解析粉絲專頁資訊失敗: {e}")
             return None
     
+    def get_ids_for_apps(self, user_id: str) -> Optional[str]:
+        """
+        透過 Meta Graph API 取得使用者的 App-Scoped User ID。
+
+        呼叫 /{user-id}?fields=ids_for_apps 取得 ASID。
+
+        Args:
+            user_id: 使用者的 PSID 或 IGSID
+
+        Returns:
+            ASID 或 None
+        """
+        if not self.access_token:
+            logger.warning("Missing META_PAGE_TOKEN，無法取得 ASID")
+            return None
+
+        try:
+            url = f"{self.base_url}/{user_id}"
+            params = {
+                'fields': 'ids_for_apps',
+                'access_token': self.access_token
+            }
+
+            response = requests.get(url, params=params, timeout=self.timeout)
+            response.raise_for_status()
+
+            data = response.json()
+            ids_for_apps = data.get('ids_for_apps', {}).get('data', [])
+
+            if ids_for_apps:
+                # 取第一個 app 的 id 作為 ASID
+                asid = ids_for_apps[0].get('id')
+                logger.info(f"成功取得 ASID：user={user_id}, asid={asid}")
+                return asid
+
+            logger.debug(f"使用者無 ids_for_apps 資料：{user_id}")
+            return None
+
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"取得 ASID 失敗 {user_id}: {e}")
+            return None
+
+    def get_id_match(
+        self,
+        user_id: str,
+        source_app_id: str,
+        target_app_id: str
+    ) -> Optional[str]:
+        """
+        透過 Meta Graph API 的 id_match endpoint 查詢跨 App 身份對應。
+
+        API: GET /{app-id}/id_matches?id={user_id}&app_id={target_app_id}
+
+        Args:
+            user_id: 使用者在來源 App 的 ID
+            source_app_id: 來源 App ID
+            target_app_id: 目標 App ID
+
+        Returns:
+            目標 App 中的使用者 ID，或 None
+        """
+        if not self.access_token:
+            logger.warning("Missing META_PAGE_TOKEN，無法查詢 id_match")
+            return None
+
+        try:
+            url = f"{self.base_url}/{source_app_id}/id_matches"
+            params = {
+                'id': user_id,
+                'app_id': target_app_id,
+                'access_token': self.access_token
+            }
+
+            response = requests.get(url, params=params, timeout=self.timeout)
+            response.raise_for_status()
+
+            data = response.json()
+            matches = data.get('data', [])
+
+            if matches:
+                matched_id = matches[0].get('id')
+                logger.info(
+                    f"id_match 成功：user={user_id}, "
+                    f"source_app={source_app_id} → target_app={target_app_id}, "
+                    f"matched_id={matched_id}"
+                )
+                return matched_id
+
+            logger.debug(f"id_match 無匹配：user={user_id}")
+            return None
+
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"id_match 查詢失敗：{e}")
+            return None
+
     def validate_webhook_token(self, verify_token: str) -> bool:
         """
         驗證 Webhook Token（用於設定檢查）

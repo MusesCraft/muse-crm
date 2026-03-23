@@ -34,6 +34,7 @@ class BaseConfig:
     
     # Meta Business API
     META_APP_SECRET = os.environ.get('META_APP_SECRET')
+    META_APP_ID = os.environ.get('META_APP_ID')
     META_VERIFY_TOKEN = os.environ.get('META_VERIFY_TOKEN', 'muse_crm_verify')
     META_PAGE_TOKEN = os.environ.get('META_PAGE_TOKEN')
     

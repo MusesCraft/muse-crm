@@ -22,6 +22,7 @@ from ..services.session_service import SessionService
 from ..utils.meta_api import meta_api
 from ..tasks.session_tasks import analyze_message
 from ..tasks.analysis_tasks import quick_triage_message
+from ..services.merge_service import MergeService
 
 logger = logging.getLogger(__name__)
 
@@ -304,6 +305,15 @@ def _handle_webhook_message(
             ad_referral=ad_referral
         )
         
+        # ── 1.5 跨渠道合併檢測 ──
+        merged_contact = MergeService.check_and_merge_on_message(
+            channel=channel,
+            external_id=sender_id,
+            contact=contact
+        )
+        if merged_contact:
+            contact = merged_contact
+
         # ── 2. 取得或建立對話 Session ──
         conversation = SessionService.get_or_create_conversation(
             contact=contact,

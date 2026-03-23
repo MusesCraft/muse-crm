@@ -4,7 +4,7 @@ MUSE CRM — Conversation Model
 對話 Session 模型。
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy import String, DateTime, Boolean, Integer, Index, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -121,13 +121,20 @@ class Conversation(db.Model):
     
     @property
     def is_expired(self) -> bool:
-        """檢查對話是否已超時"""
+        """檢查對話是否已超時（正確處理 timezone-aware datetime）"""
         if not self.last_message_at or self.status != 'active':
             return False
-        
+
         from datetime import timedelta
         timeout_delta = timedelta(minutes=self.timeout_minutes)
-        return (datetime.utcnow() - self.last_message_at.replace(tzinfo=None)) > timeout_delta
+        now = datetime.now(timezone.utc)
+
+        # 統一處理 timezone：如果 last_message_at 是 naive，視為 UTC
+        last_msg = self.last_message_at
+        if last_msg.tzinfo is None:
+            last_msg = last_msg.replace(tzinfo=timezone.utc)
+
+        return (now - last_msg) > timeout_delta
     
     def close_conversation(self) -> None:
         """關閉對話"""

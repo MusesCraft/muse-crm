@@ -128,10 +128,10 @@ class SessionService:
             
             logger.info(f"對話已關閉：{conversation_id}, 原因：{reason}")
             
-            # 觸發 LLM 分析（如果尚未分析）
+            # 觸發 LLM 分析（如果尚未分析）— 直接 dispatch，不繞 queue
             if reason in ('manual', 'timeout') and not conversation.analyses:
-                from ..tasks.session_tasks import trigger_analysis_task
-                trigger_analysis_task.delay(conversation_id)
+                from ..tasks.analysis_tasks import analyze_conversation
+                analyze_conversation.delay(str(conversation_id), 'auto')
             
             return True
             
@@ -166,10 +166,10 @@ class SessionService:
                     conv.close_conversation()
                     closed_count += 1
                     
-                    # 觸發 LLM 分析
+                    # 觸發 LLM 分析 — 直接 dispatch，不繞 queue
                     if not conv.analyses:
-                        from ..tasks.session_tasks import trigger_analysis_task
-                        trigger_analysis_task.delay(str(conv.id))
+                        from ..tasks.analysis_tasks import analyze_conversation
+                        analyze_conversation.delay(str(conv.id), 'auto')
                         
                 except Exception as e:
                     logger.error(f"清理過期對話失敗 {conv.id}: {e}")

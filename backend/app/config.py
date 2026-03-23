@@ -74,25 +74,6 @@ class ProductionConfig(BaseConfig):
     
     DEBUG = False
     TESTING = False
-    
-    # 生產環境強制使用環境變數
-    @classmethod
-    def init_app(cls, app):
-        BaseConfig.init_app(app)
-        
-        # 檢查必要的環境變數
-        required_vars = [
-            'SECRET_KEY',
-            'DATABASE_URL',
-            'REDIS_URL',
-            'OPENROUTER_API_KEY',
-            'META_APP_SECRET',
-            'META_PAGE_TOKEN'
-        ]
-        
-        missing_vars = [var for var in required_vars if not os.environ.get(var)]
-        if missing_vars:
-            raise RuntimeError(f"Missing required environment variables: {missing_vars}")
 
 
 class TestingConfig(BaseConfig):

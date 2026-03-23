@@ -19,6 +19,7 @@ config_name = os.environ.get('FLASK_ENV', 'production')
 
 # 建立 Flask 應用
 application = create_app(config_name)
+app = application  # gunicorn 預設找 app
 
 if __name__ == "__main__":
     application.run()

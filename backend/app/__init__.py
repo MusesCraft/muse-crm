@@ -33,8 +33,23 @@ def create_app(config_name: str = 'development') -> Flask:
     
     # 載入配置
     from .config import config
-    app.config.from_object(config[config_name])
-    
+    config_cls = config[config_name]
+    app.config.from_object(config_cls)
+
+    # 安全檢查：SECRET_KEY 和 JWT_SECRET_KEY 不可為空
+    if not app.config.get('SECRET_KEY'):
+        raise RuntimeError(
+            "SECRET_KEY 未設定。請透過環境變數提供 SECRET_KEY。"
+        )
+    if not app.config.get('JWT_SECRET_KEY'):
+        raise RuntimeError(
+            "JWT_SECRET_KEY 未設定。請透過環境變數提供 JWT_SECRET（或 JWT_SECRET_KEY）。"
+        )
+
+    # Production 環境額外驗證
+    if hasattr(config_cls, 'init_app'):
+        config_cls.init_app(app)
+
     # 初始化擴展
     db.init_app(app)
     migrate.init_app(app, db)

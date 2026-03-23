@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_secret():
-    return current_app.config.get('JWT_SECRET_KEY', 'dev-secret-key')
+    return current_app.config['JWT_SECRET_KEY']
 
 
 def _get_expiry_hours():

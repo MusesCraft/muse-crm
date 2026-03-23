@@ -17,4 +17,7 @@ ENV FLASK_ENV=production
 EXPOSE 5000
 
 # Production: gunicorn with eventlet for WebSocket support
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "4", "--timeout", "120", "wsgi:app"]
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+CMD ["/app/entrypoint.sh"]

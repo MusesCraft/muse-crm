@@ -34,6 +34,10 @@ class SystemSetting(db.Model):
         'llm_monthly_token_limit': '',       # 空字串表示不限制
         'llm_cost_limit_enabled': 'true',
         'min_messages_for_analysis': '3',    # 短對話跳過分析門檻
+        'notification_enabled': 'true',               # 通知功能開關
+        'notification_discord_webhook_url': '',        # Discord Webhook URL
+        'notification_line_notify_token': '',          # LINE Notify token
+        'action_reminder_hours': '24',                 # 待辦提醒：到期前 N 小時
     }
 
     @classmethod

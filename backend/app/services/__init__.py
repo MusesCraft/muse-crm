@@ -9,6 +9,7 @@ from .session_service import SessionService
 from .llm_service import LLMService, get_llm_service
 from .auto_tagger import AutoTagger
 from .action_service import ActionService
+from .notification_service import NotificationService
 
 __all__ = [
     'ContactService',
@@ -17,4 +18,5 @@ __all__ = [
     'get_llm_service',
     'AutoTagger',
     'ActionService',
+    'NotificationService',
 ]

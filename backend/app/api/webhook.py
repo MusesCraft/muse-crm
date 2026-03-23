@@ -23,6 +23,7 @@ from ..utils.meta_api import meta_api
 from ..tasks.session_tasks import analyze_message
 from ..tasks.analysis_tasks import quick_triage_message
 from ..services.merge_service import MergeService
+from ..services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -381,7 +382,17 @@ def _handle_webhook_message(
             db.session.commit()
             
             logger.info(f"✅ [webhook] 訊息已儲存：conversation={conversation.id}, message={message.id}")
-            
+
+            # ── 5.5 發送新訊息通知 ──
+            try:
+                NotificationService.notify_new_message(
+                    contact=contact,
+                    message_content=message_text,
+                    channel=channel,
+                )
+            except Exception as notify_err:
+                logger.warning(f"[webhook] 新訊息通知發送失敗: {notify_err}")
+
             # ── 6. 輕量即時分類（Phase 5A: per-message quick triage） ──
             if message.has_text_content and message.is_from_customer:
                 try:

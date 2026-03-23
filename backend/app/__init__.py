@@ -78,6 +78,11 @@ def _configure_celery(app: Flask, celery: Celery) -> None:
                 'schedule': 1800.0,  # 每 30 分鐘重試失敗的分析
                 'options': {'queue': 'maintenance'},
             },
+            'check-due-actions': {
+                'task': 'app.tasks.notification_tasks.check_due_actions',
+                'schedule': 3600.0,  # 每小時檢查即將到期的待辦動作
+                'options': {'queue': 'maintenance'},
+            },
         },
     )
     

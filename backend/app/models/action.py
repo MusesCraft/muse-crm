@@ -51,6 +51,11 @@ class Action(db.Model):
     due_date: Mapped[Optional[date]] = mapped_column(Date)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     
+    # 提醒
+    reminder_sent_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     # 審計欄位
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 
@@ -157,6 +162,7 @@ class Action(db.Model):
             'assigned_to': self.assigned_to,
             'due_date': self.due_date.isoformat() if self.due_date else None,
             'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+            'reminder_sent_at': self.reminder_sent_at.isoformat() if self.reminder_sent_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

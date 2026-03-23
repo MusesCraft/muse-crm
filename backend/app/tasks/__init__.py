@@ -13,6 +13,7 @@ from .analysis_tasks import (
     process_analysis_queue,
     retry_failed_analysis,
 )
+from .notification_tasks import check_due_actions
 
 __all__ = [
     'trigger_analysis_task',
@@ -23,4 +24,5 @@ __all__ = [
     'batch_analyze_pending',
     'process_analysis_queue',
     'retry_failed_analysis',
+    'check_due_actions',
 ]

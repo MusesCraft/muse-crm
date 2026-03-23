@@ -1,16 +1,14 @@
 """
-MUSE CRM — Meta Webhook API
+MUSE CRM — Webhook API
 
-Meta Business Webhook 接收模組，支援 Messenger 和 Instagram DM。
+多渠道 Webhook 接收模組，支援 Meta（Messenger + Instagram）和 LINE。
 實作完整的訊息存儲、客戶建檔和冪等性處理。
 """
 
-import hashlib
-import hmac
 import logging
 import threading
 from datetime import datetime
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional
 from flask import request, current_app, jsonify
 from sqlalchemy.exc import IntegrityError
 
@@ -19,12 +17,13 @@ from ..models import Contact, ChannelIdentifier, Conversation, Message
 from .. import db
 from ..services.contact_service import ContactService
 from ..services.session_service import SessionService
-from ..utils.meta_api import meta_api
 from ..tasks.session_tasks import analyze_message
 from ..tasks.analysis_tasks import quick_triage_message
 from ..services.merge_service import MergeService
 from ..services.notification_service import NotificationService
 from ..realtime.emitter import emit_scoped
+from ..channels import ChannelEvent
+from ..channels.registry import channel_registry
 
 logger = logging.getLogger(__name__)
 
@@ -58,269 +57,81 @@ def webhook_verify():
 def webhook_receive():
     """
     Meta Webhook 接收端點（Messenger + Instagram DM）。
-    
+
     流程：
-    1. 驗證 X-Hub-Signature-256（如果有 APP_SECRET）
-    2. 解析 messaging events（支援 Messenger + Instagram）
-    3. 提取訊息資料和附件
-    4. 背景處理存儲和分析
-    5. 回傳 200 OK（Meta 要求 5 秒內回應）
-    
+    1. 驗證 X-Hub-Signature-256（透過 MetaAdapter）
+    2. 解析 messaging events（透過 MetaAdapter.parse_events）
+    3. 背景處理存儲和分析
+    4. 回傳 200 OK（Meta 要求 5 秒內回應）
+
     Returns:
         200 OK 或錯誤狀態碼
     """
+    meta_adapter = channel_registry.get_adapter('meta')
+
     # ── 驗證簽名 ──
     app_secret = current_app.config.get('META_APP_SECRET')
     if app_secret:
         signature = request.headers.get('X-Hub-Signature-256', '')
-        if not _verify_signature(request.data, signature, app_secret):
+        if not meta_adapter.verify_signature(request.data, signature):
             logger.warning("❌ Webhook 簽名驗證失敗")
             return jsonify({'error': 'Invalid signature'}), 403
-    
+
     # ── 解析 payload ──
     data = request.get_json(silent=True)
     if not data:
         logger.debug("收到空的 webhook payload")
         return 'OK', 200
-    
+
     # 支援多種 object 類型
     object_type = data.get('object')
     if object_type not in ('page', 'instagram'):
         logger.debug(f"不支援的 object 類型：{object_type}")
         return 'OK', 200
-    
-    # ── 收集待處理的訊息事件 ──
-    message_events = _extract_message_events(data)
-    
+
+    # ── 透過 MetaAdapter 解析事件 ──
+    channel_events = meta_adapter.parse_events(data)
+
     # ── 先回 200 給 Meta，再背景處理（避免超時重發） ──
-    for event in message_events:
+    for event in channel_events:
         threading.Thread(
-            target=_handle_webhook_message_with_context,
-            args=(current_app._get_current_object(),) + event,
+            target=_handle_channel_event_with_context,
+            args=(current_app._get_current_object(), event),
             daemon=True,
         ).start()
-    
-    logger.info(f"✅ Webhook 收到 {len(message_events)} 個訊息事件")
+
+    logger.info(f"✅ Meta Webhook 收到 {len(channel_events)} 個訊息事件")
     return 'OK', 200
 
 
-def _verify_signature(payload: bytes, signature: str, app_secret: str) -> bool:
-    """
-    驗證 Meta Webhook 的 X-Hub-Signature-256。
-    
-    Args:
-        payload: 請求 body（bytes）
-        signature: X-Hub-Signature-256 header 值
-        app_secret: Meta App Secret
-    
-    Returns:
-        簽名是否有效
-    """
-    if not signature.startswith('sha256='):
-        return False
-    
-    expected = hmac.new(
-        app_secret.encode('utf-8'),
-        payload,
-        hashlib.sha256,
-    ).hexdigest()
-    
-    return hmac.compare_digest(f'sha256={expected}', signature)
-
-
-def _extract_message_events(data: Dict[str, Any]) -> List[Tuple[str, str, str, str, Dict[str, Any], Optional[Dict[str, Any]]]]:
-    """
-    從 Meta Webhook payload 中提取訊息事件。
-    支援 Messenger 和 Instagram DM。
-    
-    Args:
-        data: Webhook payload
-        
-    Returns:
-        List of (channel, sender_id, message_text, message_type, attachments, ad_referral)
-    """
-    events = []
-    object_type = data.get('object')
-    
-    for entry in data.get('entry', []):
-        # Messenger events
-        if 'messaging' in entry:
-            channel = 'messenger'
-            for event in entry['messaging']:
-                extracted = _extract_messenger_event(event, channel)
-                if extracted:
-                    events.append(extracted)
-        
-        # Instagram events
-        elif 'changes' in entry:
-            channel = 'instagram'
-            for change in entry['changes']:
-                if change.get('field') == 'messages':
-                    extracted = _extract_instagram_event(change, channel)
-                    if extracted:
-                        events.append(extracted)
-    
-    return events
-
-
-def _extract_messenger_event(event: Dict[str, Any], channel: str) -> Optional[Tuple[str, str, str, str, Dict[str, Any], Optional[Dict[str, Any]]]]:
-    """
-    提取 Messenger 訊息事件。
-    
-    Returns:
-        (channel, sender_id, message_text, message_type, attachments, ad_referral) 或 None
-    """
-    sender_id = event.get('sender', {}).get('id')
-    if not sender_id or 'message' not in event:
-        return None
-    
-    message_obj = event['message']
-    message_id = message_obj.get('mid')
-    message_text = message_obj.get('text', '')
-    
-    # 判斷訊息類型和提取附件
-    message_type = 'text'
-    attachments = {}
-    
-    if 'attachments' in message_obj:
-        attachment = message_obj['attachments'][0]  # 取第一個附件
-        attachment_type = attachment.get('type')
-        
-        if attachment_type == 'image':
-            message_type = 'image'
-            attachments['media_url'] = attachment.get('payload', {}).get('url')
-        elif attachment_type in ('audio', 'video', 'file'):
-            message_type = 'attachment'
-            attachments['media_url'] = attachment.get('payload', {}).get('url')
-            attachments['attachment_type'] = attachment_type
-        elif attachment_type == 'template':
-            message_type = 'sticker'
-            
-        attachments['metadata'] = attachment
-    
-    # 解析 Ad Referral — 同時檢查事件層級和訊息層級的 referral
-    ad_referral = None
-    referral = None
-
-    # 優先：事件層級 referral（如使用者透過廣告首次開啟對話）
-    if 'referral' in event:
-        referral = event['referral']
-    # 其次：訊息層級 referral
-    elif 'referral' in message_obj:
-        referral = message_obj['referral']
-
-    if referral:
-        ad_referral = {
-            'ref': referral.get('ref'),
-            'ad_id': referral.get('ad_id'),
-            'campaign_name': referral.get('campaign_name'),
-            'creative_id': referral.get('creative_id'),
-            'source': referral.get('source', 'ADS'),
-            'type': referral.get('type', 'OPEN_THREAD')
-        }
-
-    # 將 meta_message_id 加到 attachments 中
-    attachments['meta_message_id'] = message_id
-    
-    return (channel, sender_id, message_text, message_type, attachments, ad_referral)
-
-
-def _extract_instagram_event(change: Dict[str, Any], channel: str) -> Optional[Tuple[str, str, str, str, Dict[str, Any], Optional[Dict[str, Any]]]]:
-    """
-    提取 Instagram DM 訊息事件。
-    
-    Returns:
-        (channel, sender_id, message_text, message_type, attachments, ad_referral) 或 None
-    """
-    value = change.get('value', {})
-    
-    # Instagram webhook 結構不同於 Messenger
-    sender_id = value.get('from', {}).get('id')
-    if not sender_id:
-        return None
-    
-    message_obj = value.get('message', {})
-    message_id = message_obj.get('mid') or value.get('id')
-    message_text = message_obj.get('text', '')
-    
-    # Instagram DM 附件處理
-    message_type = 'text'
-    attachments = {}
-    
-    if 'attachments' in message_obj:
-        attachment = message_obj['attachments'][0]
-        attachment_type = attachment.get('type')
-        
-        if attachment_type == 'image':
-            message_type = 'image'
-            attachments['media_url'] = attachment.get('payload', {}).get('url')
-        elif attachment_type in ('audio', 'video', 'file'):
-            message_type = 'attachment'
-            attachments['media_url'] = attachment.get('payload', {}).get('url')
-            attachments['attachment_type'] = attachment_type
-        
-        attachments['metadata'] = attachment
-    
-    # Instagram referral 處理（支援 ad referral、ice_breaker、ig_web_url）
-    ad_referral = None
-    referral = value.get('referral')
-
-    if referral:
-        ad_referral = {
-            'ref': referral.get('ref'),
-            'ad_id': referral.get('ad_id'),
-            'campaign_name': referral.get('campaign_name'),
-            'creative_id': referral.get('creative_id'),
-            'source': referral.get('source', 'ADS'),
-            'type': referral.get('type', 'OPEN_THREAD')
-        }
-    else:
-        # 檢查 Instagram 特有的 entry point 類型
-        entry_point = value.get('entry_point')
-        if entry_point in ('ice_breaker', 'ig_web_url', 'ig_ad'):
-            ad_referral = {
-                'ref': value.get('ref'),
-                'ad_id': value.get('ad_id'),
-                'source': entry_point,
-                'type': entry_point
-            }
-
-    # 將 meta_message_id 加到 attachments 中
-    attachments['meta_message_id'] = message_id
-
-    return (channel, sender_id, message_text, message_type, attachments, ad_referral)
-
-
-def _handle_webhook_message_with_context(app, *args):
-    """帶有 Flask 應用上下文的 webhook 處理包裝器"""
+def _handle_channel_event_with_context(app, event: 'ChannelEvent'):
+    """帶有 Flask 應用上下文的 ChannelEvent 處理包裝器"""
     with app.app_context():
-        _handle_webhook_message(*args)
+        _handle_channel_event(event)
 
 
-def _handle_webhook_message(
-    channel: str, 
-    sender_id: str, 
-    message_text: str, 
-    message_type: str,
-    attachments: Dict[str, Any], 
-    ad_referral: Optional[Dict[str, Any]] = None
-):
+def _handle_channel_event(event: 'ChannelEvent'):
     """
-    背景線程處理單一 webhook 訊息。
-    
+    統一處理所有渠道的 ChannelEvent。
+
+    此函數由 Meta webhook 和 LINE webhook 共用，
+    接收標準化的 ChannelEvent 並執行完整的訊息處理流程。
+
     Args:
-        channel: 渠道 (messenger/instagram)
-        sender_id: Meta 平台的 sender ID
-        message_text: 訊息內容
-        message_type: 訊息類型 (text/image/attachment/sticker/referral)
-        attachments: 附件資訊和 metadata
-        ad_referral: 廣告轉介資訊（可選）
+        event: 統一的渠道事件
     """
+    channel = event.channel
+    sender_id = event.sender_id
+    message_text = event.message_text
+    message_type = event.message_type
+    attachments = event.attachments
+    ad_referral = event.ad_referral
+
     meta_message_id = attachments.get('meta_message_id')
     content_preview = message_text[:50] + '...' if len(message_text) > 50 else message_text
-    
+
     logger.info(f"📩 [webhook] {channel} sender={sender_id} type={message_type} content='{content_preview}'")
-    
+
     try:
         # ── 冪等性檢查：檢查是否已處理此訊息 ──
         if meta_message_id:
@@ -328,14 +139,14 @@ def _handle_webhook_message(
             if existing_message:
                 logger.info(f"⏭️ [webhook] 跳過重複訊息 mid={meta_message_id}")
                 return
-        
+
         # ── 1. 取得或建立客戶記錄（含 profile 拉取） ──
         contact = _get_or_create_contact_with_profile(
             channel=channel,
             external_id=sender_id,
             ad_referral=ad_referral
         )
-        
+
         # ── 1.5 如果有 ad_referral，更新 contact.source_type ──
         if ad_referral and contact.source_type != 'ad_referral':
             contact.source_type = 'ad_referral'
@@ -356,7 +167,7 @@ def _handle_webhook_message(
             channel=channel,
             ad_referral=ad_referral
         )
-        
+
         # ── 3. 建立訊息記錄（含附件處理） ──
         message = Message(
             conversation_id=conversation.id,
@@ -369,19 +180,19 @@ def _handle_webhook_message(
             meta_message_id=meta_message_id,
             sent_at=datetime.utcnow()
         )
-        
+
         try:
             db.session.add(message)
-            
+
             # ── 4. 更新對話統計 ──
             conversation.message_count += 1
             conversation.last_message_at = datetime.utcnow()
-            
+
             # ── 5. 更新客戶最後活躍時間 ──
             contact.last_active_at = datetime.utcnow()
-            
+
             db.session.commit()
-            
+
             logger.info(f"✅ [webhook] 訊息已儲存：conversation={conversation.id}, message={message.id}")
 
             # ── 5.5 發送新訊息通知 ──
@@ -418,41 +229,36 @@ def _handle_webhook_message(
                     quick_triage_message.delay(str(message.id))
                     logger.debug(f"[webhook] 已觸發快速分類：message={message.id}")
                 except Exception as triage_err:
-                    # 快速分類失敗不影響主流程
                     logger.warning(f"[webhook] 觸發快速分類失敗：{triage_err}")
-            
+
             # ── 7. 深度分析在 Session 關閉時觸發（PRD §3.4），非 per-message ──
-            # 分析觸發由 SessionService.close_expired_sessions() 和
-            # cleanup_expired_sessions celery beat 負責
-            
+
         except IntegrityError as e:
-            # 處理 meta_message_id 重複的情況
             db.session.rollback()
             if 'meta_message_id' in str(e):
                 logger.info(f"⏭️ [webhook] 檢測到重複 meta_message_id，跳過存儲：{meta_message_id}")
             else:
                 logger.error(f"❌ [webhook] 資料庫完整性錯誤：{e}")
                 raise
-        
+
     except Exception as e:
         logger.error(f"❌ [webhook] 處理失敗 {channel} sender={sender_id}: {e}", exc_info=True)
-        if 'db.session' in locals():
-            db.session.rollback()
+        db.session.rollback()
 
 
 def _get_or_create_contact_with_profile(
-    channel: str, 
-    external_id: str, 
+    channel: str,
+    external_id: str,
     ad_referral: Optional[Dict[str, Any]] = None
 ) -> Contact:
     """
-    取得或建立客戶記錄，並嘗試從 Meta Graph API 拉取 profile。
-    
+    取得或建立客戶記錄，並嘗試透過對應渠道 Adapter 拉取 profile。
+
     Args:
         channel: 渠道名稱
         external_id: 外部平台 ID
         ad_referral: 廣告轉介資訊
-        
+
     Returns:
         客戶記錄
     """
@@ -461,23 +267,22 @@ def _get_or_create_contact_with_profile(
         channel=channel,
         external_id=external_id
     ).first()
-    
+
     if channel_id:
         contact = channel_id.contact
-        # 如果 profile_data 為空或較舊，嘗試重新拉取
+        # 如果 profile_data 為空，嘗試重新拉取
         if not channel_id.profile_data:
-            profile_data = _fetch_user_profile(channel, external_id)
+            profile_data = _fetch_user_profile_via_adapter(channel, external_id)
             if profile_data:
                 channel_id.profile_data = profile_data
-                # 同時更新 contact 的基本資料
                 _update_contact_from_profile(contact, profile_data)
                 db.session.flush()
-        
+
         return contact
-    
+
     # 新建客戶，先拉取 profile
-    profile_data = _fetch_user_profile(channel, external_id)
-    
+    profile_data = _fetch_user_profile_via_adapter(channel, external_id)
+
     # 使用 ContactService 建立客戶
     contact = ContactService.get_or_create_contact(
         channel=channel,
@@ -485,49 +290,33 @@ def _get_or_create_contact_with_profile(
         profile_data=profile_data,
         ad_referral_info=ad_referral
     )
-    
+
     return contact
 
 
-def _fetch_user_profile(channel: str, external_id: str) -> Optional[Dict[str, Any]]:
+def _fetch_user_profile_via_adapter(channel: str, external_id: str) -> Optional[Dict[str, Any]]:
     """
-    從 Meta Graph API 拉取使用者 profile。
-    
+    透過渠道 Adapter 拉取使用者 profile。
+
+    根據 channel 名稱自動選用對應的 Adapter（Meta 或 LINE）。
+    Meta adapter 的 channel_name 為 'meta'，同時服務 messenger 和 instagram。
+
     Args:
-        channel: 渠道 (messenger/instagram)
+        channel: 渠道 (messenger/instagram/line)
         external_id: 使用者 ID
-        
+
     Returns:
         使用者 profile 或 None
     """
-    try:
-        if channel == 'messenger':
-            # Messenger: 支援 first_name, last_name, profile_pic, locale
-            profile = meta_api.get_user_profile(external_id)
-            if profile:
-                # 標準化格式
-                return {
-                    'first_name': profile.get('first_name'),
-                    'last_name': profile.get('last_name'),
-                    'name': profile.get('name'),
-                    'profile_pic': profile.get('profile_pic'),
-                    'locale': profile.get('locale')
-                }
-        
-        elif channel == 'instagram':
-            # Instagram: 通常只支援 name, profile_pic
-            # 注意：Instagram API 可能需要不同的權限和端點
-            profile = meta_api.get_user_profile(external_id)
-            if profile:
-                return {
-                    'name': profile.get('name'),
-                    'profile_pic': profile.get('profile_pic')
-                }
-    
-    except Exception as e:
-        logger.warning(f"拉取 {channel} 用戶 profile 失敗 {external_id}: {e}")
-    
-    return None
+    # Meta 渠道（messenger/instagram）使用同一個 adapter
+    adapter_name = 'meta' if channel in ('messenger', 'instagram') else channel
+    adapter = channel_registry.get_adapter(adapter_name)
+
+    if not adapter:
+        logger.warning(f"找不到渠道 Adapter：{adapter_name}")
+        return None
+
+    return adapter.get_user_profile(external_id)
 
 
 def _update_contact_from_profile(contact: Contact, profile_data: Dict[str, Any]) -> None:

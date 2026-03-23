@@ -13,6 +13,7 @@ from sqlalchemy import func, cast, Date
 from . import api_bp
 from .. import db
 from ..models.llm_usage_log import LlmUsageLog
+from ..models.llm_fallback_event import LlmFallbackEvent
 from ..models.system_setting import SystemSetting
 
 logger = logging.getLogger(__name__)
@@ -255,3 +256,43 @@ def llm_budget_update():
     logger.info(f"LLM 預算設定已更新：{data}")
 
     return jsonify({'success': True, 'updated': data})
+
+
+@api_bp.route('/llm/fallback-events', methods=['GET'])
+def llm_fallback_events():
+    """
+    查詢 LLM 模型降級事件。
+
+    Query params:
+        page: 頁碼（預設 1）
+        per_page: 每頁筆數（預設 20，最大 100）
+    """
+    page = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 20, type=int), 100)
+
+    pagination = (
+        LlmFallbackEvent.query
+        .order_by(LlmFallbackEvent.created_at.desc())
+        .paginate(page=page, per_page=per_page, error_out=False)
+    )
+
+    events = [
+        {
+            'id': str(event.id),
+            'primary_model': event.primary_model,
+            'fallback_model': event.fallback_model,
+            'error_reason': event.error_reason,
+            'created_at': event.created_at.isoformat(),
+        }
+        for event in pagination.items
+    ]
+
+    return jsonify({
+        'events': events,
+        'pagination': {
+            'page': pagination.page,
+            'per_page': pagination.per_page,
+            'total': pagination.total,
+            'pages': pagination.pages,
+        },
+    })

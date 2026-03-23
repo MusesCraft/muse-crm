@@ -262,6 +262,7 @@ def analyze_conversation(self, conversation_id: str, trigger_type: str = "auto")
             task_type='full_analysis',
             usage_info=usage_info,
             conversation_id=conversation_id,
+            is_fallback=usage_info.get('is_fallback', False),
         )
 
         # 儲存分析結果到 DB
@@ -699,6 +700,7 @@ def _execute_conversation_analysis(conversation_id) -> bool:
             task_type='full_analysis',
             usage_info=usage_info,
             conversation_id=str(conversation_id),
+            is_fallback=usage_info.get('is_fallback', False),
         )
 
         # 儲存結果

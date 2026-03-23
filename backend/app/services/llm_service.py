@@ -39,9 +39,16 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# 模型優先順序：主要 → fallback
+# 模型優先順序：主要 → fallback（可擴展 chain）
 MODEL_PRIMARY = "anthropic/claude-3.5-sonnet"
 MODEL_FALLBACK = "openai/gpt-4"
+
+# 完整 fallback chain（依序嘗試）
+LLM_MODEL_CHAIN = [
+    "anthropic/claude-3.5-sonnet",
+    "openai/gpt-4",
+    "google/gemini-2.0-flash-001",
+]
 
 # 輕量分類模型（per-message triage，成本 <0.001 USD/message）
 TRIAGE_MODEL = "google/gemini-2.0-flash-lite-001"
@@ -94,15 +101,17 @@ class LLMService:
         api_key: Optional[str] = None,
         primary_model: str = MODEL_PRIMARY,
         fallback_model: str = MODEL_FALLBACK,
+        model_chain: Optional[List[str]] = None,
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = MAX_RETRIES,
     ):
         self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
         if not self.api_key:
             logger.warning("OPENROUTER_API_KEY 未設定，LLM 服務將無法使用")
-        
+
         self.primary_model = primary_model
         self.fallback_model = fallback_model
+        self.model_chain = model_chain or LLM_MODEL_CHAIN
         self.timeout = timeout
         self.max_retries = max_retries
         
@@ -207,11 +216,18 @@ class LLMService:
         """
         if not self.api_key:
             raise LLMServiceError("OPENROUTER_API_KEY 未設定")
-        
-        models_to_try = [model or self.primary_model, self.fallback_model]
+
+        # 建立 fallback chain：指定模型在前，其他 chain 成員在後（去重）
+        primary = model or self.primary_model
+        models_to_try = [primary]
+        for m in self.model_chain:
+            if m not in models_to_try:
+                models_to_try.append(m)
+
         last_error = None
-        
-        for current_model in models_to_try:
+
+        for idx, current_model in enumerate(models_to_try):
+            is_fallback = idx > 0
             try:
                 result, usage = self._call_with_retry(
                     messages=messages,
@@ -220,21 +236,55 @@ class LLMService:
                     max_tokens=max_tokens,
                     response_format=response_format,
                 )
+                # 標記是否為 fallback
+                usage['is_fallback'] = is_fallback
+                if is_fallback:
+                    usage['fallback_from'] = primary
+                    usage['fallback_error'] = str(last_error) if last_error else None
+                    logger.info(
+                        f"✅ Fallback 成功：{primary} → {current_model}，"
+                        f"原因：{last_error}"
+                    )
+                    self._record_fallback_event(
+                        primary_model=primary,
+                        fallback_model=current_model,
+                        error_reason=str(last_error) if last_error else 'unknown',
+                    )
                 return result, usage
             except LLMRateLimitError as e:
-                logger.warning(f"模型 {current_model} 被限速，嘗試 fallback: {e}")
+                logger.warning(f"模型 {current_model} 被限速，嘗試下一個 fallback: {e}")
                 last_error = e
                 continue
             except LLMTimeoutError as e:
-                logger.warning(f"模型 {current_model} 超時，嘗試 fallback: {e}")
+                logger.warning(f"模型 {current_model} 超時，嘗試下一個 fallback: {e}")
                 last_error = e
                 continue
             except LLMServiceError as e:
-                logger.warning(f"模型 {current_model} 呼叫失敗，嘗試 fallback: {e}")
+                logger.warning(f"模型 {current_model} 呼叫失敗，嘗試下一個 fallback: {e}")
                 last_error = e
                 continue
-        
-        raise LLMServiceError(f"所有模型都失敗: {last_error}")
+
+        raise LLMServiceError(f"所有模型都失敗（共 {len(models_to_try)} 個）: {last_error}")
+
+    def _record_fallback_event(
+        self,
+        primary_model: str,
+        fallback_model: str,
+        error_reason: str,
+    ) -> None:
+        """記錄 fallback 事件到 llm_fallback_events 表（best effort）"""
+        try:
+            from ..models.llm_fallback_event import LlmFallbackEvent
+            from .. import db
+            event = LlmFallbackEvent(
+                primary_model=primary_model,
+                fallback_model=fallback_model,
+                error_reason=error_reason[:500] if error_reason else '',
+            )
+            db.session.add(event)
+            # 不 commit，等外層統一 commit
+        except Exception as e:
+            logger.warning(f"記錄 fallback 事件失敗（非致命）: {e}")
     
     def _call_with_retry(
         self,

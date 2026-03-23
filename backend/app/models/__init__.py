@@ -13,6 +13,7 @@ from .tag import Tag, ContactTag
 from .user import User, UserNote
 from .llm_usage_log import LlmUsageLog
 from .system_setting import SystemSetting
+from .llm_fallback_event import LlmFallbackEvent
 
 # 匯出所有模型供其他模組使用
 __all__ = [
@@ -29,4 +30,5 @@ __all__ = [
     'UserNote',
     'LlmUsageLog',
     'SystemSetting',
+    'LlmFallbackEvent',
 ]

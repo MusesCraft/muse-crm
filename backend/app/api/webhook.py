@@ -196,10 +196,18 @@ def _extract_messenger_event(event: Dict[str, Any], channel: str) -> Optional[Tu
             
         attachments['metadata'] = attachment
     
-    # 解析 Ad Referral
+    # 解析 Ad Referral — 同時檢查事件層級和訊息層級的 referral
     ad_referral = None
-    if 'referral' in message_obj:
+    referral = None
+
+    # 優先：事件層級 referral（如使用者透過廣告首次開啟對話）
+    if 'referral' in event:
+        referral = event['referral']
+    # 其次：訊息層級 referral
+    elif 'referral' in message_obj:
         referral = message_obj['referral']
+
+    if referral:
         ad_referral = {
             'ref': referral.get('ref'),
             'ad_id': referral.get('ad_id'),
@@ -208,7 +216,7 @@ def _extract_messenger_event(event: Dict[str, Any], channel: str) -> Optional[Tu
             'source': referral.get('source', 'ADS'),
             'type': referral.get('type', 'OPEN_THREAD')
         }
-    
+
     # 將 meta_message_id 加到 attachments 中
     attachments['meta_message_id'] = message_id
     
@@ -251,12 +259,33 @@ def _extract_instagram_event(change: Dict[str, Any], channel: str) -> Optional[T
         
         attachments['metadata'] = attachment
     
-    # Instagram 一般不會有 Ad Referral，但保留欄位
+    # Instagram referral 處理（支援 ad referral、ice_breaker、ig_web_url）
     ad_referral = None
-    
+    referral = value.get('referral')
+
+    if referral:
+        ad_referral = {
+            'ref': referral.get('ref'),
+            'ad_id': referral.get('ad_id'),
+            'campaign_name': referral.get('campaign_name'),
+            'creative_id': referral.get('creative_id'),
+            'source': referral.get('source', 'ADS'),
+            'type': referral.get('type', 'OPEN_THREAD')
+        }
+    else:
+        # 檢查 Instagram 特有的 entry point 類型
+        entry_point = value.get('entry_point')
+        if entry_point in ('ice_breaker', 'ig_web_url', 'ig_ad'):
+            ad_referral = {
+                'ref': value.get('ref'),
+                'ad_id': value.get('ad_id'),
+                'source': entry_point,
+                'type': entry_point
+            }
+
     # 將 meta_message_id 加到 attachments 中
     attachments['meta_message_id'] = message_id
-    
+
     return (channel, sender_id, message_text, message_type, attachments, ad_referral)
 
 
@@ -305,7 +334,12 @@ def _handle_webhook_message(
             ad_referral=ad_referral
         )
         
-        # ── 1.5 跨渠道合併檢測 ──
+        # ── 1.5 如果有 ad_referral，更新 contact.source_type ──
+        if ad_referral and contact.source_type != 'ad_referral':
+            contact.source_type = 'ad_referral'
+            logger.info(f"[webhook] 更新 contact.source_type=ad_referral: {contact.id}")
+
+        # ── 1.6 跨渠道合併檢測 ──
         merged_contact = MergeService.check_and_merge_on_message(
             channel=channel,
             external_id=sender_id,

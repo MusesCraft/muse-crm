@@ -11,12 +11,13 @@ from .analysis import Analysis, AnalysisQueue
 from .action import Action
 from .tag import Tag, ContactTag
 from .user import User, UserNote
+from .llm_usage_log import LlmUsageLog
 
 # 匯出所有模型供其他模組使用
 __all__ = [
     'Contact',
     'ChannelIdentifier',
-    'Conversation', 
+    'Conversation',
     'Message',
     'Analysis',
     'AnalysisQueue',
@@ -24,5 +25,6 @@ __all__ = [
     'Tag',
     'ContactTag',
     'User',
-    'UserNote'
+    'UserNote',
+    'LlmUsageLog',
 ]

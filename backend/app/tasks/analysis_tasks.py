@@ -15,7 +15,7 @@ import logging
 from datetime import datetime
 
 from .. import celery, db
-from ..models import Analysis, AnalysisQueue, Conversation, Message
+from ..models import Analysis, AnalysisQueue, Conversation, Message, LlmUsageLog
 from ..services.llm_service import (
     LLMService,
     LLMServiceError,
@@ -68,6 +68,13 @@ def quick_triage_message(self, message_id: str):
 
         llm = get_llm_service()
         result, usage = llm.quick_triage(message.content)
+
+        # 記錄 LLM 用量
+        LlmUsageLog.record(
+            task_type='quick_triage',
+            usage_info=usage,
+            message_id=message_id,
+        )
 
         # 寫回 message 欄位
         intent = result.get("intent", "other")
@@ -241,6 +248,13 @@ def analyze_conversation(self, conversation_id: str, trigger_type: str = "auto")
             channel=conversation.channel,
             status=conversation.status,
             message_count=conversation.message_count or len(messages),
+        )
+
+        # 記錄 LLM 用量
+        LlmUsageLog.record(
+            task_type='full_analysis',
+            usage_info=usage_info,
+            conversation_id=conversation_id,
         )
 
         # 儲存分析結果到 DB
@@ -668,6 +682,13 @@ def _execute_conversation_analysis(conversation_id) -> bool:
             channel=conversation.channel,
             status=conversation.status,
             message_count=conversation.message_count or len(messages),
+        )
+
+        # 記錄 LLM 用量
+        LlmUsageLog.record(
+            task_type='full_analysis',
+            usage_info=usage_info,
+            conversation_id=str(conversation_id),
         )
 
         # 儲存結果

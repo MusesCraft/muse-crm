@@ -75,6 +75,11 @@ class LLMResponseParseError(LLMServiceError):
     pass
 
 
+class LLMBudgetExceededError(LLMServiceError):
+    """LLM 月度預算已超過上限"""
+    pass
+
+
 class LLMService:
     """
     OpenRouter LLM 服務。
@@ -108,6 +113,68 @@ class LLMService:
             "X-Title": "MUSE CRM",
         })
     
+    # ----------------------------------------------------------
+    # 預算檢查
+    # ----------------------------------------------------------
+
+    @staticmethod
+    def check_budget() -> None:
+        """
+        檢查本月 LLM 預算是否已超過上限。
+
+        Raises:
+            LLMBudgetExceededError: 超過預算上限
+        """
+        from ..models.system_setting import SystemSetting
+        from ..models.llm_usage_log import LlmUsageLog
+
+        if not SystemSetting.get_bool('llm_cost_limit_enabled', default=True):
+            return
+
+        cost_limit = SystemSetting.get_float('llm_monthly_cost_limit_usd', default=50.0)
+        token_limit = SystemSetting.get_int('llm_monthly_token_limit')
+
+        # 查詢本月累計
+        from datetime import datetime
+        now = datetime.utcnow()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        from sqlalchemy import func
+        from .. import db
+
+        result = db.session.query(
+            func.coalesce(func.sum(LlmUsageLog.estimated_cost_usd), 0).label('cost'),
+            func.coalesce(func.sum(LlmUsageLog.total_tokens), 0).label('tokens'),
+        ).filter(LlmUsageLog.created_at >= month_start).one()
+
+        current_cost = float(result.cost)
+        current_tokens = int(result.tokens)
+
+        # 檢查成本上限
+        if cost_limit > 0 and current_cost >= cost_limit:
+            raise LLMBudgetExceededError(
+                f"月度成本已達上限：${current_cost:.4f} / ${cost_limit:.2f}"
+            )
+
+        # 檢查 token 上限
+        if token_limit and current_tokens >= token_limit:
+            raise LLMBudgetExceededError(
+                f"月度 token 已達上限：{current_tokens} / {token_limit}"
+            )
+
+        # 80% 警告
+        if cost_limit > 0 and current_cost >= cost_limit * 0.8:
+            logger.warning(
+                f"⚠️ LLM 月度成本已達 {current_cost / cost_limit * 100:.1f}%："
+                f"${current_cost:.4f} / ${cost_limit:.2f}"
+            )
+
+        if token_limit and current_tokens >= token_limit * 0.8:
+            logger.warning(
+                f"⚠️ LLM 月度 token 已達 {current_tokens / token_limit * 100:.1f}%："
+                f"{current_tokens} / {token_limit}"
+            )
+
     # ----------------------------------------------------------
     # 核心請求方法
     # ----------------------------------------------------------

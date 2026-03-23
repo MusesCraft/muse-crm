@@ -13,6 +13,7 @@ from sqlalchemy import func, cast, Date
 from . import api_bp
 from .. import db
 from ..models.llm_usage_log import LlmUsageLog
+from ..models.system_setting import SystemSetting
 
 logger = logging.getLogger(__name__)
 
@@ -172,3 +173,85 @@ def llm_usage_logs():
             'pages': pagination.pages,
         },
     })
+
+
+@api_bp.route('/llm/budget', methods=['GET'])
+def llm_budget_status():
+    """
+    取得當前 LLM 預算狀態。
+    """
+    enabled = SystemSetting.get_bool('llm_cost_limit_enabled', default=True)
+    cost_limit = SystemSetting.get_float('llm_monthly_cost_limit_usd', default=50.0)
+    token_limit = SystemSetting.get_int('llm_monthly_token_limit')
+
+    # 查詢本月累計
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    result = db.session.query(
+        func.coalesce(func.sum(LlmUsageLog.estimated_cost_usd), 0).label('cost'),
+        func.coalesce(func.sum(LlmUsageLog.total_tokens), 0).label('tokens'),
+        func.count(LlmUsageLog.id).label('requests'),
+    ).filter(LlmUsageLog.created_at >= month_start).one()
+
+    current_cost = float(result.cost)
+    current_tokens = int(result.tokens)
+
+    cost_percentage = (current_cost / cost_limit * 100) if cost_limit > 0 else 0
+    token_percentage = (current_tokens / token_limit * 100) if token_limit else None
+
+    return jsonify({
+        'enabled': enabled,
+        'cost': {
+            'current_usd': round(current_cost, 6),
+            'limit_usd': cost_limit,
+            'percentage': round(cost_percentage, 2),
+        },
+        'tokens': {
+            'current': current_tokens,
+            'limit': token_limit,
+            'percentage': round(token_percentage, 2) if token_percentage is not None else None,
+        },
+        'total_requests': result.requests,
+        'month': now.strftime('%Y-%m'),
+    })
+
+
+@api_bp.route('/llm/budget', methods=['PUT'])
+def llm_budget_update():
+    """
+    更新 LLM 預算設定。
+
+    JSON body:
+        cost_limit_usd: float（月度成本上限）
+        token_limit: int | null（月度 token 上限）
+        enabled: bool（是否啟用）
+    """
+    data = request.get_json(force=True)
+
+    if 'cost_limit_usd' in data:
+        SystemSetting.set(
+            'llm_monthly_cost_limit_usd',
+            str(data['cost_limit_usd']),
+            description='月度 LLM 成本上限（USD）',
+        )
+
+    if 'token_limit' in data:
+        val = data['token_limit']
+        SystemSetting.set(
+            'llm_monthly_token_limit',
+            str(val) if val is not None else '',
+            description='月度 LLM token 上限',
+        )
+
+    if 'enabled' in data:
+        SystemSetting.set(
+            'llm_cost_limit_enabled',
+            'true' if data['enabled'] else 'false',
+            description='是否啟用 LLM 成本上限',
+        )
+
+    db.session.commit()
+    logger.info(f"LLM 預算設定已更新：{data}")
+
+    return jsonify({'success': True, 'updated': data})

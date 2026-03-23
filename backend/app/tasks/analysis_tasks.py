@@ -21,6 +21,7 @@ from ..services.llm_service import (
     LLMServiceError,
     LLMTimeoutError,
     LLMRateLimitError,
+    LLMBudgetExceededError,
     get_llm_service,
 )
 from ..services.prompts import format_conversation_for_prompt
@@ -65,6 +66,9 @@ def quick_triage_message(self, message_id: str):
         if message.has_quick_analysis:
             logger.debug(f"[quick_triage] 訊息已分類，跳過：{message_id}")
             return {"success": True, "skipped": True}
+
+        # 預算檢查
+        LLMService.check_budget()
 
         llm = get_llm_service()
         result, usage = llm.quick_triage(message.content)
@@ -240,6 +244,9 @@ def analyze_conversation(self, conversation_id: str, trigger_type: str = "auto")
         if not messages:
             logger.warning(f"對話無有效訊息內容：{conversation_id}")
             return {"success": True, "skipped": True, "reason": "no_text_content"}
+
+        # 預算檢查
+        LLMService.check_budget()
 
         # 呼叫 LLM 綜合分析
         llm = get_llm_service()
@@ -674,6 +681,9 @@ def _execute_conversation_analysis(conversation_id) -> bool:
         if not messages:
             logger.warning(f"對話無有效訊息：{conversation_id}")
             return False
+
+        # 預算檢查
+        LLMService.check_budget()
 
         # LLM 分析
         llm = get_llm_service()

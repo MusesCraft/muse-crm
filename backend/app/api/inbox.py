@@ -14,6 +14,8 @@ from ..models import Conversation, Message, Contact
 from .. import db
 from ..tasks.analysis_tasks import analyze_conversation
 from ..utils.auth import login_required
+from ..utils.permissions import get_current_user
+from ..utils.scope import apply_conversation_scope
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,12 @@ def list_conversations():
         .join(Contact, Conversation.contact_id == Contact.id)
         .order_by(desc(Conversation.last_message_at))
     )
-    
+
+    # 套用資料可見範圍
+    user = get_current_user()
+    if user:
+        query = apply_conversation_scope(query, user)
+
     # 篩選條件
     if status:
         query = query.filter(Conversation.status == status)

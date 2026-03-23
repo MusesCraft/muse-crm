@@ -51,6 +51,13 @@ class Contact(db.Model):
     # 備註
     notes: Mapped[Optional[str]] = mapped_column(Text)
     
+    # 負責人（CRM-019）
+    assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        db.ForeignKey('users.id', ondelete='SET NULL'),
+        nullable=True
+    )
+
     # 外部 CRM 整合
     external_crm_id: Mapped[Optional[str]] = mapped_column(String(255))
     
@@ -112,11 +119,19 @@ class Contact(db.Model):
         backref="merged_contacts"
     )
     
+    # 負責人關聯
+    assigned_user: Mapped[Optional["User"]] = relationship(
+        "User",
+        foreign_keys=[assigned_to],
+        backref="assigned_contacts"
+    )
+
     # 索引
     __table_args__ = (
         Index('idx_contacts_last_active', 'last_active_at'),
         Index('idx_contacts_source', 'source_channel', 'source_type'),
         Index('idx_contacts_merged', 'merged_into_id'),
+        Index('idx_contacts_assigned_to', 'assigned_to'),
     )
     
     def __repr__(self) -> str:
@@ -135,6 +150,7 @@ class Contact(db.Model):
             'source_channel': self.source_channel,
             'source_type': self.source_type,
             'notes': self.notes,
+            'assigned_to': str(self.assigned_to) if self.assigned_to else None,
             'external_crm_id': self.external_crm_id,
             'is_merged': self.is_merged,
             'merged_into_id': str(self.merged_into_id) if self.merged_into_id else None,

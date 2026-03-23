@@ -11,6 +11,8 @@ from . import api_bp
 from ..models import Action, Contact
 from .. import db
 from ..utils.auth import login_required
+from ..utils.permissions import get_current_user
+from ..utils.scope import apply_action_scope
 
 
 @api_bp.route('/actions', methods=['GET'])
@@ -34,8 +36,13 @@ def list_actions():
     assigned_to = request.args.get('assigned_to')
     overdue_only = request.args.get('overdue', '').lower() == 'true'
     
-    query = Action.query
-    
+    query = Action.query.join(Contact, Action.contact_id == Contact.id)
+
+    # 套用資料可見範圍
+    user = get_current_user()
+    if user:
+        query = apply_action_scope(query, user)
+
     # 篩選條件
     if status:
         query = query.filter(Action.status == status)

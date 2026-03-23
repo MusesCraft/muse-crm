@@ -4,13 +4,15 @@ MUSE CRM — Contacts API
 客戶管理相關 API 端點。
 """
 
-from flask import jsonify, request
+from flask import jsonify, request, g
 from sqlalchemy import desc, or_, func
 
 from . import api_bp
 from ..models import Contact, ContactTag, Tag, UserNote
 from .. import db
 from ..utils.auth import login_required
+from ..utils.permissions import get_current_user
+from ..utils.scope import apply_contact_scope
 
 
 @api_bp.route('/contacts', methods=['GET'])
@@ -35,7 +37,12 @@ def list_contacts():
     source_type = request.args.get('source_type')
     
     query = Contact.query.filter(Contact.is_merged == False)
-    
+
+    # 套用資料可見範圍
+    user = get_current_user()
+    if user:
+        query = apply_contact_scope(query, user)
+
     # 篩選條件
     if search:
         query = query.filter(

@@ -12,6 +12,8 @@ from . import api_bp
 from ..models import Contact, Conversation, Message, Action, Tag, ContactTag, Analysis
 from .. import db
 from ..utils.auth import login_required
+from ..utils.permissions import get_current_user
+from ..utils.scope import apply_contact_scope
 
 
 @api_bp.route('/dashboard/overview', methods=['GET'])
@@ -25,44 +27,51 @@ def dashboard_overview():
     """
     days = request.args.get('days', 30, type=int)
     start_date = datetime.utcnow() - timedelta(days=days)
-    
+    user = get_current_user()
+
+    # 基礎 Contact 查詢（套用 scope）
+    contact_q = Contact.query.filter(Contact.is_merged == False)
+    if user:
+        contact_q = apply_contact_scope(contact_q, user)
+
     # 總客戶數
-    total_contacts = Contact.query.filter(Contact.is_merged == False).count()
-    
+    total_contacts = contact_q.count()
+
     # 新客戶數（指定期間）
-    new_contacts = Contact.query.filter(
-        and_(
-            Contact.created_at >= start_date,
-            Contact.is_merged == False
-        )
-    ).count()
-    
+    new_contacts = contact_q.filter(Contact.created_at >= start_date).count()
+
+    # 基礎 Conversation 查詢（套用 scope）
+    conv_q = Conversation.query.join(Contact, Conversation.contact_id == Contact.id)
+    if user:
+        conv_q = apply_contact_scope(conv_q, user)
+
     # 總對話數
-    total_conversations = Conversation.query.count()
-    
+    total_conversations = conv_q.count()
+
     # 活躍對話數
-    active_conversations = Conversation.query.filter(
-        Conversation.status == 'active'
-    ).count()
-    
+    active_conversations = conv_q.filter(Conversation.status == 'active').count()
+
     # 新對話數（指定期間）
-    new_conversations = Conversation.query.filter(
-        Conversation.created_at >= start_date
-    ).count()
-    
+    new_conversations = conv_q.filter(Conversation.created_at >= start_date).count()
+
+    # 基礎 Action 查詢（套用 scope）
+    action_q = Action.query.join(Contact, Action.contact_id == Contact.id)
+    if user:
+        action_q = apply_contact_scope(action_q, user)
+
     # 待辦動作統計
-    pending_actions = Action.query.filter(
+    pending_actions = action_q.filter(
         Action.status.in_(['pending', 'assigned', 'in_progress'])
     ).count()
-    
-    overdue_actions = Action.query.filter(
+
+    overdue_actions = action_q.filter(
         and_(
             Action.due_date < datetime.utcnow().date(),
             Action.status.in_(['pending', 'assigned', 'in_progress'])
         )
     ).count()
-    
-    completed_actions = Action.query.filter(
+
+    completed_actions = action_q.filter(
         Action.status == 'completed'
     ).count()
     
@@ -232,16 +241,32 @@ def dashboard_stats():
     Returns flat object:
         { total_contacts, total_conversations, active_conversations, total_messages, pending_actions }
     """
-    total_contacts = Contact.query.filter(Contact.is_merged == False).count()
-    total_conversations = Conversation.query.count()
-    active_conversations = Conversation.query.filter(
-        Conversation.status == 'active'
-    ).count()
-    total_messages = Message.query.count()
-    pending_actions = Action.query.filter(
+    user = get_current_user()
+
+    contact_q = Contact.query.filter(Contact.is_merged == False)
+    if user:
+        contact_q = apply_contact_scope(contact_q, user)
+    total_contacts = contact_q.count()
+
+    conv_q = Conversation.query.join(Contact, Conversation.contact_id == Contact.id)
+    if user:
+        conv_q = apply_contact_scope(conv_q, user)
+    total_conversations = conv_q.count()
+    active_conversations = conv_q.filter(Conversation.status == 'active').count()
+
+    # 訊息數量：透過 Contact scope 過濾
+    msg_q = Message.query.join(Contact, Message.contact_id == Contact.id)
+    if user:
+        msg_q = apply_contact_scope(msg_q, user)
+    total_messages = msg_q.count()
+
+    action_q = Action.query.join(Contact, Action.contact_id == Contact.id)
+    if user:
+        action_q = apply_contact_scope(action_q, user)
+    pending_actions = action_q.filter(
         Action.status.in_(['pending', 'assigned', 'in_progress'])
     ).count()
-    
+
     return jsonify({
         'total_contacts': total_contacts,
         'total_conversations': total_conversations,

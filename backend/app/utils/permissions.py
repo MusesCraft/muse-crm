@@ -8,10 +8,10 @@ import logging
 from functools import wraps
 from typing import Optional
 
-from flask import request, g, jsonify
+from flask import g, jsonify
 
 from ..models.user import User
-from .. import db
+from ..utils.auth import _extract_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,7 @@ def get_current_user() -> Optional[User]:
     """
     從 request 取得當前用戶。
 
-    優先使用 Flask g（JWT 認證後已注入），
-    其次嘗試 X-User-Id header（簡易模式，Phase 後續換 JWT）。
+    使用 JWT 認證（Authorization: Bearer <token>）。
 
     Returns:
         User 或 None
@@ -30,13 +29,11 @@ def get_current_user() -> Optional[User]:
     if hasattr(g, 'current_user') and g.current_user:
         return g.current_user
 
-    # 簡易模式：X-User-Id header
-    user_id = request.headers.get('X-User-Id')
-    if user_id:
-        user = db.session.get(User, user_id)
-        if user and user.is_active:
-            g.current_user = user
-            return user
+    # 嘗試從 Authorization header 取 JWT
+    user, error = _extract_current_user()
+    if user:
+        g.current_user = user
+        return user
 
     return None
 
@@ -46,7 +43,7 @@ def require_role(*roles):
     角色權限裝飾器。
 
     檢查當前用戶角色是否在允許的角色列表中。
-    需搭配 login_required 使用（或提供 X-User-Id header）。
+    需搭配 login_required 使用。
 
     Usage:
         @login_required

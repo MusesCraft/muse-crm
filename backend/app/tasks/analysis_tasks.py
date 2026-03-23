@@ -584,12 +584,8 @@ def _save_analysis(
     Returns:
         Analysis 物件
     """
-    # 從結構化結果中萃取各欄位
-    entities = analysis_result.get("entities", {})
-    summary = analysis_result.get("summary", {})
-    intent = analysis_result.get("intent", {})
-
-    # 處理 suggested_action：合併所有建議動作為一段文字
+    # full_analysis prompt 回傳扁平欄位，直接讀取
+    # 處理 suggested_action：合併 suggested_actions 陣列為文字，或用 suggested_next_action
     suggested_actions = analysis_result.get("suggested_actions", [])
     if isinstance(suggested_actions, list) and suggested_actions:
         action_descriptions = [
@@ -599,43 +595,33 @@ def _save_analysis(
     elif isinstance(suggested_actions, str):
         suggested_action_text = suggested_actions
     else:
-        suggested_action_text = None
+        # 回退到 suggested_next_action（舊格式相容）
+        suggested_action_text = analysis_result.get("suggested_next_action")
+
+    # intent 可能是字串或字典
+    intent_raw = analysis_result.get("intent")
+    if isinstance(intent_raw, dict):
+        intent_value = intent_raw.get("primary", str(intent_raw))
+    elif intent_raw:
+        intent_value = str(intent_raw)
+    else:
+        intent_value = None
 
     analysis = Analysis(
         conversation_id=conversation.id,
         contact_id=conversation.contact_id,
-        # MVP 萃取欄位
-        customer_name=entities.get("customer_name"),
-        demand_summary=(
-            summary.get("text")
-            if isinstance(summary, dict)
-            else str(summary) if summary else None
-        ),
-        mentioned_products=entities.get("products_interested", []),
+        # MVP 扁平欄位（直接對應 full_analysis prompt 輸出）
+        customer_name=analysis_result.get("customer_name"),
+        demand_summary=analysis_result.get("demand_summary"),
+        mentioned_products=analysis_result.get("mentioned_products", []),
         suggested_tags=analysis_result.get("suggested_tags", []),
-        conversation_summary=(
-            summary.get("text")
-            if isinstance(summary, dict)
-            else str(summary) if summary else None
-        ),
+        conversation_summary=analysis_result.get("conversation_summary"),
         suggested_action=suggested_action_text,
         # v2 欄位
-        sentiment=(
-            summary.get("sentiment")
-            if isinstance(summary, dict) else None
-        ),
-        intent=(
-            intent.get("primary")
-            if isinstance(intent, dict) else str(intent) if intent else None
-        ),
-        urgency=(
-            summary.get("urgency")
-            if isinstance(summary, dict) else None
-        ),
-        customer_stage=(
-            summary.get("customer_stage")
-            if isinstance(summary, dict) else None
-        ),
+        sentiment=analysis_result.get("sentiment"),
+        intent=intent_value,
+        urgency=analysis_result.get("urgency"),
+        customer_stage=analysis_result.get("customer_stage"),
         # Meta
         trigger_type=trigger_type,
         model_used=usage_info.get("model_used", "unknown"),

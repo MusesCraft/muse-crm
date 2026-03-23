@@ -180,14 +180,25 @@ FULL_ANALYSIS_USER = """對以下對話進行全面分析：
 - 對話狀態：{status}
 - 訊息數量：{message_count}
 
-請萃取以下 6 個 MVP 欄位，以 JSON 格式回覆：
+請萃取以下欄位，以 JSON 格式回覆：
 {{
     "customer_name": "從對話中辨識出的客戶真實姓名，如「王先生」「陳小姐」，無法辨識則為 null",
     "demand_summary": "客戶本次對話的核心需求概述，如「詢問 A 產品的報價與交期」",
     "mentioned_products": ["對話中提到的具體產品或服務項目列表"],
     "suggested_tags": ["基於語意判斷的客戶身份/類型標籤，如「潛在客戶」「設計師」「投訴者」"],
     "conversation_summary": "整段對話的精簡摘要（100字以內）",
-    "suggested_next_action": "根據對話內容建議的跟進動作，如「週五前提供正式報價單」"
+    "suggested_next_action": "根據對話內容建議的跟進動作，如「週五前提供正式報價單」",
+    "intent": "pricing|spec|visit|complaint|greeting|order|followup|other",
+    "sentiment": "positive|neutral|negative",
+    "urgency": "high|medium|low",
+    "suggested_actions": [
+        {{
+            "type": "follow_up|quote|visit|call|sample|resolve_complaint|escalate|none",
+            "description": "具體描述應該做什麼",
+            "priority": "high|medium|low",
+            "due_days": 3
+        }}
+    ]
 }}"""
 
 

@@ -125,33 +125,30 @@ class AutoTagger:
         if suggested:
             tags_to_add.update(suggested)
 
-        # 2. 從 entities.products_interested 加標籤
-        entities = analysis_result.get("entities", {})
-        products = entities.get("products_interested", [])
+        # 2. 從 mentioned_products 加標籤（full_analysis 扁平欄位）
+        products = analysis_result.get("mentioned_products", [])
         if products:
             tags_to_add.update(products)
 
-        # 3. 從 intent 加標籤
-        intent_data = analysis_result.get("intent", {})
+        # 3. 從 intent 加標籤（full_analysis 回傳字串或字典）
+        intent_data = analysis_result.get("intent", "")
         if isinstance(intent_data, dict):
             intent = intent_data.get("primary", "")
         else:
             intent = str(intent_data) if intent_data else ""
-        
+
         if intent in INTENT_TAG_MAP:
             tags_to_add.add(INTENT_TAG_MAP[intent])
 
-        # 4. 從 customer_stage 加標籤
-        summary = analysis_result.get("summary", {})
-        if isinstance(summary, dict):
-            stage = summary.get("customer_stage", "")
-            stage_tag_map = {
-                "new_lead": "潛在客戶",
-                "ready_to_buy": "VIP",
-                "existing_customer": "復購客戶",
-            }
-            if stage in stage_tag_map:
-                tags_to_add.add(stage_tag_map[stage])
+        # 4. 從 customer_stage 加標籤（扁平欄位）
+        stage = analysis_result.get("customer_stage", "")
+        stage_tag_map = {
+            "new_lead": "潛在客戶",
+            "ready_to_buy": "VIP",
+            "existing_customer": "復購客戶",
+        }
+        if stage in stage_tag_map:
+            tags_to_add.add(stage_tag_map[stage])
 
         # 5. 關鍵字匹配（如果有提供對話全文）
         if conversation_text:

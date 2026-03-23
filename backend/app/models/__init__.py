@@ -14,6 +14,7 @@ from .user import User, UserNote
 from .llm_usage_log import LlmUsageLog
 from .system_setting import SystemSetting
 from .llm_fallback_event import LlmFallbackEvent
+from .notification_preference import NotificationPreference
 
 # 匯出所有模型供其他模組使用
 __all__ = [
@@ -31,4 +32,5 @@ __all__ = [
     'LlmUsageLog',
     'SystemSetting',
     'LlmFallbackEvent',
+    'NotificationPreference',
 ]

@@ -2,6 +2,7 @@
 MUSE CRM — Notification Service
 
 通知服務：支援 Discord Webhook 和 LINE Notify 推播。
+發送前查詢使用者通知偏好，尊重勿擾時段。
 """
 
 import logging
@@ -82,6 +83,20 @@ class NotificationService:
             return False
 
     @classmethod
+    def _get_user_preference(cls, user_id):
+        """
+        取得使用者通知偏好。
+
+        Args:
+            user_id: User UUID（字串或 UUID）
+
+        Returns:
+            NotificationPreference 或 None
+        """
+        from ..models.notification_preference import NotificationPreference
+        return NotificationPreference.query.filter_by(user_id=str(user_id)).first()
+
+    @classmethod
     def notify_new_message(cls, contact, message_content: str, channel: str) -> None:
         """
         新客戶訊息通知：組裝內容並發送到已啟用的管道。
@@ -113,3 +128,48 @@ class NotificationService:
         # LINE Notify
         line_message = f"\n📩 新訊息\n客戶: {contact_name}\n渠道: {channel}\n內容: {content_preview}"
         cls.send_line_notify(line_message)
+
+    @classmethod
+    def notify_user(
+        cls,
+        user_id,
+        discord_payload: Optional[dict] = None,
+        line_message: Optional[str] = None,
+    ) -> None:
+        """
+        根據使用者偏好發送通知，尊重勿擾時段。
+
+        若使用者無偏好設定，使用全局設定發送。
+
+        Args:
+            user_id: User UUID
+            discord_payload: Discord Webhook payload（可選）
+            line_message: LINE Notify 訊息（可選）
+        """
+        if not SystemSetting.get_bool('notification_enabled', default=True):
+            logger.debug("通知功能已停用，跳過發送")
+            return
+
+        pref = cls._get_user_preference(user_id)
+
+        # 勿擾時段檢查
+        if pref and pref.is_quiet_now():
+            logger.debug(f"用戶 {user_id} 處於勿擾時段，跳過通知")
+            return
+
+        # Discord
+        if discord_payload:
+            if pref:
+                if pref.discord_enabled:
+                    cls.send_discord_webhook(discord_payload, webhook_url=pref.discord_webhook_url)
+            else:
+                # 無偏好：使用全局設定
+                cls.send_discord_webhook(discord_payload)
+
+        # LINE Notify
+        if line_message:
+            if pref:
+                if pref.line_enabled:
+                    cls.send_line_notify(line_message, token=pref.line_notify_token)
+            else:
+                cls.send_line_notify(line_message)

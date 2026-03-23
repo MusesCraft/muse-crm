@@ -19,6 +19,7 @@ from . import tags
 from . import auth
 from . import quick_replies
 from . import llm_usage
+from . import users
 
 # 註冊錯誤處理器
 from ..utils.error_handler import register_error_handlers

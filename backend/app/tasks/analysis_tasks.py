@@ -14,8 +14,11 @@ Tasks:
 import logging
 from datetime import datetime
 
+from flask import current_app
+
 from .. import celery, db
 from ..models import Analysis, AnalysisQueue, Conversation, Message, LlmUsageLog
+from ..models.system_setting import SystemSetting
 from ..services.llm_service import (
     LLMService,
     LLMServiceError,
@@ -30,6 +33,21 @@ from ..services.action_service import ActionService
 from ..utils.error_handler import handle_llm_error
 
 logger = logging.getLogger(__name__)
+
+
+def _get_min_messages_for_analysis() -> int:
+    """
+    取得最低訊息數門檻。
+
+    優先順序：.env (MIN_MESSAGES_FOR_ANALYSIS) → DB (SystemSetting) → 預設值 3
+    """
+    env_val = current_app.config.get('MIN_MESSAGES_FOR_ANALYSIS')
+    if env_val is not None:
+        try:
+            return int(env_val)
+        except (ValueError, TypeError):
+            pass
+    return SystemSetting.get_int('min_messages_for_analysis', default=3)
 
 
 # ============================================================
@@ -239,6 +257,16 @@ def analyze_conversation(self, conversation_id: str, trigger_type: str = "auto")
             logger.error(f"對話不存在：{conversation_id}")
             return {"success": False, "error": "Conversation not found"}
 
+        # 短對話跳過分析（CRM-017）
+        min_msgs = _get_min_messages_for_analysis()
+        msg_count = conversation.message_count or 0
+        if msg_count < min_msgs:
+            logger.info(
+                f"[analyze_conversation] 短對話跳過分析：{conversation_id}，"
+                f"訊息數 {msg_count} < 門檻 {min_msgs}"
+            )
+            return {"success": True, "skipped": True, "reason": "below_min_messages"}
+
         # 準備對話內容
         messages = _prepare_conversation_messages(conversation)
         if not messages:
@@ -439,6 +467,19 @@ def process_analysis_queue(self):
                 # 標記為處理中
                 queue_item.mark_as_processing()
                 db.session.commit()
+
+                # 短對話跳過分析（CRM-017）
+                conv = db.session.get(Conversation, queue_item.conversation_id)
+                min_msgs = _get_min_messages_for_analysis()
+                if conv and (conv.message_count or 0) < min_msgs:
+                    logger.info(
+                        f"[process_analysis_queue] 短對話跳過：{queue_item.conversation_id}，"
+                        f"訊息數 {conv.message_count or 0} < 門檻 {min_msgs}"
+                    )
+                    queue_item.mark_as_completed()
+                    db.session.commit()
+                    processed_count += 1
+                    continue
 
                 # 透過 analyze_conversation 執行真正的 LLM 分析
                 result = _execute_conversation_analysis(queue_item.conversation_id)
@@ -671,6 +712,16 @@ def _execute_conversation_analysis(conversation_id) -> bool:
         conversation = db.session.get(Conversation, conversation_id)
         if not conversation:
             logger.error(f"對話不存在：{conversation_id}")
+            return False
+
+        # 短對話跳過分析（CRM-017）
+        min_msgs = _get_min_messages_for_analysis()
+        msg_count = conversation.message_count or 0
+        if msg_count < min_msgs:
+            logger.info(
+                f"[_execute_conversation_analysis] 短對話跳過：{conversation_id}，"
+                f"訊息數 {msg_count} < 門檻 {min_msgs}"
+            )
             return False
 
         # 已有分析結果則跳過

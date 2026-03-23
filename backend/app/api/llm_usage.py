@@ -7,7 +7,7 @@ MUSE CRM — LLM Usage API
 import logging
 from datetime import datetime, timedelta
 
-from flask import jsonify, request
+from flask import current_app, jsonify, request
 from sqlalchemy import func, cast, Date
 
 from . import api_bp
@@ -256,6 +256,31 @@ def llm_budget_update():
     logger.info(f"LLM 預算設定已更新：{data}")
 
     return jsonify({'success': True, 'updated': data})
+
+
+@api_bp.route('/llm/settings', methods=['GET'])
+def llm_settings():
+    """
+    取得 LLM 相關設定。
+
+    回傳所有 LLM 設定項目，包含成本上限、token 上限、分析門檻等。
+    """
+    # .env 優先於 DB
+    env_min = current_app.config.get('MIN_MESSAGES_FOR_ANALYSIS')
+    if env_min is not None:
+        try:
+            min_messages = int(env_min)
+        except (ValueError, TypeError):
+            min_messages = SystemSetting.get_int('min_messages_for_analysis', default=3)
+    else:
+        min_messages = SystemSetting.get_int('min_messages_for_analysis', default=3)
+
+    return jsonify({
+        'llm_cost_limit_enabled': SystemSetting.get_bool('llm_cost_limit_enabled', default=True),
+        'llm_monthly_cost_limit_usd': SystemSetting.get_float('llm_monthly_cost_limit_usd', default=50.0),
+        'llm_monthly_token_limit': SystemSetting.get_int('llm_monthly_token_limit'),
+        'min_messages_for_analysis': min_messages,
+    })
 
 
 @api_bp.route('/llm/fallback-events', methods=['GET'])

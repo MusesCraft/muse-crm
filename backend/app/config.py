@@ -49,6 +49,7 @@ class BaseConfig:
     # 分析設定
     ANALYSIS_TIMEOUT_MINUTES = int(os.environ.get('ANALYSIS_TIMEOUT_MINUTES', '5'))
     MAX_RETRY_ATTEMPTS = int(os.environ.get('MAX_RETRY_ATTEMPTS', '3'))
+    MIN_MESSAGES_FOR_ANALYSIS = os.environ.get('MIN_MESSAGES_FOR_ANALYSIS')  # .env 優先於 DB 設定
 
 
 class DevelopmentConfig(BaseConfig):

@@ -33,6 +33,7 @@ class SystemSetting(db.Model):
         'llm_monthly_cost_limit_usd': '50.0',
         'llm_monthly_token_limit': '',       # 空字串表示不限制
         'llm_cost_limit_enabled': 'true',
+        'min_messages_for_analysis': '3',    # 短對話跳過分析門檻
     }
 
     @classmethod

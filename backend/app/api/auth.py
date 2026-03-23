@@ -71,15 +71,15 @@ def auth_register():
     name = (data.get('name') or '').strip()
     email = (data.get('email') or '').strip().lower()
     password = data.get('password') or ''
-    role = data.get('role', 'agent')
-    
+    role = data.get('role', 'user')
+
     if not name or not email or not password:
         return jsonify({'error': 'name、email、password 為必填'}), 400
-    
+
     if len(password) < 6:
         return jsonify({'error': '密碼至少 6 個字元'}), 400
-    
-    if role not in ('admin', 'supervisor', 'agent', 'readonly'):
+
+    if role not in ('admin', 'manager', 'user'):
         return jsonify({'error': '無效的角色'}), 400
     
     # 檢查 email 是否已被使用

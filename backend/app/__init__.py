@@ -90,13 +90,20 @@ def create_app(config_name: str = 'development') -> Flask:
             'version': '1.0.0'
         }
 
-    # 自動建立 DB tables（如果不存在）
-    with app.app_context():
-        try:
-            db.create_all()
-        except Exception as _db_err:
-            import logging
-            logging.getLogger(__name__).warning(f"DB create_all 失敗（可能表已存在）: {_db_err}")
+    # 自動建立 DB tables（背景執行，不阻塞啟動）
+    import threading
+    def _init_db():
+        import time
+        time.sleep(5)  # 等 gunicorn ready
+        with app.app_context():
+            try:
+                db.create_all()
+                import logging
+                logging.getLogger(__name__).info("✅ DB tables 已就緒")
+            except Exception as _db_err:
+                import logging
+                logging.getLogger(__name__).warning(f"⚠️ DB create_all 失敗: {_db_err}")
+    threading.Thread(target=_init_db, daemon=True).start()
 
     return app
 

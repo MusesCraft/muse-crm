@@ -38,6 +38,10 @@ class BaseConfig:
     META_VERIFY_TOKEN = os.environ.get('META_VERIFY_TOKEN', 'muse_crm_verify')
     META_PAGE_TOKEN = os.environ.get('META_PAGE_TOKEN')
     
+    # LINE Messaging API
+    LINE_CHANNEL_SECRET = os.environ.get('LINE_CHANNEL_SECRET')
+    LINE_CHANNEL_ACCESS_TOKEN = os.environ.get('LINE_CHANNEL_ACCESS_TOKEN')
+
     # JWT Authentication
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET', 'dev-secret-key')
     JWT_EXPIRY_HOURS = int(os.environ.get('JWT_EXPIRY_HOURS', '24'))
@@ -104,6 +108,8 @@ class TestingConfig(BaseConfig):
     OPENROUTER_API_KEY = 'test-key'
     META_APP_SECRET = 'test-secret'
     META_PAGE_TOKEN = 'test-token'
+    LINE_CHANNEL_SECRET = 'test-line-secret'
+    LINE_CHANNEL_ACCESS_TOKEN = 'test-line-token'
 
 
 # 配置字典

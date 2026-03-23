@@ -348,6 +348,136 @@ def _update_contact_from_profile(contact: Contact, profile_data: Dict[str, Any])
         contact.locale = profile_data['locale']
 
 
+# ── LINE Webhook ──
+
+@api_bp.route('/webhook/line', methods=['POST'])
+def webhook_line():
+    """
+    LINE Webhook 接收端點。
+
+    流程：
+    1. 驗證 X-Line-Signature（透過 LineAdapter）
+    2. 解析 events（透過 LineAdapter.parse_events）
+    3. 依事件類型處理：message→建客戶+Session+存訊息, follow→建客戶, unfollow→標記不活躍
+    4. 回傳 200 OK（LINE 要求 1 秒內回應）
+
+    Returns:
+        200 OK 或錯誤狀態碼
+    """
+    line_adapter = channel_registry.get_adapter('line')
+
+    # ── 驗證簽名 ──
+    signature = request.headers.get('X-Line-Signature', '')
+    if not line_adapter.verify_signature(request.data, signature):
+        logger.warning("❌ LINE Webhook 簽名驗證失敗")
+        return jsonify({'error': 'Invalid signature'}), 403
+
+    # ── 解析 payload ──
+    data = request.get_json(silent=True)
+    if not data:
+        logger.debug("收到空的 LINE webhook payload")
+        return 'OK', 200
+
+    # ── 透過 LineAdapter 解析事件 ──
+    channel_events = line_adapter.parse_events(data)
+
+    # ── 先回 200 給 LINE，再背景處理 ──
+    for event in channel_events:
+        if event.event_type == 'message':
+            threading.Thread(
+                target=_handle_channel_event_with_context,
+                args=(current_app._get_current_object(), event),
+                daemon=True,
+            ).start()
+        elif event.event_type == 'follow':
+            threading.Thread(
+                target=_handle_line_follow_with_context,
+                args=(current_app._get_current_object(), event),
+                daemon=True,
+            ).start()
+        elif event.event_type == 'unfollow':
+            threading.Thread(
+                target=_handle_line_unfollow_with_context,
+                args=(current_app._get_current_object(), event),
+                daemon=True,
+            ).start()
+
+    logger.info(f"✅ LINE Webhook 收到 {len(channel_events)} 個事件")
+    return 'OK', 200
+
+
+def _handle_line_follow_with_context(app, event: 'ChannelEvent'):
+    """帶有 Flask 應用上下文的 LINE follow 處理包裝器"""
+    with app.app_context():
+        _handle_line_follow(event)
+
+
+def _handle_line_follow(event: 'ChannelEvent'):
+    """
+    處理 LINE follow 事件（使用者加好友）。
+
+    建立客戶記錄並拉取 profile。
+    """
+    sender_id = event.sender_id
+    logger.info(f"➕ [webhook/line] follow sender={sender_id}")
+
+    try:
+        contact = _get_or_create_contact_with_profile(
+            channel='line',
+            external_id=sender_id,
+        )
+        contact.last_active_at = datetime.utcnow()
+        db.session.commit()
+        logger.info(f"✅ [webhook/line] follow 客戶已建立/更新：{contact.id}")
+    except Exception as e:
+        logger.error(f"❌ [webhook/line] follow 處理失敗 sender={sender_id}: {e}", exc_info=True)
+        db.session.rollback()
+
+
+def _handle_line_unfollow_with_context(app, event: 'ChannelEvent'):
+    """帶有 Flask 應用上下文的 LINE unfollow 處理包裝器"""
+    with app.app_context():
+        _handle_line_unfollow(event)
+
+
+def _handle_line_unfollow(event: 'ChannelEvent'):
+    """
+    處理 LINE unfollow 事件（使用者封鎖）。
+
+    標記客戶不活躍（關閉所有活躍對話）。
+    """
+    sender_id = event.sender_id
+    logger.info(f"➖ [webhook/line] unfollow sender={sender_id}")
+
+    try:
+        channel_id = ChannelIdentifier.query.filter_by(
+            channel='line',
+            external_id=sender_id
+        ).first()
+
+        if not channel_id:
+            logger.debug(f"[webhook/line] unfollow 找不到客戶：{sender_id}")
+            return
+
+        contact = channel_id.contact
+
+        # 關閉所有活躍的 LINE 對話
+        active_conversations = Conversation.query.filter_by(
+            contact_id=contact.id,
+            channel='line',
+            status='active'
+        ).all()
+
+        for conv in active_conversations:
+            SessionService.close_conversation(conv.id, reason='system')
+
+        logger.info(f"✅ [webhook/line] unfollow 已處理：contact={contact.id}, 關閉 {len(active_conversations)} 個對話")
+
+    except Exception as e:
+        logger.error(f"❌ [webhook/line] unfollow 處理失敗 sender={sender_id}: {e}", exc_info=True)
+        db.session.rollback()
+
+
 @api_bp.route('/health', methods=['GET'])
 def health_check():
     """

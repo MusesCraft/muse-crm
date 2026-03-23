@@ -8,11 +8,13 @@ from flask import jsonify, request, g
 from sqlalchemy import desc, or_, func
 
 from . import api_bp
-from ..models import Contact, ContactTag, Tag, UserNote
+from ..models import Contact, ChannelIdentifier, ContactTag, Tag, UserNote
 from .. import db
 from ..utils.auth import login_required
 from ..utils.permissions import get_current_user, require_role
 from ..utils.scope import apply_contact_scope
+from ..services.contact_service import ContactService
+from ..services.merge_service import MergeService
 
 
 @api_bp.route('/contacts', methods=['GET'])
@@ -278,6 +280,10 @@ def update_contact(contact_id):
         contact.source_channel = data['source_channel']
     if 'source_type' in data:
         contact.source_type = data['source_type']
+    if 'phone' in data:
+        contact.phone = data['phone']
+    if 'email' in data:
+        contact.email = data['email']
     if 'external_crm_id' in data:
         contact.external_crm_id = data['external_crm_id']
     if 'assigned_to' in data:
@@ -305,3 +311,227 @@ def delete_contact(contact_id):
     db.session.commit()
 
     return jsonify({'message': '客戶已刪除'})
+
+
+# ──────────────────────────────────────────────
+# CRM-012: LINE 與 Meta 客戶合併 API
+# ──────────────────────────────────────────────
+
+@api_bp.route('/contacts/merge', methods=['POST'])
+@login_required
+@require_role('admin', 'manager')
+def merge_contacts():
+    """
+    手動合併兩個客戶
+
+    Body: {"source_contact_id": "uuid", "target_contact_id": "uuid"}
+    source 會被合併進 target（target 保留）。
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '缺少請求資料'}), 400
+
+    source_id = data.get('source_contact_id')
+    target_id = data.get('target_contact_id')
+
+    if not source_id or not target_id:
+        return jsonify({'error': '必須提供 source_contact_id 和 target_contact_id'}), 400
+
+    if source_id == target_id:
+        return jsonify({'error': '不能將客戶合併到自己'}), 400
+
+    source = Contact.query.get(source_id)
+    if not source:
+        return jsonify({'error': f'來源客戶 {source_id} 不存在'}), 404
+
+    target = Contact.query.get(target_id)
+    if not target:
+        return jsonify({'error': f'目標客戶 {target_id} 不存在'}), 404
+
+    if source.is_merged:
+        return jsonify({'error': '來源客戶已被合併'}), 400
+
+    if target.is_merged:
+        return jsonify({'error': '目標客戶已被合併'}), 400
+
+    success = ContactService.merge_contacts(source_id, target_id)
+    if not success:
+        return jsonify({'error': '合併失敗'}), 400
+
+    # 重新載入 target 以取得最新資料
+    db.session.refresh(target)
+
+    result = target.to_dict()
+    result['channel_identifiers'] = [
+        ci.to_dict() for ci in target.channel_identifiers
+    ]
+    result['merge_history'] = MergeService.get_merge_history(str(target.id))
+
+    return jsonify({
+        'message': '客戶合併成功',
+        'contact': result
+    })
+
+
+@api_bp.route('/contacts/search', methods=['GET'])
+@login_required
+@require_role('admin', 'manager', 'user')
+def search_contacts():
+    """
+    搜尋客戶
+
+    Query params:
+        q: 搜尋關鍵字（display_name, notes, channel_identifier.external_id）
+        page: 頁碼（預設 1）
+        per_page: 每頁筆數（預設 20）
+    """
+    keyword = request.args.get('q', '').strip()
+    page = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 20, type=int), 100)
+
+    if not keyword:
+        return jsonify({'error': '必須提供搜尋關鍵字 q'}), 400
+
+    like_pattern = f'%{keyword}%'
+
+    # 子查詢：channel_identifier.external_id 匹配的 contact_id
+    ci_subquery = (
+        db.session.query(ChannelIdentifier.contact_id)
+        .filter(ChannelIdentifier.external_id.ilike(like_pattern))
+        .subquery()
+    )
+
+    query = (
+        Contact.query
+        .filter(Contact.is_merged == False)
+        .filter(
+            or_(
+                Contact.display_name.ilike(like_pattern),
+                Contact.notes.ilike(like_pattern),
+                Contact.id.in_(ci_subquery)
+            )
+        )
+        .order_by(desc(Contact.last_active_at))
+    )
+
+    pagination = query.paginate(page=page, per_page=per_page)
+
+    contacts = []
+    for contact in pagination.items:
+        contact_dict = contact.to_dict()
+        contact_dict['channel_identifiers'] = [
+            ci.to_dict() for ci in contact.channel_identifiers
+        ]
+        contacts.append(contact_dict)
+
+    return jsonify({
+        'data': contacts,
+        'pagination': {
+            'page': page,
+            'per_page': per_page,
+            'total': pagination.total,
+            'pages': pagination.pages,
+            'has_prev': pagination.has_prev,
+            'has_next': pagination.has_next
+        }
+    })
+
+
+@api_bp.route('/contacts/<contact_id>/merge-candidates', methods=['GET'])
+@login_required
+@require_role('admin', 'manager')
+def get_merge_candidates(contact_id):
+    """
+    取得合併候選客戶
+
+    根據 phone、email、display_name 相似度推薦候選。
+    排除已合併和自己，上限 10 筆。
+    """
+    contact = Contact.query.get_or_404(contact_id)
+
+    if contact.is_merged:
+        return jsonify({'error': '此客戶已被合併'}), 400
+
+    candidates = []
+    seen_ids = set()
+
+    # 1. phone 相同
+    if contact.phone:
+        matches = (
+            Contact.query
+            .filter(
+                Contact.phone == contact.phone,
+                Contact.id != contact.id,
+                Contact.is_merged == False
+            )
+            .all()
+        )
+        for c in matches:
+            if c.id not in seen_ids:
+                seen_ids.add(c.id)
+                candidates.append((c, f'電話號碼相同：{contact.phone}'))
+
+    # 2. email 相同
+    if contact.email:
+        matches = (
+            Contact.query
+            .filter(
+                Contact.email == contact.email,
+                Contact.id != contact.id,
+                Contact.is_merged == False
+            )
+            .all()
+        )
+        for c in matches:
+            if c.id not in seen_ids:
+                seen_ids.add(c.id)
+                candidates.append((c, f'Email 相同：{contact.email}'))
+
+    # 3. display_name 相似（包含相同子字串，至少 2 個字元）
+    if contact.display_name and len(contact.display_name) >= 2:
+        like_pattern = f'%{contact.display_name}%'
+        matches = (
+            Contact.query
+            .filter(
+                Contact.display_name.ilike(like_pattern),
+                Contact.id != contact.id,
+                Contact.is_merged == False
+            )
+            .limit(20)
+            .all()
+        )
+        for c in matches:
+            if c.id not in seen_ids:
+                seen_ids.add(c.id)
+                candidates.append((c, f'名稱相似：包含 "{contact.display_name}"'))
+
+        # 反向：自己的名稱包含在候選的名稱中
+        all_contacts = (
+            Contact.query
+            .filter(
+                Contact.id != contact.id,
+                Contact.is_merged == False,
+                Contact.display_name.isnot(None),
+                func.length(Contact.display_name) >= 2
+            )
+            .all()
+        )
+        for c in all_contacts:
+            if c.id not in seen_ids and c.display_name:
+                if c.display_name.lower() in contact.display_name.lower():
+                    seen_ids.add(c.id)
+                    candidates.append((c, f'名稱相似：包含 "{c.display_name}"'))
+
+    # 上限 10 筆
+    candidates = candidates[:10]
+
+    result = []
+    for c, reason in candidates:
+        c_dict = c.to_dict()
+        c_dict['channel_identifiers'] = [
+            ci.to_dict() for ci in c.channel_identifiers
+        ]
+        c_dict['match_reason'] = reason
+        result.append(c_dict)
+
+    return jsonify({'data': result})

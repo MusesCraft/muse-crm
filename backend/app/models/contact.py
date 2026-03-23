@@ -50,7 +50,11 @@ class Contact(db.Model):
     
     # 備註
     notes: Mapped[Optional[str]] = mapped_column(Text)
-    
+
+    # 聯絡資訊
+    phone: Mapped[Optional[str]] = mapped_column(String(50))
+    email: Mapped[Optional[str]] = mapped_column(String(255))
+
     # 負責人（CRM-019）
     assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
@@ -150,6 +154,8 @@ class Contact(db.Model):
             'source_channel': self.source_channel,
             'source_type': self.source_type,
             'notes': self.notes,
+            'phone': self.phone,
+            'email': self.email,
             'assigned_to': str(self.assigned_to) if self.assigned_to else None,
             'external_crm_id': self.external_crm_id,
             'is_merged': self.is_merged,

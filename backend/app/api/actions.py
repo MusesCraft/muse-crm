@@ -11,12 +11,13 @@ from . import api_bp
 from ..models import Action, Contact
 from .. import db
 from ..utils.auth import login_required
-from ..utils.permissions import get_current_user
+from ..utils.permissions import get_current_user, require_role
 from ..utils.scope import apply_action_scope
 
 
 @api_bp.route('/actions', methods=['GET'])
 @login_required
+@require_role('admin', 'manager', 'user')
 def list_actions():
     """
     列出待辦動作列表（分頁）
@@ -81,6 +82,7 @@ def list_actions():
 @api_bp.route('/actions/<action_id>', methods=['PATCH'])
 @api_bp.route('/actions/<action_id>/status', methods=['PATCH'])
 @login_required
+@require_role('admin', 'manager')
 def update_action_status(action_id):
     """更新動作狀態"""
     action = Action.query.get_or_404(action_id)
@@ -115,6 +117,7 @@ def update_action_status(action_id):
 
 @api_bp.route('/actions', methods=['POST'])
 @login_required
+@require_role('admin', 'manager')
 def create_action():
     """建立新的待辦動作"""
     data = request.get_json()

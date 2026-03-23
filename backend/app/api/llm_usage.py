@@ -15,6 +15,8 @@ from .. import db
 from ..models.llm_usage_log import LlmUsageLog
 from ..models.llm_fallback_event import LlmFallbackEvent
 from ..models.system_setting import SystemSetting
+from ..utils.auth import login_required
+from ..utils.permissions import require_role
 
 logger = logging.getLogger(__name__)
 
@@ -219,6 +221,8 @@ def llm_budget_status():
 
 
 @api_bp.route('/llm/budget', methods=['PUT'])
+@login_required
+@require_role('admin')
 def llm_budget_update():
     """
     更新 LLM 預算設定。

@@ -11,12 +11,13 @@ from . import api_bp
 from ..models import Contact, ContactTag, Tag, UserNote
 from .. import db
 from ..utils.auth import login_required
-from ..utils.permissions import get_current_user
+from ..utils.permissions import get_current_user, require_role
 from ..utils.scope import apply_contact_scope
 
 
 @api_bp.route('/contacts', methods=['GET'])
 @login_required
+@require_role('admin', 'manager', 'user')
 def list_contacts():
     """
     列出客戶列表（分頁）
@@ -105,6 +106,7 @@ def list_contacts():
 
 @api_bp.route('/contacts/<contact_id>', methods=['GET'])
 @login_required
+@require_role('admin', 'manager', 'user')
 def get_contact_detail(contact_id):
     """取得客戶 360 檢視"""
     contact = Contact.query.get_or_404(contact_id)
@@ -166,9 +168,10 @@ def add_contact_note(contact_id):
     if not data or not data.get('content', '').strip():
         return jsonify({'error': '備註內容不能為空'}), 400
     
+    user = get_current_user()
     note = UserNote(
         contact_id=contact.id,
-        # author_id=current_user.id,  # TODO: 實作認證後啟用
+        author_id=user.id if user else None,
         content=data['content'].strip()
     )
     
@@ -242,3 +245,63 @@ def remove_contact_tag(contact_id, tag_id):
     db.session.commit()
     
     return jsonify({'message': '標籤已移除'})
+
+
+@api_bp.route('/contacts/<contact_id>', methods=['PATCH'])
+@login_required
+@require_role('admin', 'manager', 'user')
+def update_contact(contact_id):
+    """
+    編輯客戶資料
+
+    user 角色只能編輯 assigned_to 為自己的 Contact。
+    admin/manager 可編輯所有（受 scope 限制）。
+    """
+    contact = Contact.query.get_or_404(contact_id)
+    user = get_current_user()
+
+    # user 角色 ownership 檢查
+    if user and user.role == 'user':
+        if contact.assigned_to != user.id:
+            return jsonify({'error': '權限不足，只能編輯自己負責的客戶'}), 403
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '缺少請求資料'}), 400
+
+    # 可更新的欄位
+    if 'display_name' in data:
+        contact.display_name = data['display_name']
+    if 'notes' in data:
+        contact.notes = data['notes']
+    if 'source_channel' in data:
+        contact.source_channel = data['source_channel']
+    if 'source_type' in data:
+        contact.source_type = data['source_type']
+    if 'external_crm_id' in data:
+        contact.external_crm_id = data['external_crm_id']
+    if 'assigned_to' in data:
+        # 指派任務：需要 admin 或 manager 角色
+        if user and user.role == 'user':
+            return jsonify({'error': '權限不足，無法指派客戶'}), 403
+        contact.assigned_to = data['assigned_to']
+
+    db.session.commit()
+
+    return jsonify({
+        'message': '客戶資料已更新',
+        'contact': contact.to_dict()
+    })
+
+
+@api_bp.route('/contacts/<contact_id>', methods=['DELETE'])
+@login_required
+@require_role('admin')
+def delete_contact(contact_id):
+    """刪除客戶（僅 admin）"""
+    contact = Contact.query.get_or_404(contact_id)
+
+    db.session.delete(contact)
+    db.session.commit()
+
+    return jsonify({'message': '客戶已刪除'})

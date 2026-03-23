@@ -8,6 +8,8 @@ import logging
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 
+from sqlalchemy.exc import IntegrityError
+
 from ..models import Contact, Conversation
 from .. import db
 
@@ -36,13 +38,19 @@ class SessionService:
         Returns:
             對話 Session（新建或現有）
         """
-        # 1. 檢查是否有活躍的對話
-        active_conversation = Conversation.query.filter_by(
-            contact_id=contact.id,
-            channel=channel,
-            status='active'
-        ).order_by(Conversation.started_at.desc()).first()
-        
+        # 1. 使用 FOR UPDATE 鎖定查詢，防止併發建立重複 Session
+        active_conversation = (
+            Conversation.query
+            .filter_by(
+                contact_id=contact.id,
+                channel=channel,
+                status='active'
+            )
+            .order_by(Conversation.started_at.desc())
+            .with_for_update()
+            .first()
+        )
+
         if active_conversation:
             # 檢查是否已超時
             if not active_conversation.is_expired:
@@ -52,11 +60,11 @@ class SessionService:
                 # 對話已超時，自動關閉
                 logger.info(f"對話已超時，自動關閉：{active_conversation.id}")
                 active_conversation.close_conversation()
-                db.session.commit()
-        
+                db.session.flush()
+
         # 2. 建立新對話
         logger.info(f"為客戶 {contact.id} 建立新對話 Session")
-        
+
         conversation = Conversation(
             contact_id=contact.id,
             channel=channel,
@@ -65,10 +73,33 @@ class SessionService:
             timeout_minutes=timeout_minutes,
             ad_referral=ad_referral
         )
-        
-        db.session.add(conversation)
-        db.session.flush()  # 取得 conversation.id
-        
+
+        try:
+            db.session.add(conversation)
+            db.session.flush()  # 取得 conversation.id，唯一約束在此觸發
+        except IntegrityError:
+            # 併發情況下唯一約束衝突，回滾並重新查詢
+            db.session.rollback()
+            logger.info(f"併發建立衝突，重新查詢活躍對話：contact={contact.id}")
+            active_conversation = Conversation.query.filter_by(
+                contact_id=contact.id,
+                channel=channel,
+                status='active'
+            ).order_by(Conversation.started_at.desc()).first()
+            if active_conversation:
+                return active_conversation
+            # 極端情況：重新建立
+            conversation = Conversation(
+                contact_id=contact.id,
+                channel=channel,
+                status='active',
+                started_at=datetime.utcnow(),
+                timeout_minutes=timeout_minutes,
+                ad_referral=ad_referral
+            )
+            db.session.add(conversation)
+            db.session.flush()
+
         logger.info(f"新對話 Session 已建立：{conversation.id}")
         return conversation
     

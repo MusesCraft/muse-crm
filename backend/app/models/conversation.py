@@ -97,7 +97,13 @@ class Conversation(db.Model):
         Index('idx_conversations_contact', 'contact_id'),
         Index('idx_conversations_status', 'status', 'last_message_at'),
         Index('idx_conversations_channel', 'channel'),
-        # 注意：has_ad_referral 是 property，不是資料庫欄位，無法建立索引
+        # 唯一約束：同一個 contact + channel + status=active 只能有一個
+        Index(
+            'uq_conversations_active_per_contact_channel',
+            'contact_id', 'channel',
+            unique=True,
+            postgresql_where=db.text("status = 'active'")
+        ),
     )
     
     def __repr__(self) -> str:

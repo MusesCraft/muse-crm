@@ -15,6 +15,9 @@ db = SQLAlchemy()
 migrate = Migrate()
 celery = Celery(__name__)
 
+# SocketIO 在 realtime 模組中初始化
+from .realtime import socketio
+
 
 def create_app(config_name: str = 'development') -> Flask:
     """
@@ -39,7 +42,17 @@ def create_app(config_name: str = 'development') -> Flask:
     
     # 配置 Celery
     _configure_celery(app, celery)
-    
+
+    # 初始化 SocketIO
+    socketio.init_app(
+        app,
+        cors_allowed_origins='*',
+        async_mode='threading',
+        message_queue=app.config.get('REDIS_URL'),
+    )
+    # 匯入事件處理器（確保註冊到 socketio）
+    from .realtime import events  # noqa: F401
+
     # 註冊 API Blueprint
     from .api import api_bp
     app.register_blueprint(api_bp, url_prefix='/api/v1')

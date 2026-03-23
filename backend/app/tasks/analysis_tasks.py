@@ -17,7 +17,7 @@ from datetime import datetime
 from flask import current_app
 
 from .. import celery, db
-from ..models import Analysis, AnalysisQueue, Conversation, Message, LlmUsageLog
+from ..models import Analysis, AnalysisQueue, Contact, Conversation, Message, LlmUsageLog
 from ..models.system_setting import SystemSetting
 from ..services.llm_service import (
     LLMService,
@@ -31,6 +31,7 @@ from ..services.prompts import format_conversation_for_prompt
 from ..services.auto_tagger import AutoTagger
 from ..services.action_service import ActionService
 from ..utils.error_handler import handle_llm_error
+from ..realtime.emitter import emit_scoped
 
 logger = logging.getLogger(__name__)
 
@@ -325,6 +326,23 @@ def analyze_conversation(self, conversation_id: str, trigger_type: str = "auto")
             f"tags_added={len(added_tags)}, "
             f"actions_created={len(created_action_ids)}"
         )
+
+        # WebSocket 推送 analysis_complete
+        try:
+            summary_preview = (analysis_result.get('conversation_summary') or '')[:100]
+            contact = db.session.get(Contact, conversation.contact_id) if conversation else None
+            emit_scoped(
+                event='analysis_complete',
+                data={
+                    'conversation_id': conversation_id,
+                    'analysis_id': str(analysis.id),
+                    'summary_preview': summary_preview,
+                },
+                assigned_user_id=getattr(contact, 'assigned_to', None) if contact else None,
+                team_id=None,
+            )
+        except Exception as ws_err:
+            logger.warning(f"[analyze_conversation] WebSocket 推送失敗: {ws_err}")
 
         return {
             "success": True,

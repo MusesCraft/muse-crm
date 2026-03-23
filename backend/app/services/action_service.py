@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 
 from .. import db
 from ..models import Action
+from ..realtime.emitter import emit_scoped
 
 logger = logging.getLogger(__name__)
 
@@ -221,6 +222,22 @@ class ActionService:
             f"due={due_date})"
         )
 
+        # WebSocket 推送 new_action
+        try:
+            emit_scoped(
+                event='new_action',
+                data={
+                    'action_id': str(action.id),
+                    'description': description,
+                    'priority': effective_priority,
+                    'due_date': due_date.isoformat(),
+                },
+                assigned_user_id=action.assigned_to,
+                team_id=None,
+            )
+        except Exception as ws_err:
+            logger.warning(f"[_create_single_action] WebSocket 推送失敗: {ws_err}")
+
         return str(action.id)
 
     @staticmethod
@@ -266,6 +283,23 @@ class ActionService:
         db.session.flush()
 
         logger.info(f"手動 Action 已建立: {action.id}")
+
+        # WebSocket 推送 new_action
+        try:
+            emit_scoped(
+                event='new_action',
+                data={
+                    'action_id': str(action.id),
+                    'description': description,
+                    'priority': priority,
+                    'due_date': due_date.isoformat(),
+                },
+                assigned_user_id=assigned_to,
+                team_id=None,
+            )
+        except Exception as ws_err:
+            logger.warning(f"[create_manual_action] WebSocket 推送失敗: {ws_err}")
+
         return str(action.id)
 
     @staticmethod

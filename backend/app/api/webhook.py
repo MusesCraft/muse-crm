@@ -24,6 +24,7 @@ from ..tasks.session_tasks import analyze_message
 from ..tasks.analysis_tasks import quick_triage_message
 from ..services.merge_service import MergeService
 from ..services.notification_service import NotificationService
+from ..realtime.emitter import emit_scoped
 
 logger = logging.getLogger(__name__)
 
@@ -392,6 +393,24 @@ def _handle_webhook_message(
                 )
             except Exception as notify_err:
                 logger.warning(f"[webhook] 新訊息通知發送失敗: {notify_err}")
+
+            # ── 5.6 WebSocket 即時推送 new_message ──
+            try:
+                contact_name = contact.display_name or '未知客戶'
+                emit_scoped(
+                    event='new_message',
+                    data={
+                        'contact_id': str(contact.id),
+                        'contact_name': contact_name,
+                        'channel': channel,
+                        'content_preview': message_text[:100] if message_text else '',
+                        'conversation_id': str(conversation.id),
+                    },
+                    assigned_user_id=getattr(contact, 'assigned_to', None),
+                    team_id=None,
+                )
+            except Exception as ws_err:
+                logger.warning(f"[webhook] WebSocket 推送失敗: {ws_err}")
 
             # ── 6. 輕量即時分類（Phase 5A: per-message quick triage） ──
             if message.has_text_content and message.is_from_customer:

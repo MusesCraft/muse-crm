@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 
 from ..models import Contact, Conversation
 from .. import db
+from ..realtime.emitter import emit_scoped
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +128,24 @@ class SessionService:
             db.session.commit()
             
             logger.info(f"對話已關閉：{conversation_id}, 原因：{reason}")
-            
+
+            # WebSocket 推送 session_closed
+            try:
+                contact = db.session.get(Contact, conversation.contact_id)
+                contact_name = contact.display_name if contact else '未知客戶'
+                emit_scoped(
+                    event='session_closed',
+                    data={
+                        'conversation_id': conversation_id,
+                        'contact_name': contact_name,
+                        'message_count': conversation.message_count or 0,
+                    },
+                    assigned_user_id=getattr(contact, 'assigned_to', None) if contact else None,
+                    team_id=None,
+                )
+            except Exception as ws_err:
+                logger.warning(f"[close_conversation] WebSocket 推送失敗: {ws_err}")
+
             # 觸發 LLM 分析（如果尚未分析）— 直接 dispatch，不繞 queue
             if reason in ('manual', 'timeout') and not conversation.analyses:
                 from ..tasks.analysis_tasks import analyze_conversation

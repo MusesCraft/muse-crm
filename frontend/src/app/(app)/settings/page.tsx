@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { mockQuickReplies, type QuickReply } from '@/lib/mock-data';
-import { quickRepliesApi, type QuickReplyItem } from '@/lib/api';
+import { quickRepliesApi, llmApi, type QuickReplyItem, type LlmUsageSummary, type LlmBudget } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import {
   Settings,
@@ -19,15 +19,18 @@ import {
   Bell,
   Copy,
   CheckCircle,
+  DollarSign,
+  Loader2,
 } from 'lucide-react';
 
 // ── Tab system ─────────────────────────────────────────
 
-type TabId = 'integration' | 'ai' | 'quick-replies' | 'notifications' | 'status' | 'urgency';
+type TabId = 'integration' | 'ai' | 'quick-replies' | 'notifications' | 'status' | 'urgency' | 'llm-cost';
 
 const tabs: { id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'integration', label: 'LINE 整合', icon: Link2 },
   { id: 'ai', label: 'AI 模型', icon: Brain },
+  { id: 'llm-cost', label: 'LLM 成本', icon: DollarSign },
   { id: 'quick-replies', label: '快捷回覆', icon: Zap },
   { id: 'notifications', label: '通知偏好', icon: Bell },
   { id: 'status', label: '客戶狀態', icon: Clock },
@@ -433,6 +436,179 @@ function QuickRepliesManagementCard() {
   );
 }
 
+// ── LLM Cost Dashboard ─────────────────────────────────
+
+type LlmPeriod = 'day' | 'week' | 'month';
+const periodLabels: Record<LlmPeriod, string> = { day: '日', week: '週', month: '月' };
+
+function LlmCostCard() {
+  const [period, setPeriod] = useState<LlmPeriod>('month');
+  const [summary, setSummary] = useState<LlmUsageSummary | null>(null);
+  const [budget, setBudget] = useState<LlmBudget | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      llmApi.getUsageSummary(period).catch(() => null),
+      llmApi.getBudget().catch(() => null),
+    ]).then(([s, b]) => {
+      setSummary(s);
+      setBudget(b);
+      if (!s && !b) setError('無法載入 LLM 用量資料');
+    }).finally(() => setLoading(false));
+  }, [period]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-5 h-5 animate-spin text-zinc-400" />
+        <span className="ml-2 text-sm text-zinc-400">載入中…</span>
+      </div>
+    );
+  }
+
+  if (error && !summary && !budget) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">{error}</p>
+        <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">請確認後端 /api/v1/llm/* 端點已啟用</p>
+      </div>
+    );
+  }
+
+  const budgetPct = budget && budget.monthly_limit > 0
+    ? Math.min(100, Math.round((budget.current_usage / budget.monthly_limit) * 100))
+    : 0;
+  const budgetColor = budgetPct >= 90 ? 'bg-red-500' : budgetPct >= 70 ? 'bg-amber-500' : 'bg-indigo-500';
+
+  return (
+    <div className="space-y-6">
+      <p className="text-xs text-zinc-400 dark:text-zinc-500">監控 LLM API 用量與成本。</p>
+
+      {/* Period selector */}
+      <div className="flex items-center gap-1 p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg w-fit">
+        {(['day', 'week', 'month'] as LlmPeriod[]).map((p) => (
+          <button
+            key={p}
+            onClick={() => setPeriod(p)}
+            className={cn(
+              'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+              period === p
+                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm'
+                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
+            )}
+          >
+            {periodLabels[p]}
+          </button>
+        ))}
+      </div>
+
+      {/* Summary cards */}
+      {summary && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-zinc-700">
+            <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">總 Tokens</p>
+            <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
+              {summary.total_tokens.toLocaleString()}
+            </p>
+          </div>
+          <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-zinc-700">
+            <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">總成本</p>
+            <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
+              ${summary.total_cost.toFixed(2)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Budget progress */}
+      {budget && (
+        <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-zinc-700 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-zinc-700 dark:text-zinc-200">月預算</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              ${budget.current_usage.toFixed(2)} / ${budget.monthly_limit.toFixed(2)}
+            </p>
+          </div>
+          <div className="w-full h-2.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+            <div
+              className={cn('h-full rounded-full transition-all', budgetColor)}
+              style={{ width: `${budgetPct}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+              已使用 {budgetPct}%
+            </p>
+            <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+              剩餘 ${budget.remaining.toFixed(2)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* By model table */}
+      {summary && summary.by_model.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-zinc-700 dark:text-zinc-200 mb-2">依模型分類</p>
+          <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-zinc-50 dark:bg-zinc-800/50">
+                  <th className="text-left px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">模型</th>
+                  <th className="text-right px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">Tokens</th>
+                  <th className="text-right px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">成本</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.by_model.map((row) => (
+                  <tr key={row.model} className="border-t border-zinc-100 dark:border-zinc-800">
+                    <td className="px-3 py-2 text-zinc-700 dark:text-zinc-200 font-mono">{row.model}</td>
+                    <td className="px-3 py-2 text-right text-zinc-600 dark:text-zinc-300">{row.tokens.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-zinc-600 dark:text-zinc-300">${row.cost.toFixed(4)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* By task_type table */}
+      {summary && summary.by_task_type.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-zinc-700 dark:text-zinc-200 mb-2">依任務類型分類</p>
+          <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-zinc-50 dark:bg-zinc-800/50">
+                  <th className="text-left px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">類型</th>
+                  <th className="text-right px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">次數</th>
+                  <th className="text-right px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">Tokens</th>
+                  <th className="text-right px-3 py-2 font-medium text-zinc-500 dark:text-zinc-400">成本</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.by_task_type.map((row) => (
+                  <tr key={row.task_type} className="border-t border-zinc-100 dark:border-zinc-800">
+                    <td className="px-3 py-2 text-zinc-700 dark:text-zinc-200">{row.task_type}</td>
+                    <td className="px-3 py-2 text-right text-zinc-600 dark:text-zinc-300">{row.count}</td>
+                    <td className="px-3 py-2 text-right text-zinc-600 dark:text-zinc-300">{row.tokens.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-zinc-600 dark:text-zinc-300">${row.cost.toFixed(4)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Settings Page ─────────────────────────────────
 
 export default function SettingsPage() {
@@ -446,6 +622,7 @@ export default function SettingsPage() {
       case 'notifications': return <NotificationsCard />;
       case 'status': return <CustomerStatusCard />;
       case 'urgency': return <UrgencyRulesCard />;
+      case 'llm-cost': return <LlmCostCard />;
     }
   };
 

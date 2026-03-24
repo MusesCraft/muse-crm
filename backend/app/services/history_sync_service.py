@@ -64,7 +64,16 @@ class HistorySyncService:
             return None
 
     def _get_page_id(self) -> Optional[str]:
-        """取得 Page ID"""
+        """取得 Page ID（優先從環境變數讀取，避免 /me 權限問題）"""
+        import os
+        from flask import current_app
+
+        # 優先從環境變數或 config 讀取
+        page_id = os.environ.get('META_PAGE_ID') or current_app.config.get('META_APP_ID')
+        if page_id:
+            return page_id
+
+        # Fallback: 從 /me 取得
         token = meta_api.access_token
         if not token:
             logger.error("缺少 META_PAGE_TOKEN，無法同步")
@@ -76,6 +85,26 @@ class HistorySyncService:
         )
         if data:
             return data.get('id')
+
+        # 最終 fallback: 從 conversations API 的 participants 推斷
+        logger.warning("無法從 /me 取得 Page ID，嘗試從 conversations 推斷")
+        data = self._api_get(
+            f"{meta_api.base_url}/me/conversations",
+            params={'fields': 'participants', 'limit': '1', 'access_token': token}
+        )
+        if data and data.get('data'):
+            participants = data['data'][0].get('participants', {}).get('data', [])
+            # Page 通常是名稱含「商店」或 ID 較小的那個
+            for p in participants:
+                # 嘗試用此 ID 查 conversations，如果成功就是 page
+                test = self._api_get(
+                    f"{meta_api.base_url}/{p['id']}/conversations",
+                    params={'limit': '1', 'access_token': token}
+                )
+                if test and 'data' in test:
+                    logger.info(f"推斷 Page ID: {p['id']} ({p.get('name')})")
+                    return p['id']
+
         return None
 
     def _fetch_conversations(

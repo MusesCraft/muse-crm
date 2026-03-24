@@ -1,14 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { dashboardApi, type DashboardStats } from '@/lib/api';
-import {
-  mockUrgencyDistribution,
-  mockStatusDistribution,
-  mockTodayMessages,
-  mockSourceAnalysis,
-  mockContacts,
-} from '@/lib/mock-data';
+import { dashboardApi, contactsApi, type DashboardStats, type Contact } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { LoadingSpinner } from '@/components/loading';
 import { Avatar } from '@/components/avatar';
@@ -163,8 +156,8 @@ function SourceCard({ data }: { data: { organic: number; ad: number; referral: n
   );
 }
 
-function RecentCustomersCard() {
-  const recentContacts = mockContacts.slice(0, 4);
+function RecentCustomersCard({ contacts }: { contacts: Contact[] }) {
+  const recentContacts = contacts.slice(0, 4);
   const statusLabels: Record<string, { label: string; color: string }> = {
     high: { label: '活躍', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' },
     medium: { label: '洽談中', color: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' },

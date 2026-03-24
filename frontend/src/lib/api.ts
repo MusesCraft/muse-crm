@@ -1,18 +1,5 @@
 // API Client for MUSE CRM Backend
 // Transforms backend response fields to frontend types
-// Falls back to mock data when backend is unavailable
-
-import {
-  getMockConversations,
-  getMockConversation,
-  getMockContacts,
-  getMockContactDetail,
-  getMockActions,
-  mockTags,
-  mockDashboardStats,
-  mockChannelDistribution,
-  mockActivity,
-} from './mock-data';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5000/api/v1';
 
@@ -333,8 +320,8 @@ export const inboxApi = {
         data: (raw.data || []).map(transformConversation),
         pagination: raw.pagination,
       } as PaginatedResponse<Conversation>;
-    } catch {
-      return getMockConversations(params);
+    } catch (err) {
+      throw err;
     }
   },
 
@@ -355,18 +342,16 @@ export const inboxApi = {
 
       // Handle flat format (if backend returns flat conversation)
       return transformConversation(raw);
-    } catch {
-      const conv = getMockConversation(id);
-      if (!conv) throw new ApiError(404, 'Not found');
-      return conv;
+    } catch (err) {
+      throw err;
     }
   },
 
   async closeConversation(id: string | number) {
     try {
       return await request<{ message: string }>(`/inbox/conversations/${id}/close`, { method: 'POST' });
-    } catch {
-      return { message: 'Conversation closed (mock)' };
+    } catch (err) {
+      throw err;
     }
   },
 
@@ -375,8 +360,8 @@ export const inboxApi = {
       return await request<{ message: string; task_id: string }>(`/inbox/conversations/${id}/analyze`, {
         method: 'POST',
       });
-    } catch {
-      return { message: 'Analysis started (mock)', task_id: `mock-${id}-${Date.now()}` };
+    } catch (err) {
+      throw err;
     }
   },
 };
@@ -407,8 +392,8 @@ export const contactsApi = {
         data: (raw.data || []).map(transformContact),
         pagination: raw.pagination,
       } as PaginatedResponse<Contact>;
-    } catch {
-      return getMockContacts(params);
+    } catch (err) {
+      throw err;
     }
   },
 
@@ -417,10 +402,8 @@ export const contactsApi = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const raw = await request<any>(`/contacts/${id}`);
       return transformContactDetail(raw);
-    } catch {
-      const contact = getMockContactDetail(id);
-      if (!contact) throw new ApiError(404, 'Not found');
-      return contact;
+    } catch (err) {
+      throw err;
     }
   },
 
@@ -434,14 +417,8 @@ export const contactsApi = {
       // Backend wraps in { message, note }
       const noteData = raw.note || raw;
       return transformNote(noteData);
-    } catch {
-      return {
-        id: Date.now(),
-        contact_id: contactId,
-        content,
-        created_by: 'admin',
-        created_at: new Date().toISOString(),
-      } as Note;
+    } catch (err) {
+      throw err;
     }
   },
 
@@ -455,12 +432,8 @@ export const contactsApi = {
       // Backend wraps in { message, tag }
       const tagData = raw.tag || raw;
       return transformTag(tagData);
-    } catch {
-      return {
-        id: Date.now(),
-        tag_name: tagName,
-        category: category || null,
-      } as Tag;
+    } catch (err) {
+      throw err;
     }
   },
 
@@ -469,8 +442,8 @@ export const contactsApi = {
       return await request<{ message: string }>(`/contacts/${contactId}/tags/${tagId}`, {
         method: 'DELETE',
       });
-    } catch {
-      return { message: 'Tag removed (mock)' };
+    } catch (err) {
+      throw err;
     }
   },
 };
@@ -483,8 +456,8 @@ export const tagsApi = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const raw = await request<any[]>('/tags');
       return (raw || []).map(transformTag);
-    } catch {
-      return mockTags;
+    } catch (err) {
+      throw err;
     }
   },
 };
@@ -503,8 +476,8 @@ export const actionsApi = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const raw = await request<any[]>(`/actions${qs ? `?${qs}` : ''}`);
       return (raw || []).map(transformAction);
-    } catch {
-      return getMockActions(params);
+    } catch (err) {
+      throw err;
     }
   },
 
@@ -518,9 +491,8 @@ export const actionsApi = {
       // Backend wraps in { message, action }
       const actionData = raw.action || raw;
       return transformAction(actionData);
-    } catch {
-      // Return a mock updated action
-      return { id, status: data.status || 'pending' } as Action;
+    } catch (err) {
+      throw err;
     }
   },
 
@@ -540,16 +512,8 @@ export const actionsApi = {
       // Backend wraps in { message, action }
       const actionData = raw.action || raw;
       return transformAction(actionData);
-    } catch {
-      return {
-        id: Date.now(),
-        ...data,
-        conversation_id: null,
-        status: 'pending',
-        due_date: data.due_date || null,
-        completed_at: null,
-        created_at: new Date().toISOString(),
-      } as Action;
+    } catch (err) {
+      throw err;
     }
   },
 };
@@ -578,9 +542,8 @@ export const quickRepliesApi = {
       return await request<{ data: QuickReplyItem[]; total: number; categories: string[] }>(
         `/quick-replies${qs ? `?${qs}` : ''}`
       );
-    } catch {
-      // Fallback: return empty
-      return { data: [], total: 0, categories: [] };
+    } catch (err) {
+      throw err;
     }
   },
 
@@ -591,16 +554,16 @@ export const quickRepliesApi = {
       return await request<{ data: QuickReplyItem[]; total: number; query: string }>(
         `/quick-replies/search?${params.toString()}`
       );
-    } catch {
-      return { data: [], total: 0, query: q };
+    } catch (err) {
+      throw err;
     }
   },
 
   async getById(id: string) {
     try {
       return await request<QuickReplyItem>(`/quick-replies/${id}`);
-    } catch {
-      return null;
+    } catch (err) {
+      throw err;
     }
   },
 };
@@ -617,8 +580,8 @@ export const inboxImageApi = {
           body: JSON.stringify({ image_url: imageUrl, caption }),
         }
       );
-    } catch {
-      return { message: '圖片已記錄（離線模式）', sent_via_api: false, message_id: `mock-${Date.now()}` };
+    } catch (err) {
+      throw err;
     }
   },
 };
@@ -629,24 +592,24 @@ export const dashboardApi = {
   async getStats() {
     try {
       return await request<DashboardStats>('/dashboard/stats');
-    } catch {
-      return mockDashboardStats;
+    } catch (err) {
+      throw err;
     }
   },
 
   async getChannelDistribution() {
     try {
       return await request<ChannelDistribution[]>('/dashboard/channel-distribution');
-    } catch {
-      return mockChannelDistribution;
+    } catch (err) {
+      throw err;
     }
   },
 
   async getActivity(days = 30) {
     try {
       return await request<ActivityPoint[]>(`/dashboard/activity?days=${days}`);
-    } catch {
-      return mockActivity.slice(-days);
+    } catch (err) {
+      throw err;
     }
   },
 };

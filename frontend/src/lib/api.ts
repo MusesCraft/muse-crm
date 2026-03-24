@@ -27,7 +27,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     },
   });
 
-  // 401 → throw error (callers catch and fall back to mock data)
   if (res.status === 401) {
     throw new ApiError(401, 'Unauthorized');
   }
@@ -306,63 +305,47 @@ export const inboxApi = {
     channel?: string;
     search?: string;
   }) {
-    try {
-      const searchParams = new URLSearchParams();
-      if (params?.page) searchParams.set('page', String(params.page));
-      if (params?.per_page) searchParams.set('per_page', String(params.per_page));
-      if (params?.status) searchParams.set('status', params.status);
-      if (params?.channel) searchParams.set('channel', params.channel);
-      if (params?.search) searchParams.set('search', params.search);
-      const qs = searchParams.toString();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await request<any>(`/inbox/conversations${qs ? `?${qs}` : ''}`);
-      return {
-        data: (raw.data || []).map(transformConversation),
-        pagination: raw.pagination,
-      } as PaginatedResponse<Conversation>;
-    } catch (err) {
-      throw err;
-    }
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', String(params.page));
+    if (params?.per_page) searchParams.set('per_page', String(params.per_page));
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.channel) searchParams.set('channel', params.channel);
+    if (params?.search) searchParams.set('search', params.search);
+    const qs = searchParams.toString();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = await request<any>(`/inbox/conversations${qs ? `?${qs}` : ''}`);
+    return {
+      data: (raw.data || []).map(transformConversation),
+      pagination: raw.pagination,
+    } as PaginatedResponse<Conversation>;
   },
 
   async getConversation(id: string | number) {
-    try {
-      // Backend returns { conversation, contact, messages, analyses }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await request<any>(`/inbox/conversations/${id}`);
+    // Backend returns { conversation, contact, messages, analyses }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = await request<any>(`/inbox/conversations/${id}`);
 
-      // Handle nested response format from backend
-      if (raw.conversation) {
-        const conv = transformConversation(raw.conversation);
-        conv.contact = raw.contact ? transformContact(raw.contact) : conv.contact;
-        conv.messages = raw.messages?.map(transformMessage) || conv.messages;
-        conv.analyses = raw.analyses?.map(transformAnalysis) || conv.analyses;
-        return conv;
-      }
-
-      // Handle flat format (if backend returns flat conversation)
-      return transformConversation(raw);
-    } catch (err) {
-      throw err;
+    // Handle nested response format from backend
+    if (raw.conversation) {
+      const conv = transformConversation(raw.conversation);
+      conv.contact = raw.contact ? transformContact(raw.contact) : conv.contact;
+      conv.messages = raw.messages?.map(transformMessage) || conv.messages;
+      conv.analyses = raw.analyses?.map(transformAnalysis) || conv.analyses;
+      return conv;
     }
+
+    // Handle flat format (if backend returns flat conversation)
+    return transformConversation(raw);
   },
 
   async closeConversation(id: string | number) {
-    try {
-      return await request<{ message: string }>(`/inbox/conversations/${id}/close`, { method: 'POST' });
-    } catch (err) {
-      throw err;
-    }
+    return await request<{ message: string }>(`/inbox/conversations/${id}/close`, { method: 'POST' });
   },
 
   async analyzeConversation(id: string | number) {
-    try {
-      return await request<{ message: string; task_id: string }>(`/inbox/conversations/${id}/analyze`, {
-        method: 'POST',
-      });
-    } catch (err) {
-      throw err;
-    }
+    return await request<{ message: string; task_id: string }>(`/inbox/conversations/${id}/analyze`, {
+      method: 'POST',
+    });
   },
 };
 
@@ -377,74 +360,54 @@ export const contactsApi = {
     channel?: string;
     source_type?: string;
   }) {
-    try {
-      const searchParams = new URLSearchParams();
-      if (params?.page) searchParams.set('page', String(params.page));
-      if (params?.per_page) searchParams.set('per_page', String(params.per_page));
-      if (params?.search) searchParams.set('search', params.search);
-      if (params?.tag) searchParams.set('tag', params.tag);
-      if (params?.channel) searchParams.set('channel', params.channel);
-      if (params?.source_type) searchParams.set('source_type', params.source_type);
-      const qs = searchParams.toString();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await request<any>(`/contacts${qs ? `?${qs}` : ''}`);
-      return {
-        data: (raw.data || []).map(transformContact),
-        pagination: raw.pagination,
-      } as PaginatedResponse<Contact>;
-    } catch (err) {
-      throw err;
-    }
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', String(params.page));
+    if (params?.per_page) searchParams.set('per_page', String(params.per_page));
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.tag) searchParams.set('tag', params.tag);
+    if (params?.channel) searchParams.set('channel', params.channel);
+    if (params?.source_type) searchParams.set('source_type', params.source_type);
+    const qs = searchParams.toString();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = await request<any>(`/contacts${qs ? `?${qs}` : ''}`);
+    return {
+      data: (raw.data || []).map(transformContact),
+      pagination: raw.pagination,
+    } as PaginatedResponse<Contact>;
   },
 
   async getContact(id: string | number) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await request<any>(`/contacts/${id}`);
-      return transformContactDetail(raw);
-    } catch (err) {
-      throw err;
-    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = await request<any>(`/contacts/${id}`);
+    return transformContactDetail(raw);
   },
 
   async addNote(contactId: string | number, content: string) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await request<any>(`/contacts/${contactId}/notes`, {
-        method: 'POST',
-        body: JSON.stringify({ content }),
-      });
-      // Backend wraps in { message, note }
-      const noteData = raw.note || raw;
-      return transformNote(noteData);
-    } catch (err) {
-      throw err;
-    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = await request<any>(`/contacts/${contactId}/notes`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+    // Backend wraps in { message, note }
+    const noteData = raw.note || raw;
+    return transformNote(noteData);
   },
 
   async addTag(contactId: string | number, tagName: string, category?: string) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await request<any>(`/contacts/${contactId}/tags`, {
-        method: 'POST',
-        body: JSON.stringify({ tag_name: tagName, category }),
-      });
-      // Backend wraps in { message, tag }
-      const tagData = raw.tag || raw;
-      return transformTag(tagData);
-    } catch (err) {
-      throw err;
-    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = await request<any>(`/contacts/${contactId}/tags`, {
+      method: 'POST',
+      body: JSON.stringify({ tag_name: tagName, category }),
+    });
+    // Backend wraps in { message, tag }
+    const tagData = raw.tag || raw;
+    return transformTag(tagData);
   },
 
   async removeTag(contactId: string | number, tagId: string | number) {
-    try {
-      return await request<{ message: string }>(`/contacts/${contactId}/tags/${tagId}`, {
-        method: 'DELETE',
-      });
-    } catch (err) {
-      throw err;
-    }
+    return await request<{ message: string }>(`/contacts/${contactId}/tags/${tagId}`, {
+      method: 'DELETE',
+    });
   },
 };
 
@@ -452,13 +415,9 @@ export const contactsApi = {
 
 export const tagsApi = {
   async getTags() {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await request<any[]>('/tags');
-      return (raw || []).map(transformTag);
-    } catch (err) {
-      throw err;
-    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = await request<any[]>('/tags');
+    return (raw || []).map(transformTag);
   },
 };
 
@@ -466,34 +425,26 @@ export const tagsApi = {
 
 export const actionsApi = {
   async getActions(params?: { status?: string; priority?: string; sort?: string; contact_id?: string | number }) {
-    try {
-      const searchParams = new URLSearchParams();
-      if (params?.status) searchParams.set('status', params.status);
-      if (params?.priority) searchParams.set('priority', params.priority);
-      if (params?.sort) searchParams.set('sort', params.sort);
-      if (params?.contact_id) searchParams.set('contact_id', String(params.contact_id));
-      const qs = searchParams.toString();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await request<any[]>(`/actions${qs ? `?${qs}` : ''}`);
-      return (raw || []).map(transformAction);
-    } catch (err) {
-      throw err;
-    }
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.priority) searchParams.set('priority', params.priority);
+    if (params?.sort) searchParams.set('sort', params.sort);
+    if (params?.contact_id) searchParams.set('contact_id', String(params.contact_id));
+    const qs = searchParams.toString();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = await request<any[]>(`/actions${qs ? `?${qs}` : ''}`);
+    return (raw || []).map(transformAction);
   },
 
   async updateAction(id: string | number, data: Partial<Pick<Action, 'status'>>) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await request<any>(`/actions/${id}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      });
-      // Backend wraps in { message, action }
-      const actionData = raw.action || raw;
-      return transformAction(actionData);
-    } catch (err) {
-      throw err;
-    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = await request<any>(`/actions/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    // Backend wraps in { message, action }
+    const actionData = raw.action || raw;
+    return transformAction(actionData);
   },
 
   async createAction(data: {
@@ -503,18 +454,14 @@ export const actionsApi = {
     priority: string;
     due_date?: string;
   }) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = await request<any>('/actions', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-      // Backend wraps in { message, action }
-      const actionData = raw.action || raw;
-      return transformAction(actionData);
-    } catch (err) {
-      throw err;
-    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = await request<any>('/actions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    // Backend wraps in { message, action }
+    const actionData = raw.action || raw;
+    return transformAction(actionData);
   },
 };
 
@@ -535,36 +482,24 @@ export interface QuickReplyItem {
 
 export const quickRepliesApi = {
   async getAll(category?: string) {
-    try {
-      const params = new URLSearchParams();
-      if (category) params.set('category', category);
-      const qs = params.toString();
-      return await request<{ data: QuickReplyItem[]; total: number; categories: string[] }>(
-        `/quick-replies${qs ? `?${qs}` : ''}`
-      );
-    } catch (err) {
-      throw err;
-    }
+    const params = new URLSearchParams();
+    if (category) params.set('category', category);
+    const qs = params.toString();
+    return await request<{ data: QuickReplyItem[]; total: number; categories: string[] }>(
+      `/quick-replies${qs ? `?${qs}` : ''}`
+    );
   },
 
   async search(q: string, category?: string) {
-    try {
-      const params = new URLSearchParams({ q });
-      if (category) params.set('category', category);
-      return await request<{ data: QuickReplyItem[]; total: number; query: string }>(
-        `/quick-replies/search?${params.toString()}`
-      );
-    } catch (err) {
-      throw err;
-    }
+    const params = new URLSearchParams({ q });
+    if (category) params.set('category', category);
+    return await request<{ data: QuickReplyItem[]; total: number; query: string }>(
+      `/quick-replies/search?${params.toString()}`
+    );
   },
 
   async getById(id: string) {
-    try {
-      return await request<QuickReplyItem>(`/quick-replies/${id}`);
-    } catch (err) {
-      throw err;
-    }
+    return await request<QuickReplyItem>(`/quick-replies/${id}`);
   },
 };
 
@@ -572,17 +507,13 @@ export const quickRepliesApi = {
 
 export const inboxImageApi = {
   async sendImage(conversationId: string | number, imageUrl: string, caption?: string) {
-    try {
-      return await request<{ message: string; sent_via_api: boolean; message_id: string }>(
-        `/inbox/conversations/${conversationId}/send-image`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ image_url: imageUrl, caption }),
-        }
-      );
-    } catch (err) {
-      throw err;
-    }
+    return await request<{ message: string; sent_via_api: boolean; message_id: string }>(
+      `/inbox/conversations/${conversationId}/send-image`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ image_url: imageUrl, caption }),
+      }
+    );
   },
 };
 
@@ -590,26 +521,41 @@ export const inboxImageApi = {
 
 export const dashboardApi = {
   async getStats() {
-    try {
-      return await request<DashboardStats>('/dashboard/stats');
-    } catch (err) {
-      throw err;
-    }
+    return await request<DashboardStats>('/dashboard/stats');
   },
 
   async getChannelDistribution() {
-    try {
-      return await request<ChannelDistribution[]>('/dashboard/channel-distribution');
-    } catch (err) {
-      throw err;
-    }
+    return await request<ChannelDistribution[]>('/dashboard/channel-distribution');
   },
 
   async getActivity(days = 30) {
-    try {
-      return await request<ActivityPoint[]>(`/dashboard/activity?days=${days}`);
-    } catch (err) {
-      throw err;
-    }
+    return await request<ActivityPoint[]>(`/dashboard/activity?days=${days}`);
+  },
+};
+
+// ── LLM Usage API ──────────────────────────────────────
+
+export interface LlmUsageSummary {
+  period: string;
+  total_tokens: number;
+  total_cost: number;
+  by_model: { model: string; tokens: number; cost: number }[];
+  by_task_type: { task_type: string; tokens: number; cost: number; count: number }[];
+}
+
+export interface LlmBudget {
+  monthly_limit: number;
+  current_usage: number;
+  remaining: number;
+  reset_date: string;
+}
+
+export const llmApi = {
+  async getUsageSummary(period: 'day' | 'week' | 'month') {
+    return await request<LlmUsageSummary>(`/llm/usage/summary?period=${period}`);
+  },
+
+  async getBudget() {
+    return await request<LlmBudget>('/llm/budget');
   },
 };

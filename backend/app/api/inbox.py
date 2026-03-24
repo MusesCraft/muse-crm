@@ -10,7 +10,7 @@ from flask import jsonify, request
 from sqlalchemy import desc
 
 from . import api_bp
-from ..models import Conversation, Message, Contact
+from ..models import Conversation, Message, Contact, ContactTag, Tag
 from .. import db
 from ..tasks.analysis_tasks import analyze_conversation
 from ..utils.auth import login_required
@@ -18,6 +18,24 @@ from ..utils.permissions import get_current_user
 from ..utils.scope import apply_conversation_scope
 
 logger = logging.getLogger(__name__)
+
+# 根據 tags 推斷 contact priority
+_HIGH_PRIORITY_TAGS = {'VIP', '投訴者'}
+_MEDIUM_PRIORITY_TAGS = {'潛在客戶'}
+
+
+def _infer_contact_priority(contact: Contact) -> str:
+    """根據 contact tags 推斷 priority（high/medium/low）"""
+    tag_names = set()
+    for ct in contact.tags:
+        if ct.tag:
+            tag_names.add(ct.tag.name)
+
+    if tag_names & _HIGH_PRIORITY_TAGS:
+        return 'high'
+    if tag_names & _MEDIUM_PRIORITY_TAGS:
+        return 'medium'
+    return 'low'
 
 
 @api_bp.route('/inbox/conversations', methods=['GET'])
@@ -73,7 +91,11 @@ def list_conversations():
         )
         
         conv_dict = conv.to_dict()
-        conv_dict['contact'] = conv.contact.to_dict()
+        contact_dict = conv.contact.to_dict()
+        priority = _infer_contact_priority(conv.contact)
+        contact_dict['priority'] = priority
+        conv_dict['contact'] = contact_dict
+        conv_dict['urgency'] = priority
         conv_dict['last_message'] = last_message.to_dict() if last_message else None
         conversations.append(conv_dict)
     

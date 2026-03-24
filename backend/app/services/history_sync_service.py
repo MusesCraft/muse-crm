@@ -16,6 +16,7 @@ from .. import db
 from ..models import Contact, Message, Conversation
 from ..services.contact_service import ContactService
 from ..services.session_service import SessionService
+from ..services.auto_tagger import AutoTagger
 from ..utils.meta_api import meta_api
 
 logger = logging.getLogger(__name__)
@@ -184,25 +185,25 @@ class HistorySyncService:
 
         return messages
 
-    def _extract_customer_psid(
+    def _extract_customer_info(
         self,
         conversation_data: Dict,
         page_id: str
-    ) -> Optional[str]:
+    ) -> Optional[Dict[str, str]]:
         """
-        從對話的 participants 中提取客戶 PSID。
+        從對話的 participants 中提取客戶 PSID 和名稱。
 
         Args:
             conversation_data: 對話資料
             page_id: Page ID（用來排除 page 自身）
 
         Returns:
-            客戶 PSID 或 None
+            {'id': PSID, 'name': 名稱} 或 None
         """
         participants = conversation_data.get('participants', {}).get('data', [])
         for p in participants:
             if p.get('id') != page_id:
-                return p.get('id')
+                return {'id': p.get('id'), 'name': p.get('name')}
         return None
 
     def sync_all_conversations(self, channel: str = 'messenger', limit: int = 100) -> Dict[str, Any]:
@@ -294,12 +295,15 @@ class HistorySyncService:
         result = {'conversations': 0, 'messages': 0, 'contacts': 0, 'skipped': 0}
 
         meta_conv_id = conv_data.get('id')
-        customer_psid = self._extract_customer_psid(conv_data, page_id)
+        customer_info = self._extract_customer_info(conv_data, page_id)
 
-        if not customer_psid:
+        if not customer_info or not customer_info.get('id'):
             logger.warning(f"對話 {meta_conv_id} 找不到客戶 PSID，跳過")
             result['skipped'] += 1
             return result
+
+        customer_psid = customer_info['id']
+        customer_name = customer_info.get('name')
 
         # 取得或建立 Contact
         existing = db.session.query(Contact).join(
@@ -321,6 +325,11 @@ class HistorySyncService:
 
         if is_new_contact:
             result['contacts'] += 1
+
+        # 回填 display_name：如果 contact 沒有名稱，從 participants 取得
+        if not contact.display_name and customer_name:
+            contact.display_name = customer_name
+            logger.info(f"回填 display_name: {customer_psid} → {customer_name}")
 
         # 取得或建立 Conversation
         conversation = SessionService.get_or_create_conversation(
@@ -347,6 +356,23 @@ class HistorySyncService:
         if result['messages'] > 0:
             conversation.message_count = (conversation.message_count or 0) + result['messages']
             conversation.last_message_at = datetime.utcnow()
+
+        # 同步完成後跑 keyword-based auto-tagging
+        try:
+            all_msgs = Message.query.filter_by(
+                conversation_id=conversation.id
+            ).all()
+            conversation_text = ' '.join(
+                m.content for m in all_msgs if m.content
+            )
+            if conversation_text.strip():
+                keyword_tags = AutoTagger._match_keywords(conversation_text)
+                if keyword_tags:
+                    added = AutoTagger._apply_tags(contact.id, keyword_tags)
+                    if added:
+                        logger.info(f"自動打標（sync）: contact={contact.id}, tags={added}")
+        except Exception as e:
+            logger.error(f"同步後自動打標失敗: {e}")
 
         db.session.commit()
         return result
@@ -437,3 +463,38 @@ class HistorySyncService:
             db.session.rollback()
             logger.debug(f"重複訊息，跳過：meta_message_id={meta_message_id}")
             return False
+
+    @staticmethod
+    def backfill_display_names() -> int:
+        """
+        回填 display_name=None 的 contacts。
+        嘗試從 Meta profile API 拉取名稱。
+
+        Returns:
+            更新的 contact 數量
+        """
+        contacts = Contact.query.filter(
+            Contact.display_name.is_(None),
+            Contact.is_merged == False,
+        ).all()
+
+        updated = 0
+        for contact in contacts:
+            # 嘗試從 channel_identifiers 拿 external_id 去拉 profile
+            for ci in contact.channel_identifiers:
+                if ci.channel in ('messenger', 'instagram'):
+                    try:
+                        profile = meta_api.get_user_profile(ci.external_id)
+                        if profile and profile.get('name'):
+                            contact.display_name = profile['name']
+                            updated += 1
+                            logger.info(f"回填 display_name: {ci.external_id} → {profile['name']}")
+                            break
+                    except Exception as e:
+                        logger.debug(f"拉取 profile 失敗 ({ci.external_id}): {e}")
+
+        if updated:
+            db.session.commit()
+            logger.info(f"回填 display_name 完成，更新 {updated} 個 contacts")
+
+        return updated

@@ -7,12 +7,13 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { useState, useEffect } from 'react';
+import { dashboardApi, actionsApi } from '@/lib/api';
 
 const navItems = [
-  { href: '/inbox', label: '收件匣', icon: Inbox, badge: 12 },
+  { href: '/inbox', label: '收件匣', icon: Inbox, badgeKey: 'active_conversations' as const },
   { href: '/contacts', label: '客戶', icon: Users },
   { href: '/dashboard', label: '儀表板', icon: LayoutDashboard },
-  { href: '/actions', label: '待辦事項', icon: CheckSquare, badge: 3 },
+  { href: '/actions', label: '待辦事項', icon: CheckSquare, badgeKey: 'pending_actions' as const },
   { href: '/settings', label: '設定', icon: Settings },
 ];
 
@@ -22,12 +23,25 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
+  const [badges, setBadges] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('muse_sidebar_collapsed');
       if (saved === 'true') setCollapsed(true);
     }
+  }, []);
+
+  // Fetch badge counts from API
+  useEffect(() => {
+    dashboardApi.getStats()
+      .then((stats) => {
+        setBadges({
+          active_conversations: stats.active_conversations || 0,
+          pending_actions: stats.pending_actions || 0,
+        });
+      })
+      .catch(() => {});
   }, []);
 
   const toggleCollapsed = () => {
@@ -100,14 +114,14 @@ export function Sidebar() {
               {!collapsed && (
                 <>
                   <span className="flex-1">{item.label}</span>
-                  {item.badge && (
+                  {item.badgeKey && badges[item.badgeKey] > 0 && (
                     <span className={cn(
                       'text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5',
                       isActive
                         ? 'bg-indigo-500 text-white'
                         : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300'
                     )}>
-                      {item.badge}
+                      {badges[item.badgeKey]}
                     </span>
                   )}
                 </>

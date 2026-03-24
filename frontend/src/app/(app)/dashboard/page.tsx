@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { dashboardApi, contactsApi, type DashboardStats, type Contact } from '@/lib/api';
+import { dashboardApi, contactsApi, type Contact } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { LoadingSpinner } from '@/components/loading';
 import { Avatar } from '@/components/avatar';
@@ -156,7 +156,7 @@ function SourceCard({ data }: { data: { organic: number; ad: number; referral: n
   );
 }
 
-function RecentCustomersCard({ contacts }: { contacts: Contact[] }) {
+function RecentCustomersCard({ contacts = [] }: { contacts?: Contact[] }) {
   const recentContacts = contacts.slice(0, 4);
   const statusLabels: Record<string, { label: string; color: string }> = {
     high: { label: '活躍', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' },
@@ -198,8 +198,13 @@ function RecentCustomersCard({ contacts }: { contacts: Contact[] }) {
 }
 
 export default function DashboardPage() {
-  const { data: stats, loading: loadingStats } = useAsync<DashboardStats>(
+  const { data: stats, loading: loadingStats } = useAsync(
     () => dashboardApi.getStats(),
+    []
+  );
+
+  const { data: contactsRes } = useAsync(
+    () => contactsApi.getContacts({ per_page: 4 }),
     []
   );
 
@@ -212,6 +217,11 @@ export default function DashboardPage() {
     day: 'numeric',
     weekday: 'long',
   });
+
+  const defaultUrgency = { high: 0, medium: 0, low: 0 };
+  const defaultStatus = { active: 0, silent: 0, unanswered: 0 };
+  const defaultToday = { count: 0, yesterdayCount: 0 };
+  const defaultSource = { organic: 0, ad: 0, referral: 0 };
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -227,23 +237,25 @@ export default function DashboardPage() {
       {/* Top stats */}
       {stats && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <StatCard icon={Users} label="本月新客戶" value={stats.total_contacts} color="bg-indigo-500" change={{ value: '+12%', positive: true }} />
-          <StatCard icon={TrendingUp} label="成交率" value="68%" color="bg-emerald-500" change={{ value: '+4.5%', positive: true }} />
-          <StatCard icon={CheckSquare} label="待辦事項" value={stats.pending_actions} color="bg-amber-500" change={{ value: '-2', positive: false }} />
-          <StatCard icon={MessagesSquare} label="活躍案件" value={stats.active_conversations} color="bg-indigo-500" change={{ value: '+8', positive: true }} />
+          <StatCard icon={Users} label="總客戶數" value={stats.total_contacts} color="bg-indigo-500" />
+          <StatCard icon={TrendingUp} label="總對話數" value={stats.total_conversations} color="bg-emerald-500" />
+          <StatCard icon={CheckSquare} label="待辦事項" value={stats.pending_actions} color="bg-amber-500" />
+          <StatCard icon={MessagesSquare} label="活躍案件" value={stats.active_conversations} color="bg-indigo-500" />
         </div>
       )}
 
       {/* Detail cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <UrgencyCard data={mockUrgencyDistribution} />
-        <StatusCard data={mockStatusDistribution} />
-        <TodayMessagesCard data={mockTodayMessages} />
-        <SourceCard data={mockSourceAnalysis} />
-      </div>
+      {stats && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <UrgencyCard data={stats.urgency_distribution || defaultUrgency} />
+          <StatusCard data={stats.status_distribution || defaultStatus} />
+          <TodayMessagesCard data={stats.today_messages || defaultToday} />
+          <SourceCard data={stats.source_analysis || defaultSource} />
+        </div>
+      )}
 
       {/* Recent customers */}
-      <RecentCustomersCard />
+      <RecentCustomersCard contacts={contactsRes?.data} />
     </div>
   );
 }

@@ -267,12 +267,76 @@ def dashboard_stats():
         Action.status.in_(['pending', 'assigned', 'in_progress'])
     ).count()
 
+    # 緊急度分布：根據 contact tags 推斷
+    from ..models import ContactTag, Tag
+    high_priority_tags = {'VIP', '投訴者'}
+    medium_priority_tags = {'潛在客戶'}
+
+    # 取得有高優先標籤的 contact 數
+    high_contacts = (
+        db.session.query(func.count(distinct(ContactTag.contact_id)))
+        .join(Tag, ContactTag.tag_id == Tag.id)
+        .filter(Tag.name.in_(high_priority_tags))
+        .scalar()
+    ) or 0
+    medium_contacts = (
+        db.session.query(func.count(distinct(ContactTag.contact_id)))
+        .join(Tag, ContactTag.tag_id == Tag.id)
+        .filter(Tag.name.in_(medium_priority_tags))
+        .scalar()
+    ) or 0
+    low_contacts = max(0, total_contacts - high_contacts - medium_contacts)
+
+    # 對話狀態分布
+    silent_conversations = conv_q.filter(
+        Conversation.status == 'active',
+        Conversation.last_message_at < (datetime.utcnow() - timedelta(hours=24))
+    ).count()
+    unanswered_conversations = conv_q.filter(
+        Conversation.status == 'active',
+        Conversation.message_count <= 1
+    ).count()
+    truly_active = max(0, active_conversations - silent_conversations - unanswered_conversations)
+
+    # 今日訊息 vs 昨日
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_start = today_start - timedelta(days=1)
+    today_messages = msg_q.filter(Message.sent_at >= today_start).count()
+    yesterday_messages = msg_q.filter(
+        Message.sent_at >= yesterday_start,
+        Message.sent_at < today_start
+    ).count()
+
+    # 來源分析
+    ad_contacts = contact_q.filter(Contact.source_type == 'ad_referral').count()
+    organic_contacts = total_contacts - ad_contacts
+    referral_contacts = 0  # 目前無 referral 來源
+
     return jsonify({
         'total_contacts': total_contacts,
         'total_conversations': total_conversations,
         'active_conversations': active_conversations,
         'total_messages': total_messages,
         'pending_actions': pending_actions,
+        'urgency_distribution': {
+            'high': high_contacts,
+            'medium': medium_contacts,
+            'low': low_contacts,
+        },
+        'status_distribution': {
+            'active': truly_active,
+            'silent': silent_conversations,
+            'unanswered': unanswered_conversations,
+        },
+        'today_messages': {
+            'count': today_messages,
+            'yesterdayCount': yesterday_messages,
+        },
+        'source_analysis': {
+            'organic': organic_contacts,
+            'ad': ad_contacts,
+            'referral': referral_contacts,
+        },
     })
 
 

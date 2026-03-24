@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { inboxApi, inboxImageApi, quickRepliesApi, type Conversation, type Message, type Analysis, type QuickReplyItem } from '@/lib/api';
-import { mockQuickReplies, getConversationAnalysis, type QuickReply } from '@/lib/mock-data';
+import { mockQuickReplies, getConversationAnalysis } from '@/lib/mock-data';
 import { useAsync } from '@/lib/hooks';
 import { Avatar } from '@/components/avatar';
 import { ChannelBadge } from '@/components/channel-icon';
@@ -70,14 +70,19 @@ function MessageBubble({ message }: { message: Message }) {
         {/* Image message */}
         {message.message_type === 'image' && message.media_url && (
           <div className="mb-2">
-            {message.media_url.startsWith('blob:') ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={message.media_url} alt="uploaded" className="w-48 h-36 object-cover rounded-lg" />
-            ) : (
-              <div className="w-48 h-36 bg-zinc-200 dark:bg-zinc-700 rounded-lg flex items-center justify-center">
-                <ImageIcon className="w-8 h-8 text-zinc-400 dark:text-zinc-500" />
-              </div>
-            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={message.media_url}
+              alt="image"
+              className="max-w-[240px] max-h-[180px] object-cover rounded-lg cursor-pointer"
+              onClick={() => window.open(message.media_url!, '_blank')}
+              onError={(e) => {
+                // 圖片載入失敗（URL 過期等），顯示 placeholder
+                const target = e.currentTarget;
+                target.style.display = 'none';
+                target.parentElement!.innerHTML = `<div class="w-48 h-36 bg-zinc-200 dark:bg-zinc-700 rounded-lg flex items-center justify-center"><span class="text-xs text-zinc-400">圖片已過期</span></div>`;
+              }}
+            />
           </div>
         )}
 
@@ -185,23 +190,32 @@ function QuickRepliesPanel({ onSelect, onClose }: { onSelect: (text: string) => 
 
   // Try loading from API on mount
   useEffect(() => {
-    quickRepliesApi.getAll().then((res) => {
-      if (res.data.length > 0) {
-        setApiReplies(res.data);
-      }
-      setApiLoaded(true);
-    });
+    quickRepliesApi.getAll()
+      .then((res) => {
+        if (res.data && res.data.length > 0) {
+          setApiReplies(res.data);
+        }
+        setApiLoaded(true);
+      })
+      .catch(() => {
+        // API unavailable, fall back to mock data
+        setApiLoaded(true);
+      });
   }, []);
 
   // Search from API when search changes
   useEffect(() => {
     if (!search.trim() || !apiLoaded || apiReplies.length === 0) return;
     const timer = setTimeout(() => {
-      quickRepliesApi.search(search).then((res) => {
-        if (res.data.length > 0) {
-          setApiReplies(res.data);
-        }
-      });
+      quickRepliesApi.search(search)
+        .then((res) => {
+          if (res.data && res.data.length > 0) {
+            setApiReplies(res.data);
+          }
+        })
+        .catch(() => {
+          // Search failed, keep existing replies
+        });
     }, 300);
     return () => clearTimeout(timer);
   }, [search, apiLoaded, apiReplies.length]);

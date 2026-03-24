@@ -148,6 +148,10 @@ export interface DashboardStats {
   active_conversations: number;
   total_messages: number;
   pending_actions: number;
+  urgency_distribution?: { high: number; medium: number; low: number };
+  status_distribution?: { active: number; silent: number; unanswered: number };
+  today_messages?: { count: number; yesterdayCount: number };
+  source_analysis?: { organic: number; ad: number; referral: number };
 }
 
 export interface ChannelDistribution {

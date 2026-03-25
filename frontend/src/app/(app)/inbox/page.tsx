@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { inboxApi, type Conversation, type PaginatedResponse } from '@/lib/api';
 import { mockConversations } from '@/lib/mock-data';
 import { useAsync } from '@/lib/hooks';
@@ -28,6 +28,14 @@ export default function InboxPage() {
       }),
     [page, status, channel, search]
   );
+
+  // Auto polling every 10 seconds (pause when tab hidden)
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!document.hidden) refetch();
+    }, 10000);
+    return () => clearInterval(id);
+  }, [refetch]);
 
   const handleSelect = useCallback((id: string | number) => {
     setSelectedId(id);

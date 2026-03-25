@@ -373,6 +373,14 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     setShowQuickReplies(false);
   }, [conversationId]);
 
+  // Auto polling every 5 seconds (pause when tab hidden)
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!document.hidden) refetch();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [refetch]);
+
   // Auto-resize textarea
   useEffect(() => {
     const ta = textareaRef.current;
@@ -383,8 +391,13 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   }, [inputText]);
 
   // Scroll to bottom when messages change
+  const prevMsgCountRef = useRef(0);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const count = (conv?.messages?.length || 0) + localMessages.length;
+    if (count !== prevMsgCountRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      prevMsgCountRef.current = count;
+    }
   }, [conv?.messages, localMessages]);
 
   const allMessages = [

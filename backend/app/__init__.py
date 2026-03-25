@@ -81,6 +81,17 @@ def create_app(config_name: str = 'development') -> Flask:
     from .api import api_bp
     app.register_blueprint(api_bp, url_prefix='/api/v1')
     
+    # 提供 uploads 靜態檔案
+    import os
+    uploads_dir = os.path.join(app.root_path, '..', 'uploads')
+    os.makedirs(uploads_dir, exist_ok=True)
+
+    from flask import send_from_directory
+
+    @app.route('/uploads/<path:filename>')
+    def serve_upload(filename):
+        return send_from_directory(uploads_dir, filename)
+
     # Health check endpoint
     @app.route('/api/health')
     def health():

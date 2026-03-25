@@ -5,16 +5,17 @@ MUSE CRM — Inbox API
 """
 
 import logging
+from datetime import datetime, timezone
 
 from flask import jsonify, request
 from sqlalchemy import desc
 
 from . import api_bp
-from ..models import Conversation, Message, Contact, ContactTag, Tag
+from ..models import Conversation, Message, Contact, ChannelIdentifier, ContactTag, Tag
 from .. import db
 from ..tasks.analysis_tasks import analyze_conversation
 from ..utils.auth import login_required
-from ..utils.permissions import get_current_user
+from ..utils.permissions import get_current_user, require_role
 from ..utils.scope import apply_conversation_scope
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,15 @@ logger = logging.getLogger(__name__)
 # 根據 tags 推斷 contact priority
 _HIGH_PRIORITY_TAGS = {'VIP', '投訴者'}
 _MEDIUM_PRIORITY_TAGS = {'潛在客戶'}
+
+
+def _get_contact_external_id(contact, channel=None):
+    """從 contact 的 channel_identifiers 取得外部平台 ID（PSID）"""
+    query = ChannelIdentifier.query.filter_by(contact_id=contact.id)
+    if channel:
+        query = query.filter_by(channel=channel)
+    ci = query.first()
+    return ci.external_id if ci else None
 
 
 def _infer_contact_priority(contact: Contact) -> str:
@@ -173,44 +183,124 @@ def trigger_manual_analysis(conversation_id):
     }), 202
 
 
+@api_bp.route('/inbox/conversations/<conversation_id>/send', methods=['POST'])
+@login_required
+@require_role('admin', 'manager', 'user')
+def send_message(conversation_id):
+    """
+    發送訊息（文字或圖片）
+
+    Request body:
+        - content: 訊息內容（文字必填，圖片選填作為 caption）
+        - message_type: 'text' | 'image'（預設 'text'）
+        - media_url: 圖片 URL（message_type='image' 時必填）
+    """
+    conversation = Conversation.query.get_or_404(conversation_id)
+    data = request.get_json() or {}
+
+    content = (data.get('content') or '').strip()
+    message_type = data.get('message_type', 'text')
+    media_url = data.get('media_url')
+
+    if message_type == 'text' and not content:
+        return jsonify({'error': '請提供訊息內容'}), 400
+    if message_type == 'image' and not media_url:
+        return jsonify({'error': '請提供 media_url'}), 400
+
+    # 找到 PSID
+    contact = conversation.contact
+    psid = _get_contact_external_id(contact, channel=conversation.channel)
+
+    # 嘗試透過 Meta API 發送
+    from ..utils.meta_api import meta_api
+    sent_via_api = False
+    try:
+        if psid:
+            if message_type == 'text':
+                sent_via_api = meta_api.send_message(psid, content)
+            elif message_type == 'image':
+                sent_via_api = meta_api.send_image(psid, media_url)
+                # 如果有 caption，額外發一則文字
+                if content and sent_via_api:
+                    meta_api.send_message(psid, content)
+    except Exception as e:
+        logger.warning(f"Meta API 發送失敗: {e}")
+
+    # 不管 API 是否成功，都建立 Message 記錄
+    now = datetime.now(timezone.utc)
+    msg = Message(
+        conversation_id=conversation.id,
+        contact_id=contact.id,
+        sender_type='business',
+        message_type=message_type,
+        content=content or None,
+        media_url=media_url if message_type == 'image' else None,
+        sent_at=now,
+    )
+    db.session.add(msg)
+
+    # 更新 conversation 統計
+    conversation.message_count = (conversation.message_count or 0) + 1
+    conversation.last_message_at = now
+
+    db.session.commit()
+
+    return jsonify({
+        'message': '訊息已發送' if sent_via_api else '訊息已記錄（Meta API 未連接）',
+        'sent_via_api': sent_via_api,
+        'data': msg.to_dict(),
+    })
+
+
 @api_bp.route('/inbox/conversations/<conversation_id>/send-image', methods=['POST'])
 @login_required
 def send_image_message(conversation_id):
     """
-    發送圖片訊息
-    
+    發送圖片訊息（舊版端點，保留向下相容）
+
     Request body:
         - image_url: 圖片 URL（必填）
         - caption: 圖片說明文字（選填）
     """
     conversation = Conversation.query.get_or_404(conversation_id)
     data = request.get_json() or {}
-    
+
     image_url = data.get('image_url')
     if not image_url:
         return jsonify({'error': '請提供 image_url'}), 400
-    
+
     caption = data.get('caption', '')
-    
-    # 嘗試透過 Meta API 發送圖片
+
+    # 透過 channel_identifiers 取得 PSID
     from ..utils.meta_api import meta_api
     contact = conversation.contact
-    
+    psid = _get_contact_external_id(contact, channel=conversation.channel)
+
     success = False
-    if contact and contact.platform_id:
-        success = meta_api.send_image(contact.platform_id, image_url)
-    
+    if psid:
+        try:
+            success = meta_api.send_image(psid, image_url)
+        except Exception as e:
+            logger.warning(f"Meta API send_image 失敗: {e}")
+
     # 建立訊息記錄
+    now = datetime.now(timezone.utc)
     msg = Message(
         conversation_id=conversation.id,
+        contact_id=contact.id,
         sender_type='business',
         message_type='image',
         content=caption,
         media_url=image_url,
+        sent_at=now,
     )
     db.session.add(msg)
+
+    conversation.message_count = (conversation.message_count or 0) + 1
+    conversation.last_message_at = now
+
     db.session.commit()
-    
+
     return jsonify({
         'message': '圖片已發送' if success else '圖片已記錄（Meta API 未連接）',
         'sent_via_api': success,

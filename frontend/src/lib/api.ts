@@ -507,7 +507,68 @@ export const quickRepliesApi = {
   },
 };
 
-// ── Inbox Image API ────────────────────────────────────
+// ── Inbox Send API ─────────────────────────────────────
+
+export interface SendMessageResponse {
+  message: string;
+  sent_via_api: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: any;
+}
+
+export const inboxSendApi = {
+  async sendMessage(conversationId: string | number, content: string, messageType: 'text' | 'image' = 'text', mediaUrl?: string) {
+    const raw = await request<SendMessageResponse>(
+      `/inbox/conversations/${conversationId}/send`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          content,
+          message_type: messageType,
+          media_url: mediaUrl,
+        }),
+      }
+    );
+    return {
+      ...raw,
+      data: raw.data ? transformMessage(raw.data) : undefined,
+    };
+  },
+
+  async sendImage(conversationId: string | number, imageUrl: string, caption?: string) {
+    return await inboxSendApi.sendMessage(conversationId, caption || '', 'image', imageUrl);
+  },
+};
+
+// ── Upload API ─────────────────────────────────────────
+
+export const uploadApi = {
+  async uploadImage(file: File): Promise<{ url: string; filename: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const url = `${API_BASE}/upload`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...getAuthHeaders(),
+      },
+      body: formData,
+    });
+
+    if (res.status === 401) {
+      throw new ApiError(401, 'Unauthorized');
+    }
+    if (!res.ok) {
+      const body = await res.text();
+      throw new ApiError(res.status, body || res.statusText);
+    }
+
+    return res.json();
+  },
+};
+
+// ── Inbox Image API (legacy) ──────────────────────────
 
 export const inboxImageApi = {
   async sendImage(conversationId: string | number, imageUrl: string, caption?: string) {

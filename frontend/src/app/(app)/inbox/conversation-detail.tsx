@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { inboxApi, inboxImageApi, quickRepliesApi, type Conversation, type Message, type Analysis, type QuickReplyItem } from '@/lib/api';
+import { inboxApi, inboxSendApi, uploadApi, quickRepliesApi, type Conversation, type Message, type Analysis, type QuickReplyItem } from '@/lib/api';
 import { mockQuickReplies, getConversationAnalysis } from '@/lib/mock-data';
 import { useAsync } from '@/lib/hooks';
 import { Avatar } from '@/components/avatar';
@@ -349,6 +349,8 @@ function AiSuggestionCard({
 export function ConversationDetail({ conversationId, onClose }: ConversationDetailProps) {
   const [closing, setClosing] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [imagePreview, setImagePreview] = useState<{ file: File; url: string } | null>(null);
@@ -392,37 +394,71 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
   // ── Send Message ──
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     const text = inputText.trim();
     const hasImage = !!imagePreview;
 
     if (!text && !hasImage) return;
+    if (sending) return;
 
-    const newMsg: Message = {
-      id: Date.now(),
-      conversation_id: conversationId,
-      sender_type: 'business',
-      message_type: hasImage ? 'image' : 'text',
-      content: text,
-      media_url: hasImage ? imagePreview.url : null,
-      timestamp: new Date().toISOString(),
-      is_read: false,
-      platform_message_id: null,
-    };
+    setSending(true);
+    setSendError(null);
 
-    setLocalMessages((prev) => [...prev, newMsg]);
-    setInputText('');
-    setImagePreview(null);
+    try {
+      let mediaUrl: string | undefined;
 
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+      // 如果有圖片，先上傳取得 URL
+      if (hasImage) {
+        try {
+          const uploaded = await uploadApi.uploadImage(imagePreview.file);
+          mediaUrl = uploaded.url;
+        } catch {
+          setSendError('圖片上傳失敗，請重試');
+          setSending(false);
+          return;
+        }
+      }
+
+      // 呼叫 send API
+      const messageType = hasImage ? 'image' as const : 'text' as const;
+      const result = await inboxSendApi.sendMessage(
+        conversationId,
+        text,
+        messageType,
+        mediaUrl,
+      );
+
+      // 成功：把回傳的 message 加入本地
+      if (result.data) {
+        setLocalMessages((prev) => [...prev, result.data as Message]);
+      } else {
+        // fallback: 如果後端沒回傳完整 message，自己建一個
+        const newMsg: Message = {
+          id: Date.now(),
+          conversation_id: conversationId,
+          sender_type: 'business',
+          message_type: messageType,
+          content: text,
+          media_url: mediaUrl || null,
+          timestamp: new Date().toISOString(),
+          is_read: false,
+          platform_message_id: null,
+        };
+        setLocalMessages((prev) => [...prev, newMsg]);
+      }
+
+      setInputText('');
+      setImagePreview(null);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '發送失敗';
+      setSendError(msg);
+    } finally {
+      setSending(false);
     }
-
-    // Send image via API if applicable
-    if (hasImage && imagePreview.url) {
-      inboxImageApi.sendImage(conversationId, imagePreview.url, text).catch(() => {});
-    }
-  }, [inputText, imagePreview, conversationId]);
+  }, [inputText, imagePreview, conversationId, sending]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -656,18 +692,33 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           {/* Send Button */}
           <button
             onClick={handleSend}
-            disabled={!inputText.trim() && !imagePreview}
+            disabled={sending || (!inputText.trim() && !imagePreview)}
             className={cn(
               'p-2 rounded-lg transition-colors',
-              inputText.trim() || imagePreview
-                ? 'bg-indigo-500 text-white hover:bg-indigo-600'
-                : 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600 cursor-not-allowed'
+              sending
+                ? 'bg-indigo-400 text-white cursor-wait'
+                : inputText.trim() || imagePreview
+                  ? 'bg-indigo-500 text-white hover:bg-indigo-600'
+                  : 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600 cursor-not-allowed'
             )}
             title="發送"
           >
-            <Send className="w-5 h-5" />
+            {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
           </button>
         </div>
+
+        {/* Error Message */}
+        {sendError && (
+          <div className="px-4 pb-2 flex items-center gap-2">
+            <span className="text-xs text-red-500">{sendError}</span>
+            <button
+              onClick={() => setSendError(null)}
+              className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
       </div>
     </>
   );

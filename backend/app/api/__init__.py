@@ -22,6 +22,7 @@ from . import llm_usage
 from . import users
 from . import notification_preferences
 from . import sync
+from . import upload
 
 # 註冊錯誤處理器
 from ..utils.error_handler import register_error_handlers

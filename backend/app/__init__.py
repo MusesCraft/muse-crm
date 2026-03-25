@@ -146,6 +146,11 @@ def _configure_celery(app: Flask, celery: Celery) -> None:
                 'schedule': 3600.0,  # 每小時檢查即將到期的待辦動作
                 'options': {'queue': 'maintenance'},
             },
+            'periodic-data-health-check': {
+                'task': 'app.tasks.maintenance_tasks.periodic_data_health_check',
+                'schedule': 21600.0,  # 每 6 小時執行一次
+                'options': {'queue': 'maintenance'},
+            },
         },
     )
     

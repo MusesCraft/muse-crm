@@ -280,6 +280,22 @@ class HistorySyncService:
         stats['rate_limited'] = self._rate_limited
         stats['api_calls'] = self._api_call_count
 
+        # 同步完成後自動跑資料健康修復
+        try:
+            from .data_health_service import DataHealthService
+
+            count_fixed = DataHealthService.fix_message_counts()
+            tag_result = DataHealthService.run_keyword_tagging()
+
+            stats['health_check'] = {
+                'message_counts_fixed': count_fixed,
+                'keyword_tagging': tag_result,
+            }
+            logger.info(f"同步後健康修復完成: counts={count_fixed}, tags={tag_result}")
+        except Exception as e:
+            logger.error(f"同步後健康修復失敗: {e}", exc_info=True)
+            stats['health_check'] = {'error': str(e)}
+
         logger.info(f"歷史對話同步完成：{stats}")
         return stats
 

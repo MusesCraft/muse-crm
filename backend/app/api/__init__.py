@@ -23,6 +23,7 @@ from . import users
 from . import notification_preferences
 from . import sync
 from . import upload
+from . import health_check
 
 # 註冊錯誤處理器
 from ..utils.error_handler import register_error_handlers

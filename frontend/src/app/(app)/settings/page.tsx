@@ -336,16 +336,26 @@ function QuickRepliesManagementCard() {
   // Try to load from API
   useEffect(() => {
     quickRepliesApi.getAll().then((res) => {
-      console.log('Quick replies loaded:', res);
       if (res.data && res.data.length > 0) {
         setApiReplies(res.data);
+      }
+      if (res.categories && res.categories.length > 0) {
+        setApiCategories(res.categories);
       }
     }).catch((err) => {
       console.error('Quick replies load failed:', err);
     });
   }, []);
 
-  const categories = ['問候語', '產品介紹', '報價相關', '售後回覆'];
+  const [apiCategories, setApiCategories] = useState<string[]>([]);
+  const categories = apiCategories.length > 0 ? apiCategories : ['問候語', '產品介紹', '報價相關', '售後回覆'];
+
+  const categoryLabels: Record<string, string> = {
+    basin: '一體盆', dm: 'DM資料', hot_bend: '熱彎', identity: '身分確認',
+    material: '材質說明', visit: '參訪邀約', dimension: '尺寸規格',
+    general: '通用回覆', project_info: '案場資訊', needs: '需求確認',
+    store: '商城', follow_up: '回訪跟進',
+  };
 
   const handleAdd = () => {
     if (!formTitle.trim() || !formContent.trim()) return;
@@ -418,7 +428,7 @@ function QuickRepliesManagementCard() {
           if (items.length === 0) return null;
           return (
             <div key={cat}>
-              <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">{cat}</p>
+              <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">{categoryLabels[cat] || cat}</p>
               {items.map((item) => (
                 <div key={item.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
                   <div className="flex-1 min-w-0">

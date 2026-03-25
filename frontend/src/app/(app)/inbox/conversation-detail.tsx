@@ -373,10 +373,13 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     setShowQuickReplies(false);
   }, [conversationId]);
 
-  // Auto polling every 5 seconds (pause when tab hidden)
+  // Auto polling every 5 seconds (pause when tab hidden or just sent a message)
+  const lastSentRef = useRef(0);
   useEffect(() => {
     const id = setInterval(() => {
-      if (!document.hidden) refetch();
+      const now = Date.now();
+      // 發送後 8 秒內不 polling（避免重複刷新）
+      if (!document.hidden && now - lastSentRef.current > 8000) refetch();
     }, 5000);
     return () => clearInterval(id);
   }, [refetch]);
@@ -462,6 +465,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
       setInputText('');
       setImagePreview(null);
+      lastSentRef.current = Date.now(); // 防止 polling 立刻 refetch
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
@@ -503,7 +507,9 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
   const handleQuickReplySelect = (text: string) => {
     setInputText(text);
-    textareaRef.current?.focus();
+    setShowQuickReplies(false);
+    // 用 setTimeout 確保面板關閉後再 focus，避免 scroll 跳動
+    setTimeout(() => textareaRef.current?.focus(), 50);
   };
 
   // ── AI Suggestion Use ──

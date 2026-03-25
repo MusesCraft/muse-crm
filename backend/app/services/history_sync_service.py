@@ -269,11 +269,68 @@ class HistorySyncService:
                     db.session.rollback()
                     stats['errors'] += 1
 
+        # 回填所有 display_name 為 None 的 contacts（從 participants 或 profile）
+        try:
+            backfilled = self._backfill_names_from_conversations(page_id, channels, limit)
+            stats['names_backfilled'] = backfilled
+        except Exception as e:
+            logger.error(f"回填 display_name 失敗: {e}")
+            stats['names_backfilled'] = 0
+
         stats['rate_limited'] = self._rate_limited
         stats['api_calls'] = self._api_call_count
 
         logger.info(f"歷史對話同步完成：{stats}")
         return stats
+
+    def _backfill_names_from_conversations(
+        self, page_id: str, channels: List[str], limit: int
+    ) -> int:
+        """
+        對所有 display_name 為 None 的 contacts，嘗試從已拉取的
+        conversations participants 回填名稱。
+        """
+        from ..models import ChannelIdentifier
+
+        contacts = Contact.query.filter(
+            Contact.display_name.is_(None),
+            Contact.is_merged == False,
+        ).all()
+
+        if not contacts:
+            return 0
+
+        # 建立 external_id → contact 的映射
+        ext_id_map = {}
+        for c in contacts:
+            for ci in c.channel_identifiers:
+                ext_id_map[ci.external_id] = c
+
+        if not ext_id_map:
+            return 0
+
+        # 從已同步的 conversations 中尋找 participant names
+        updated = 0
+        for ch in channels:
+            conversations = self._fetch_conversations(page_id, ch, limit)
+            for conv_data in conversations:
+                customer_info = self._extract_customer_info(conv_data, page_id)
+                if not customer_info:
+                    continue
+                cid = customer_info.get('id')
+                cname = customer_info.get('name')
+                if cid in ext_id_map and cname:
+                    contact = ext_id_map[cid]
+                    if not contact.display_name:
+                        contact.display_name = cname
+                        updated += 1
+                        logger.info(f"回填 display_name (sync 結束): {cid} → {cname}")
+
+        if updated:
+            db.session.commit()
+            logger.info(f"sync 結束回填 display_name: {updated} 個 contacts")
+
+        return updated
 
     def _sync_single_conversation(
         self,
@@ -315,12 +372,14 @@ class HistorySyncService:
 
         is_new_contact = existing is None
 
-        # 嘗試拉取 profile
-        profile_data = meta_api.get_user_profile(customer_psid)
+        # 嘗試拉取 profile，合併 participants 的客戶名稱
+        profile_data = meta_api.get_user_profile(customer_psid) or {}
+        if customer_name and not profile_data.get('name'):
+            profile_data['name'] = customer_name
         contact = ContactService.get_or_create_contact(
             channel=channel,
             external_id=customer_psid,
-            profile_data=profile_data,
+            profile_data=profile_data if profile_data else None,
         )
 
         if is_new_contact:

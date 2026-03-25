@@ -125,6 +125,43 @@ def analyze_all_conversations():
     return jsonify({'data': stats}), 200
 
 
+@api_bp.route('/sync/tag-all', methods=['POST'])
+@login_required
+@require_role('admin')
+def tag_all_conversations():
+    """
+    遍歷所有 conversations 跑 keyword-based 自動打標。
+
+    Returns:
+        打標統計
+    """
+    conversations = Conversation.query.all()
+    stats = {
+        'total_conversations': len(conversations),
+        'tagged_conversations': 0,
+        'total_tags_added': 0,
+    }
+
+    for conv in conversations:
+        messages = Message.query.filter_by(conversation_id=conv.id).all()
+        conversation_text = ' '.join(
+            m.content for m in messages if m.content
+        )
+        if not conversation_text.strip():
+            continue
+
+        keyword_tags = AutoTagger._match_keywords(conversation_text)
+        if keyword_tags:
+            added = AutoTagger._apply_tags(conv.contact_id, keyword_tags)
+            if added:
+                stats['tagged_conversations'] += 1
+                stats['total_tags_added'] += len(added)
+
+    db.session.commit()
+    logger.info(f"tag-all 自動打標完成：{stats}")
+    return jsonify({'data': stats}), 200
+
+
 @api_bp.route('/sync/backfill-names', methods=['POST'])
 @login_required
 @require_role('admin')

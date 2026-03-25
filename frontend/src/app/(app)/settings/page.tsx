@@ -336,9 +336,12 @@ function QuickRepliesManagementCard() {
   // Try to load from API
   useEffect(() => {
     quickRepliesApi.getAll().then((res) => {
-      if (res.data.length > 0) {
+      console.log('Quick replies loaded:', res);
+      if (res.data && res.data.length > 0) {
         setApiReplies(res.data);
       }
+    }).catch((err) => {
+      console.error('Quick replies load failed:', err);
     });
   }, []);
 

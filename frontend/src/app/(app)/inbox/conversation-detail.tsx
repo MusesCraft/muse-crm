@@ -435,6 +435,14 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     if (!text && !hasImage) return;
     if (sending) return;
 
+    // 發送前確認
+    const confirmMsg = hasImage && text
+      ? '確定要發送這則訊息和圖片？'
+      : hasImage
+        ? '確定要發送這張圖片？'
+        : '確定要發送這則訊息？';
+    if (!window.confirm(confirmMsg)) return;
+
     setSending(true);
     setSendError(null);
 

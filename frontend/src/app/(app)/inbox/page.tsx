@@ -30,12 +30,28 @@ export default function InboxPage() {
   );
 
   // Auto polling every 10 seconds (pause when tab hidden)
+  // 使用 silent fetch 避免觸發 loading/error state → 防止不必要的 re-render
   useEffect(() => {
-    const id = setInterval(() => {
-      if (!document.hidden) refetch().catch(() => {});
+    const id = setInterval(async () => {
+      if (document.hidden) return;
+      try {
+        const fresh = await inboxApi.getConversations({
+          page,
+          per_page: 20,
+          status: status || undefined,
+          channel: channel || undefined,
+          search: search || undefined,
+        });
+        // 只在筆數變化時才 refetch（更新完整 state）
+        if (fresh.pagination?.total !== data?.pagination?.total) {
+          refetch();
+        }
+      } catch {
+        // 靜默忽略所有 polling 錯誤
+      }
     }, 10000);
     return () => clearInterval(id);
-  }, [refetch]);
+  }, [page, status, channel, search, data?.pagination?.total, refetch]);
 
   const handleSelect = useCallback((id: string | number) => {
     setSelectedId(id);

@@ -374,17 +374,23 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   }, [conversationId]);
 
   // Auto polling every 5 seconds (pause when tab hidden or just sent a message)
+  // 使用 silent fetch 避免觸發 loading/error state → 防止不必要的 re-render 和 scroll 重置
   const lastSentRef = useRef(0);
   useEffect(() => {
-    const id = setInterval(() => {
-      const now = Date.now();
-      // 發送後 8 秒內不 polling（避免重複刷新）
-      if (!document.hidden && now - lastSentRef.current > 8000) {
-        refetch().catch(() => {}); // 靜默處理 401 等錯誤，不觸發頁面刷新
+    const id = setInterval(async () => {
+      if (document.hidden || Date.now() - lastSentRef.current < 8000) return;
+      try {
+        const freshData = await inboxApi.getConversation(conversationId);
+        // 只在有新訊息時才 refetch（更新完整 state）
+        if (freshData?.messages && freshData.messages.length > (conv?.messages?.length || 0)) {
+          refetch();
+        }
+      } catch {
+        // 靜默忽略所有 polling 錯誤（包含 401），不觸發 state 更新
       }
     }, 5000);
     return () => clearInterval(id);
-  }, [refetch]);
+  }, [conversationId, conv?.messages?.length, refetch]);
 
   // Auto-resize textarea
   useEffect(() => {

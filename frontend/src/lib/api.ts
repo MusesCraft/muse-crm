@@ -616,11 +616,35 @@ export interface LlmBudget {
 }
 
 export const llmApi = {
-  async getUsageSummary(period: 'day' | 'week' | 'month') {
-    return await request<LlmUsageSummary>(`/llm/usage/summary?period=${period}`);
+  async getUsageSummary(period: 'day' | 'week' | 'month'): Promise<LlmUsageSummary> {
+    const raw = await request<any>(`/llm/usage/summary?period=${period}`);
+    return {
+      period: raw.period || period,
+      total_tokens: raw.total_tokens || 0,
+      total_cost: raw.total_cost_usd ?? raw.total_cost ?? 0,
+      by_model: (raw.by_model || []).map((m: any) => ({
+        model: m.model,
+        tokens: m.tokens ?? m.total_tokens ?? 0,
+        cost: m.cost ?? m.estimated_cost_usd ?? 0,
+      })),
+      by_task_type: (raw.by_task_type || []).map((t: any) => ({
+        task_type: t.task_type,
+        tokens: t.tokens ?? t.total_tokens ?? 0,
+        cost: t.cost ?? t.estimated_cost_usd ?? 0,
+        count: t.count ?? t.request_count ?? 0,
+      })),
+    };
   },
 
-  async getBudget() {
-    return await request<LlmBudget>('/llm/budget');
+  async getBudget(): Promise<LlmBudget> {
+    const raw = await request<any>('/llm/budget');
+    const limit = raw.cost?.limit_usd ?? raw.monthly_limit ?? 50;
+    const current = raw.cost?.current_usd ?? raw.current_usage ?? 0;
+    return {
+      monthly_limit: limit,
+      current_usage: current,
+      remaining: limit - current,
+      reset_date: raw.month ? `${raw.month}-01` : '',
+    };
   },
 };

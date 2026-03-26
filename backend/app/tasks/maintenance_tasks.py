@@ -6,7 +6,7 @@ MUSE CRM — Maintenance Tasks
 
 import logging
 
-from .. import celery_app
+from .. import celery as celery_app
 
 logger = logging.getLogger(__name__)
 

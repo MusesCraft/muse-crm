@@ -379,7 +379,9 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     const id = setInterval(() => {
       const now = Date.now();
       // 發送後 8 秒內不 polling（避免重複刷新）
-      if (!document.hidden && now - lastSentRef.current > 8000) refetch();
+      if (!document.hidden && now - lastSentRef.current > 8000) {
+        refetch().catch(() => {}); // 靜默處理 401 等錯誤，不觸發頁面刷新
+      }
     }, 5000);
     return () => clearInterval(id);
   }, [refetch]);

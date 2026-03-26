@@ -32,7 +32,7 @@ export default function InboxPage() {
   // Auto polling every 10 seconds (pause when tab hidden)
   useEffect(() => {
     const id = setInterval(() => {
-      if (!document.hidden) refetch();
+      if (!document.hidden) refetch().catch(() => {});
     }, 10000);
     return () => clearInterval(id);
   }, [refetch]);

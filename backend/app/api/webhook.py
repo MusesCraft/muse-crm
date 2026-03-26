@@ -223,6 +223,23 @@ def _handle_channel_event(event: 'ChannelEvent'):
             except Exception as ws_err:
                 logger.warning(f"[webhook] WebSocket 推送失敗: {ws_err}")
 
+            # ── 5.7 名片 OCR 自動辨識（圖片訊息） ──
+            if message_type == 'image' and attachments.get('media_url'):
+                try:
+                    threading.Thread(
+                        target=_ocr_business_card_with_context,
+                        args=(
+                            current_app._get_current_object(),
+                            attachments['media_url'],
+                            str(contact.id),
+                            str(conversation.id),
+                        ),
+                        daemon=True,
+                    ).start()
+                    logger.debug(f"[webhook] 已觸發名片 OCR：message={message.id}")
+                except Exception as ocr_err:
+                    logger.warning(f"[webhook] 觸發名片 OCR 失敗：{ocr_err}")
+
             # ── 6. 輕量即時分類（Phase 5A: per-message quick triage） ──
             if message.has_text_content and message.is_from_customer:
                 try:
@@ -346,6 +363,38 @@ def _update_contact_from_profile(contact: Contact, profile_data: Dict[str, Any])
     # 更新 locale（如果尚未設定）
     if not contact.locale and profile_data.get('locale'):
         contact.locale = profile_data['locale']
+
+
+def _ocr_business_card_with_context(app, media_url: str, contact_id: str, conversation_id: str):
+    """背景執行名片 OCR 辨識（帶 Flask app context）"""
+    with app.app_context():
+        try:
+            from ..services.ocr_service import BusinessCardOCR
+            from .ocr import _update_contact_from_ocr, _add_ocr_system_message
+
+            ocr = BusinessCardOCR()
+            result = ocr.analyze_image(media_url)
+
+            if result is None:
+                return
+
+            # 只有辨識出 name/phone/email 才更新
+            if not (result.get('name') or result.get('phone') or result.get('email')):
+                return
+
+            contact = Contact.query.get(contact_id)
+            if not contact:
+                return
+
+            updated = _update_contact_from_ocr(contact, result)
+            if updated:
+                _add_ocr_system_message(conversation_id, contact, result)
+                db.session.commit()
+                logger.info(f"📇 [webhook] 名片 OCR 自動更新 contact={contact_id}")
+
+        except Exception as e:
+            logger.error(f"❌ [webhook] 名片 OCR 背景處理失敗：{e}", exc_info=True)
+            db.session.rollback()
 
 
 # ── LINE Webhook ──

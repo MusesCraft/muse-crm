@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { inboxApi, inboxSendApi, uploadApi, quickRepliesApi, type Conversation, type Message, type Analysis, type QuickReplyItem } from '@/lib/api';
+import { inboxApi, inboxSendApi, uploadApi, quickRepliesApi, ocrApi, type Conversation, type Message, type Analysis, type QuickReplyItem, type OcrResult } from '@/lib/api';
 import { mockQuickReplies, getConversationAnalysis } from '@/lib/mock-data';
 import { useAsync } from '@/lib/hooks';
 import { Avatar } from '@/components/avatar';
@@ -43,7 +43,7 @@ function formatDateTime(dateStr: string): string {
   });
 }
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, onOcr }: { message: Message; onOcr?: (mediaUrl: string) => void }) {
   const isCustomer = message.sender_type === 'customer';
   const isSystem = message.sender_type === 'system';
 
@@ -83,6 +83,14 @@ function MessageBubble({ message }: { message: Message }) {
                 target.parentElement!.innerHTML = `<div class="w-48 h-36 bg-zinc-200 dark:bg-zinc-700 rounded-lg flex items-center justify-center"><span class="text-xs text-zinc-400">圖片已過期</span></div>`;
               }}
             />
+            {onOcr && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onOcr(message.media_url!); }}
+                className="mt-1 text-[11px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+              >
+                📇 辨識名片
+              </button>
+            )}
           </div>
         )}
 
@@ -355,6 +363,8 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   const [inputText, setInputText] = useState('');
   const [imagePreview, setImagePreview] = useState<{ file: File; url: string } | null>(null);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrToast, setOcrToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -527,6 +537,34 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     textareaRef.current?.focus();
   };
 
+  // ── OCR ──
+
+  const handleOcr = useCallback(async (mediaUrl: string) => {
+    if (ocrLoading) return;
+    setOcrLoading(true);
+    setOcrToast(null);
+    try {
+      const contactId = conv?.contact?.id ? String(conv.contact.id) : undefined;
+      const res = await ocrApi.analyzeBusinessCard(mediaUrl, contactId);
+      const r = res.result;
+      const parts = [r.name, r.company, r.phone].filter(Boolean);
+      setOcrToast({
+        message: parts.length > 0
+          ? `辨識成功：${parts.join(' / ')}${res.contact_updated ? '（已更新客戶資料）' : ''}`
+          : '未能從圖片中辨識出名片資訊',
+        type: parts.length > 0 ? 'success' : 'error',
+      });
+      if (res.contact_updated) {
+        setTimeout(() => refetch(), 1000);
+      }
+    } catch {
+      setOcrToast({ message: '名片辨識失敗，請重試', type: 'error' });
+    } finally {
+      setOcrLoading(false);
+      setTimeout(() => setOcrToast(null), 5000);
+    }
+  }, [ocrLoading, conv?.contact?.id, refetch]);
+
   // ── Conversation Actions ──
 
   const handleClose = async () => {
@@ -626,7 +664,13 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-6 space-y-1">
         {allMessages.length > 0 ? (
-          allMessages.map((msg) => <MessageBubble key={msg.id} message={msg} />)
+          allMessages.map((msg) => (
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              onOcr={msg.message_type === 'image' && msg.media_url ? handleOcr : undefined}
+            />
+          ))
         ) : (
           <p className="text-center text-sm text-zinc-500 py-8">尚無訊息</p>
         )}
@@ -733,6 +777,23 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
           </button>
         </div>
+
+        {/* OCR Toast */}
+        {(ocrLoading || ocrToast) && (
+          <div className="px-4 pb-2">
+            {ocrLoading && (
+              <span className="text-xs text-amber-500 flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                名片辨識中...
+              </span>
+            )}
+            {ocrToast && (
+              <span className={cn('text-xs', ocrToast.type === 'success' ? 'text-green-500' : 'text-red-500')}>
+                {ocrToast.message}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Error Message */}
         {sendError && (

@@ -24,6 +24,7 @@ from . import notification_preferences
 from . import sync
 from . import upload
 from . import health_check
+from . import ocr
 
 # 註冊錯誤處理器
 from ..utils.error_handler import register_error_handlers

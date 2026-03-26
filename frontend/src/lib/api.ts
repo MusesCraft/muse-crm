@@ -582,6 +582,29 @@ export const inboxImageApi = {
   },
 };
 
+// ── OCR API ────────────────────────────────────────────
+
+export interface OcrResult {
+  name: string;
+  company: string;
+  title: string;
+  phone: string;
+  email: string;
+  address: string;
+  line_id: string;
+  other_info?: string;
+  confidence: number;
+}
+
+export const ocrApi = {
+  async analyzeBusinessCard(imageUrl: string, contactId?: string) {
+    return await request<{ result: OcrResult; contact_updated: boolean }>('/ocr/business-card', {
+      method: 'POST',
+      body: JSON.stringify({ image_url: imageUrl, contact_id: contactId }),
+    });
+  },
+};
+
 // ── Dashboard API ──────────────────────────────────────
 
 export const dashboardApi = {

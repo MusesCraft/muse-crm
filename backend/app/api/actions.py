@@ -82,7 +82,15 @@ def list_actions():
         action_dict['is_overdue'] = action.is_overdue
         actions.append(action_dict)
     
-    return jsonify(actions)
+    return jsonify({
+        'data': actions,
+        'pagination': {
+            'page': pagination.page,
+            'per_page': pagination.per_page,
+            'total': pagination.total,
+            'pages': pagination.pages,
+        },
+    })
 
 
 @api_bp.route('/actions/<action_id>', methods=['PATCH'])

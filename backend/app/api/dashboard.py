@@ -4,8 +4,8 @@ MUSE CRM — Dashboard API
 Dashboard 統計數據相關 API 端點。
 """
 
-from datetime import datetime, timedelta
-from flask import jsonify, request
+from datetime import datetime, timedelta, timezone
+from flask import current_app, jsonify, request
 from sqlalchemy import func, and_, distinct
 
 from . import api_bp
@@ -298,8 +298,15 @@ def dashboard_stats():
     ).count()
     truly_active = max(0, active_conversations - silent_conversations - unanswered_conversations)
 
-    # 今日訊息 vs 昨日
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    # 今日訊息 vs 昨日（使用 Asia/Taipei 時區計算日期邊界）
+    tz_name = current_app.config.get('DISPLAY_TIMEZONE', 'Asia/Taipei')
+    try:
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo(tz_name)
+    except Exception:
+        tz = timezone(timedelta(hours=8))  # fallback UTC+8
+    now_local = datetime.now(tz)
+    today_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc).replace(tzinfo=None)
     yesterday_start = today_start - timedelta(days=1)
     today_messages = msg_q.filter(Message.sent_at >= today_start).count()
     yesterday_messages = msg_q.filter(

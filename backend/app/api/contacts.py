@@ -6,6 +6,7 @@ MUSE CRM — Contacts API
 
 from flask import jsonify, request, g
 from sqlalchemy import desc, or_, func
+from sqlalchemy.orm import subqueryload, joinedload
 
 from . import api_bp
 from ..models import Contact, ChannelIdentifier, ContactTag, Tag, UserNote
@@ -72,6 +73,13 @@ def list_contacts():
     
     # 排序：最近活躍優先
     query = query.order_by(desc(Contact.last_active_at))
+
+    # Eager loading 避免 N+1（tags + tag 定義一起載入）
+    query = query.options(
+        subqueryload(Contact.tags).joinedload(ContactTag.tag),
+        subqueryload(Contact.conversations),
+        subqueryload(Contact.messages),
+    )
     
     pagination = query.paginate(page=page, per_page=per_page)
     
@@ -79,7 +87,7 @@ def list_contacts():
     for contact in pagination.items:
         contact_dict = contact.to_dict()
         
-        # 加入標籤資訊
+        # 加入標籤資訊（已 eager loaded）
         contact_dict['tags'] = [
             {
                 'name': ct.tag.name,
@@ -89,7 +97,7 @@ def list_contacts():
             for ct in contact.tags
         ]
         
-        # 加入統計資訊
+        # 加入統計資訊（已 eager loaded，直接用 len）
         contact_dict['conversation_count'] = len(contact.conversations)
         contact_dict['message_count'] = len(contact.messages)
         

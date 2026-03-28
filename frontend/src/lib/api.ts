@@ -68,6 +68,8 @@ export interface Contact {
 
 export interface Tag {
   id: string | number;
+  /** Backend returns `name`; `tag_name` kept for backward compatibility */
+  name: string;
   tag_name: string;
   category: string | null;
   contact_count?: number;
@@ -116,6 +118,8 @@ export interface Action {
   id: string | number;
   contact_id: string | number;
   conversation_id: string | number | null;
+  /** Backend returns `source`; `action_type` kept for backward compatibility */
+  source: string;
   action_type: string;
   description: string;
   priority: string;
@@ -130,6 +134,8 @@ export interface Note {
   id: string | number;
   contact_id: string | number;
   content: string;
+  /** Backend returns `author_id`; `created_by` kept for backward compatibility */
+  author_id: string | null;
   created_by: string;
   created_at: string;
 }
@@ -187,9 +193,11 @@ function transformContact(raw: any): Contact {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function transformTag(raw: any): Tag {
+  const tagName = raw.tag_name || raw.name || '';
   return {
     id: raw.id,
-    tag_name: raw.tag_name || raw.name || '',
+    name: tagName,
+    tag_name: tagName,
     category: raw.category ?? null,
     contact_count: raw.contact_count,
     created_at: raw.created_at,
@@ -260,11 +268,13 @@ function transformConversation(raw: any): Conversation {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function transformAction(raw: any): Action {
+  const src = raw.source || raw.action_type || 'followup';
   return {
     id: raw.id,
     contact_id: raw.contact_id,
     conversation_id: raw.conversation_id ?? null,
-    action_type: raw.action_type || raw.source || 'followup',
+    source: src,
+    action_type: src,
     description: raw.description || '',
     priority: raw.priority || 'medium',
     status: raw.status || 'pending',
@@ -277,11 +287,13 @@ function transformAction(raw: any): Action {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function transformNote(raw: any): Note {
+  const authorId = raw.author_id || raw.created_by || null;
   return {
     id: raw.id,
     contact_id: raw.contact_id,
     content: raw.content || '',
-    created_by: raw.created_by || raw.author_id || 'system',
+    author_id: authorId,
+    created_by: authorId || 'system',
     created_at: raw.created_at || '',
   };
 }
@@ -436,8 +448,10 @@ export const actionsApi = {
     if (params?.contact_id) searchParams.set('contact_id', String(params.contact_id));
     const qs = searchParams.toString();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw = await request<any[]>(`/actions${qs ? `?${qs}` : ''}`);
-    return (raw || []).map(transformAction);
+    const raw = await request<any>(`/actions${qs ? `?${qs}` : ''}`);
+    // Support both { data, pagination } and plain array (backward compat)
+    const items = Array.isArray(raw) ? raw : (raw.data || []);
+    return items.map(transformAction);
   },
 
   async updateAction(id: string | number, data: Partial<Pick<Action, 'status'>>) {

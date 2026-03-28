@@ -53,7 +53,11 @@ def create_app(config_name: str = 'development') -> Flask:
     # 初始化擴展
     db.init_app(app)
     migrate.init_app(app, db)
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    # CORS：production 應透過 CORS_ORIGINS 環境變數限制來源
+    cors_origins = app.config.get('CORS_ORIGINS', '*')
+    if isinstance(cors_origins, str) and ',' in cors_origins:
+        cors_origins = [o.strip() for o in cors_origins.split(',')]
+    CORS(app, resources={r"/api/*": {"origins": cors_origins}})
     
     # 配置 Celery
     _configure_celery(app, celery)
@@ -62,7 +66,7 @@ def create_app(config_name: str = 'development') -> Flask:
     try:
         socketio.init_app(
             app,
-            cors_allowed_origins='*',
+            cors_allowed_origins=cors_origins,
             async_mode='threading',
             message_queue=app.config.get('REDIS_URL'),
         )
@@ -71,7 +75,7 @@ def create_app(config_name: str = 'development') -> Flask:
         logging.getLogger(__name__).warning(f"SocketIO message_queue 初始化失敗，改用無 queue 模式: {_socketio_err}")
         socketio.init_app(
             app,
-            cors_allowed_origins='*',
+            cors_allowed_origins=cors_origins,
             async_mode='threading',
         )
     # 匯入事件處理器（確保註冊到 socketio）
@@ -92,29 +96,26 @@ def create_app(config_name: str = 'development') -> Flask:
     def serve_upload(filename):
         return send_from_directory(uploads_dir, filename)
 
-    # Health check endpoint
+    # Health check — 輕量探針，供 load balancer / Docker 使用
+    # 詳細版（含 DB/Redis 檢查）在 /api/v1/health
     @app.route('/api/health')
     def health():
         return {
             'status': 'ok',
             'service': 'muse-crm',
-            'version': '1.0.0'
+            'version': '1.0.0',
+            'detail_url': '/api/v1/health',
         }
 
-    # 自動建立 DB tables（背景執行，不阻塞啟動）
-    import threading
-    def _init_db():
-        import time
-        time.sleep(5)  # 等 gunicorn ready
-        with app.app_context():
-            try:
-                db.create_all()
-                import logging
-                logging.getLogger(__name__).info("✅ DB tables 已就緒")
-            except Exception as _db_err:
-                import logging
-                logging.getLogger(__name__).warning(f"⚠️ DB create_all 失敗: {_db_err}")
-    threading.Thread(target=_init_db, daemon=True).start()
+    # 自動建立 DB tables（在 app context 內同步執行）
+    with app.app_context():
+        try:
+            db.create_all()
+            import logging as _log
+            _log.getLogger(__name__).info("✅ DB tables 已就緒")
+        except Exception as _db_err:
+            import logging as _log
+            _log.getLogger(__name__).warning(f"⚠️ DB create_all 失敗（DB 可能尚未就緒）: {_db_err}")
 
     return app
 
@@ -132,23 +133,23 @@ def _configure_celery(app: Flask, celery: Celery) -> None:
         # Celery Beat 定期任務
         beat_schedule={
             'cleanup-expired-sessions': {
-                'task': 'app.tasks.session_tasks.cleanup_expired_sessions',
+                'task': 'crm.tasks.cleanup_expired_sessions',
                 'schedule': 3600.0,  # 每小時執行一次
                 'options': {'queue': 'maintenance'},
             },
             'retry-failed-analysis': {
-                'task': 'app.tasks.analysis_tasks.retry_failed_analysis',
+                'task': 'crm.tasks.retry_failed_analysis',
                 'schedule': 1800.0,  # 每 30 分鐘重試失敗的分析
                 'options': {'queue': 'maintenance'},
             },
             'check-due-actions': {
-                'task': 'app.tasks.notification_tasks.check_due_actions',
+                'task': 'crm.tasks.check_due_actions',
                 'schedule': 3600.0,  # 每小時檢查即將到期的待辦動作
                 'options': {'queue': 'maintenance'},
             },
             'periodic-data-health-check': {
                 'task': 'app.tasks.maintenance_tasks.periodic_data_health_check',
-                'schedule': 21600.0,  # 每 6 小時執行一次
+                'schedule': 21600.0,  # 每 6 小時執行一次（已有 explicit name）
                 'options': {'queue': 'maintenance'},
             },
         },

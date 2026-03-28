@@ -405,6 +405,13 @@ def dashboard_activity():
 @api_bp.route('/dashboard/export', methods=['GET'])
 @login_required
 def export_dashboard_csv():
-    """匯出 Dashboard 數據為 CSV"""
-    # TODO: 實作 CSV 匯出功能
-    return jsonify({'message': 'CSV 匯出功能開發中'}), 501
+    """
+    匯出 Dashboard 數據為 CSV
+
+    TODO: 實作完整 CSV 匯出（含客戶、對話、動作等資料）。
+    目前回傳 501 Not Implemented。預計 Phase 3 實作。
+    """
+    return jsonify({
+        'error': 'Not Implemented',
+        'message': 'CSV 匯出功能尚未實作，預計 Phase 3 提供。',
+    }), 501

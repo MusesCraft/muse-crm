@@ -18,7 +18,7 @@ from ..services.notification_service import NotificationService
 logger = logging.getLogger(__name__)
 
 
-@celery.task(bind=True)
+@celery.task(bind=True, name='crm.tasks.check_due_actions')
 def check_due_actions(self):
     """
     檢查即將到期的待辦動作並發送提醒通知。

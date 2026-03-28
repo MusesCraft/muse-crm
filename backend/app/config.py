@@ -46,6 +46,9 @@ class BaseConfig:
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET')
     JWT_EXPIRY_HOURS = int(os.environ.get('JWT_EXPIRY_HOURS', '24'))
 
+    # CORS — 逗號分隔的允許來源（production 建議明確指定）
+    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*')
+
     # Celery
     CELERY_BROKER_URL = REDIS_URL
     CELERY_RESULT_BACKEND = REDIS_URL

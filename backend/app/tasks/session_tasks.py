@@ -15,7 +15,7 @@ from ..services.session_service import SessionService
 logger = logging.getLogger(__name__)
 
 
-@celery.task(bind=True, max_retries=3)
+@celery.task(bind=True, max_retries=3, name='crm.tasks.trigger_analysis_task')
 def trigger_analysis_task(self, conversation_id: str):
     """
     觸發對話分析任務（對話層級）
@@ -73,7 +73,7 @@ def trigger_analysis_task(self, conversation_id: str):
             logger.error(f"觸發分析達到最大重試次數：{conversation_id}")
 
 
-@celery.task(bind=True, max_retries=3)
+@celery.task(bind=True, max_retries=3, name='crm.tasks.analyze_message')
 def analyze_message(self, message_id: str):
     """
     單一訊息的 LLM 分析觸發（Phase 2 stub）
@@ -130,7 +130,7 @@ def analyze_message(self, message_id: str):
         }
 
 
-@celery.task
+@celery.task(name='crm.tasks.cleanup_expired_sessions')
 def cleanup_expired_sessions():
     """
     定期清理過期的對話 Session
@@ -159,7 +159,7 @@ def cleanup_expired_sessions():
         }
 
 
-@celery.task(bind=True, max_retries=5)
+@celery.task(bind=True, max_retries=5, name='crm.tasks.close_conversation_task')
 def close_conversation_task(self, conversation_id: str, reason: str = 'system'):
     """
     背景任務：關閉對話 Session

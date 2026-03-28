@@ -57,6 +57,7 @@ def _get_min_messages_for_analysis() -> int:
 
 @celery.task(
     bind=True,
+    name='crm.tasks.quick_triage_message',
     max_retries=0,  # 失敗不重試（輕量分析失敗不嚴重）
 )
 def quick_triage_message(self, message_id: str):
@@ -142,6 +143,7 @@ def quick_triage_message(self, message_id: str):
 
 @celery.task(
     bind=True,
+    name='crm.tasks.analyze_message_llm',
     max_retries=3,
     default_retry_delay=30,
     autoretry_for=(LLMTimeoutError, LLMRateLimitError),
@@ -233,6 +235,7 @@ def analyze_message(self, message_id: str):
 
 @celery.task(
     bind=True,
+    name='crm.tasks.analyze_conversation',
     max_retries=3,
     default_retry_delay=60,
     autoretry_for=(LLMTimeoutError, LLMRateLimitError),
@@ -388,7 +391,7 @@ def analyze_conversation(self, conversation_id: str, trigger_type: str = "auto")
 # 3. 批次處理待分析訊息
 # ============================================================
 
-@celery.task(bind=True)
+@celery.task(bind=True, name='crm.tasks.batch_analyze_pending')
 def batch_analyze_pending(self):
     """
     批次處理待分析的訊息。
@@ -449,7 +452,7 @@ def batch_analyze_pending(self):
 # 4. 處理分析佇列（保留 Phase 2 原有介面）
 # ============================================================
 
-@celery.task(bind=True)
+@celery.task(bind=True, name='crm.tasks.process_analysis_queue')
 def process_analysis_queue(self):
     """
     處理分析佇列中的待分析對話。
@@ -560,7 +563,7 @@ def process_analysis_queue(self):
 # 5. 重試失敗的分析
 # ============================================================
 
-@celery.task(bind=True, max_retries=3)
+@celery.task(bind=True, max_retries=3, name='crm.tasks.retry_failed_analysis')
 def retry_failed_analysis(self):
     """
     重試失敗的分析任務。

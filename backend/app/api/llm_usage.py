@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 @api_bp.route('/llm/usage/summary', methods=['GET'])
+@login_required
 def llm_usage_summary():
     """
     LLM 用量彙總統計。
@@ -124,6 +125,7 @@ def llm_usage_summary():
 
 
 @api_bp.route('/llm/usage/logs', methods=['GET'])
+@login_required
 def llm_usage_logs():
     """
     LLM 用量原始 log 分頁查詢。
@@ -179,6 +181,7 @@ def llm_usage_logs():
 
 
 @api_bp.route('/llm/budget', methods=['GET'])
+@login_required
 def llm_budget_status():
     """
     取得當前 LLM 預算狀態。
@@ -263,6 +266,7 @@ def llm_budget_update():
 
 
 @api_bp.route('/llm/settings', methods=['GET'])
+@login_required
 def llm_settings():
     """
     取得 LLM 相關設定。
@@ -288,6 +292,7 @@ def llm_settings():
 
 
 @api_bp.route('/llm/fallback-events', methods=['GET'])
+@login_required
 def llm_fallback_events():
     """
     查詢 LLM 模型降級事件。

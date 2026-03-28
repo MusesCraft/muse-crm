@@ -112,6 +112,9 @@ def _log_error(error_type: str, context: Dict[str, Any], conversation_id: Option
         conversation_id: 相關對話 ID
     """
     try:
+        # 延遲建立 error_logs 表
+        _ensure_error_logs_table()
+
         # 使用原生 SQL 確保並發安全
         db.session.execute(
             text("""
@@ -286,8 +289,15 @@ def register_error_handlers(blueprint: Blueprint):
 
 
 # 確保 error_logs 表存在
+_error_logs_table_ensured = False
+
+
 def _ensure_error_logs_table():
-    """確保 error_logs 表存在"""
+    """確保 error_logs 表存在（延遲建立，需在 app context 內呼叫）"""
+    global _error_logs_table_ensured
+    if _error_logs_table_ensured:
+        return
+
     try:
         db.session.execute(text("""
             CREATE TABLE IF NOT EXISTS error_logs (
@@ -313,15 +323,8 @@ def _ensure_error_logs_table():
         """))
         
         db.session.commit()
+        _error_logs_table_ensured = True
         
     except SQLAlchemyError as e:
         logger.error(f"建立 error_logs 表失敗：{e}")
         db.session.rollback()
-
-
-# 模組載入時自動建立表
-try:
-    _ensure_error_logs_table()
-except:
-    # 如果應用尚未初始化，忽略錯誤
-    pass

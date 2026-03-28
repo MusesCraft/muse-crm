@@ -107,7 +107,10 @@ def webhook_receive():
 def _handle_channel_event_with_context(app, event: 'ChannelEvent'):
     """帶有 Flask 應用上下文的 ChannelEvent 處理包裝器"""
     with app.app_context():
-        _handle_channel_event(event)
+        try:
+            _handle_channel_event(event)
+        finally:
+            db.session.remove()
 
 
 def _handle_channel_event(event: 'ChannelEvent'):
@@ -395,6 +398,8 @@ def _ocr_business_card_with_context(app, media_url: str, contact_id: str, conver
         except Exception as e:
             logger.error(f"❌ [webhook] 名片 OCR 背景處理失敗：{e}", exc_info=True)
             db.session.rollback()
+        finally:
+            db.session.remove()
 
 
 # ── LINE Webhook ──
@@ -458,7 +463,10 @@ def webhook_line():
 def _handle_line_follow_with_context(app, event: 'ChannelEvent'):
     """帶有 Flask 應用上下文的 LINE follow 處理包裝器"""
     with app.app_context():
-        _handle_line_follow(event)
+        try:
+            _handle_line_follow(event)
+        finally:
+            db.session.remove()
 
 
 def _handle_line_follow(event: 'ChannelEvent'):
@@ -486,7 +494,10 @@ def _handle_line_follow(event: 'ChannelEvent'):
 def _handle_line_unfollow_with_context(app, event: 'ChannelEvent'):
     """帶有 Flask 應用上下文的 LINE unfollow 處理包裝器"""
     with app.app_context():
-        _handle_line_unfollow(event)
+        try:
+            _handle_line_unfollow(event)
+        finally:
+            db.session.remove()
 
 
 def _handle_line_unfollow(event: 'ChannelEvent'):

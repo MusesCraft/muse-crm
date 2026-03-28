@@ -5,7 +5,7 @@ MUSE CRM — Actions API
 """
 
 from flask import jsonify, request
-from sqlalchemy import desc, and_
+from sqlalchemy import desc, and_, case
 
 from . import api_bp
 from ..models import Action, Contact
@@ -60,9 +60,15 @@ def list_actions():
             )
         )
     
-    # 排序：優先級 > 到期日 > 建立時間
+    # 排序：優先級（high=1 > medium=2 > low=3）> 到期日 > 建立時間
+    priority_order = case(
+        (Action.priority == 'high', 1),
+        (Action.priority == 'medium', 2),
+        (Action.priority == 'low', 3),
+        else_=4,
+    )
     query = query.order_by(
-        Action.priority.desc(),
+        priority_order.asc(),
         Action.due_date.asc().nullslast(),
         desc(Action.created_at)
     )

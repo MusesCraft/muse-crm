@@ -12,6 +12,7 @@ from sqlalchemy import or_
 from . import api_bp
 from ..models.user import User
 from .. import db
+from ..utils import escape_like
 from ..utils.auth import login_required
 from ..utils.permissions import require_role
 
@@ -48,10 +49,11 @@ def list_users():
         query = query.filter(User.is_active == active_val)
 
     if search:
+        safe_search = escape_like(search)
         query = query.filter(
             or_(
-                User.name.ilike(f'%{search}%'),
-                User.email.ilike(f'%{search}%')
+                User.name.ilike(f'%{safe_search}%', escape='\\'),
+                User.email.ilike(f'%{safe_search}%', escape='\\')
             )
         )
 

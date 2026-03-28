@@ -10,6 +10,7 @@ from sqlalchemy import desc, or_, func
 from . import api_bp
 from ..models import Contact, ChannelIdentifier, ContactTag, Tag, UserNote
 from .. import db
+from ..utils import escape_like
 from ..utils.auth import login_required
 from ..utils.permissions import get_current_user, require_role
 from ..utils.scope import apply_contact_scope
@@ -48,10 +49,11 @@ def list_contacts():
 
     # 篩選條件
     if search:
+        safe_search = escape_like(search)
         query = query.filter(
             or_(
-                Contact.display_name.ilike(f'%{search}%'),
-                Contact.notes.ilike(f'%{search}%')
+                Contact.display_name.ilike(f'%{safe_search}%', escape='\\'),
+                Contact.notes.ilike(f'%{safe_search}%', escape='\\')
             )
         )
     
@@ -392,12 +394,13 @@ def search_contacts():
     if not keyword:
         return jsonify({'error': '必須提供搜尋關鍵字 q'}), 400
 
-    like_pattern = f'%{keyword}%'
+    safe_keyword = escape_like(keyword)
+    like_pattern = f'%{safe_keyword}%'
 
     # 子查詢：channel_identifier.external_id 匹配的 contact_id
     ci_subquery = (
         db.session.query(ChannelIdentifier.contact_id)
-        .filter(ChannelIdentifier.external_id.ilike(like_pattern))
+        .filter(ChannelIdentifier.external_id.ilike(like_pattern, escape='\\'))
         .subquery()
     )
 
@@ -406,8 +409,8 @@ def search_contacts():
         .filter(Contact.is_merged == False)
         .filter(
             or_(
-                Contact.display_name.ilike(like_pattern),
-                Contact.notes.ilike(like_pattern),
+                Contact.display_name.ilike(like_pattern, escape='\\'),
+                Contact.notes.ilike(like_pattern, escape='\\'),
                 Contact.id.in_(ci_subquery)
             )
         )
@@ -489,11 +492,12 @@ def get_merge_candidates(contact_id):
 
     # 3. display_name 相似（包含相同子字串，至少 2 個字元）
     if contact.display_name and len(contact.display_name) >= 2:
-        like_pattern = f'%{contact.display_name}%'
+        safe_name = escape_like(contact.display_name)
+        like_pattern = f'%{safe_name}%'
         matches = (
             Contact.query
             .filter(
-                Contact.display_name.ilike(like_pattern),
+                Contact.display_name.ilike(like_pattern, escape='\\'),
                 Contact.id != contact.id,
                 Contact.is_merged == False
             )

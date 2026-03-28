@@ -10,6 +10,7 @@ MUSE CRM — 資料可見範圍模組（Scope Filter）
 import logging
 from typing import List
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Query
 
 from ..models.user import User
@@ -47,10 +48,16 @@ def apply_contact_scope(query: Query, user: User) -> Query:
 
     if user.role == 'manager':
         team_ids = _get_team_user_ids(user)
-        return query.filter(Contact.assigned_to.in_(team_ids))
+        return query.filter(or_(
+            Contact.assigned_to.in_(team_ids),
+            Contact.assigned_to.is_(None),
+        ))
 
-    # user 角色
-    return query.filter(Contact.assigned_to == user.id)
+    # user 角色：自己負責的 + 未指派的
+    return query.filter(or_(
+        Contact.assigned_to == user.id,
+        Contact.assigned_to.is_(None),
+    ))
 
 
 def apply_conversation_scope(query: Query, user: User) -> Query:
@@ -64,9 +71,15 @@ def apply_conversation_scope(query: Query, user: User) -> Query:
 
     if user.role == 'manager':
         team_ids = _get_team_user_ids(user)
-        return query.filter(Contact.assigned_to.in_(team_ids))
+        return query.filter(or_(
+            Contact.assigned_to.in_(team_ids),
+            Contact.assigned_to.is_(None),
+        ))
 
-    return query.filter(Contact.assigned_to == user.id)
+    return query.filter(or_(
+        Contact.assigned_to == user.id,
+        Contact.assigned_to.is_(None),
+    ))
 
 
 def apply_action_scope(query: Query, user: User) -> Query:
@@ -80,6 +93,12 @@ def apply_action_scope(query: Query, user: User) -> Query:
 
     if user.role == 'manager':
         team_ids = _get_team_user_ids(user)
-        return query.filter(Contact.assigned_to.in_(team_ids))
+        return query.filter(or_(
+            Contact.assigned_to.in_(team_ids),
+            Contact.assigned_to.is_(None),
+        ))
 
-    return query.filter(Contact.assigned_to == user.id)
+    return query.filter(or_(
+        Contact.assigned_to == user.id,
+        Contact.assigned_to.is_(None),
+    ))

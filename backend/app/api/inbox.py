@@ -14,6 +14,7 @@ from . import api_bp
 from ..models import Conversation, Message, Contact, ChannelIdentifier, ContactTag, Tag
 from .. import db
 from ..tasks.analysis_tasks import analyze_conversation
+from ..utils import escape_like
 from ..utils.auth import login_required
 from ..utils.permissions import get_current_user, require_role
 from ..utils.scope import apply_conversation_scope
@@ -84,8 +85,9 @@ def list_conversations():
     if channel:
         query = query.filter(Conversation.channel == channel)
     if search:
+        safe_search = escape_like(search)
         query = query.filter(
-            Contact.display_name.ilike(f'%{search}%')
+            Contact.display_name.ilike(f'%{safe_search}%', escape='\\')
         )
     
     pagination = query.paginate(page=page, per_page=per_page)

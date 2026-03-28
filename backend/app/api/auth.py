@@ -59,11 +59,24 @@ def auth_register():
     
     規則：
     - 如果系統中沒有任何用戶，第一個註冊的自動成為 admin
-    - 否則需要 admin 權限才能建立新用戶
+    - 否則需要 admin 權限才能建立新用戶（需 JWT）
     
     Body: { name, email, password, role? }
     Response: { user }
     """
+    # 判斷是否為第一個用戶（在驗證前就檢查）
+    user_count = User.query.count()
+    is_first_user = user_count == 0
+
+    if not is_first_user:
+        # 非第一個用戶，強制要求 admin JWT
+        from ..utils.auth import _extract_current_user
+        current_user, error = _extract_current_user()
+        if error:
+            return error  # 回傳原始 401/403 而非籠統的 403
+        if current_user.role != 'admin':
+            return jsonify({'error': '需要管理員權限'}), 403
+
     data = request.get_json()
     if not data:
         return jsonify({'error': '缺少請求資料'}), 400
@@ -87,19 +100,7 @@ def auth_register():
     if existing:
         return jsonify({'error': '此 Email 已被註冊'}), 409
     
-    # 判斷是否為第一個用戶
-    user_count = User.query.count()
-    is_first_user = user_count == 0
-    
-    if not is_first_user:
-        # 非第一個用戶，需要 admin 權限
-        from ..utils.auth import _extract_current_user
-        current_user, error = _extract_current_user()
-        if error:
-            return jsonify({'error': '需要管理員權限才能建立新用戶'}), 403
-        if current_user.role != 'admin':
-            return jsonify({'error': '需要管理員權限'}), 403
-    else:
+    if is_first_user:
         # 第一個用戶自動成為 admin
         role = 'admin'
     

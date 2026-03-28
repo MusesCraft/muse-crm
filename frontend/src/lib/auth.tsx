@@ -55,8 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       fetchMe(savedToken)
         .then((u) => setUser(u))
         .catch((err) => {
-          if (err.message === 'BACKEND_OFFLINE') {
-            // Backend unreachable — use mock user for offline dev
+          if (err.message === 'BACKEND_OFFLINE' && process.env.NODE_ENV === 'development') {
+            // Backend unreachable — use mock user for offline dev only
             setUser(MOCK_USER);
           } else {
             // Token invalid (401) — clear and show login
@@ -67,29 +67,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .finally(() => setIsLoading(false));
     } else if (savedToken === 'mock-demo-token') {
       // Had mock token — check if backend is now available
-      checkBackendAvailable()
-        .then((available) => {
-          if (available) {
-            // Backend is up — clear mock, show login for real auth
-            localStorage.removeItem('muse_token');
-          } else {
-            // Backend still down — keep mock
-            setToken('mock-demo-token');
-            setUser(MOCK_USER);
-          }
-        })
-        .finally(() => setIsLoading(false));
+      if (process.env.NODE_ENV !== 'development') {
+        // Production: never use mock token
+        localStorage.removeItem('muse_token');
+        setIsLoading(false);
+      } else {
+        checkBackendAvailable()
+          .then((available) => {
+            if (available) {
+              // Backend is up — clear mock, show login for real auth
+              localStorage.removeItem('muse_token');
+            } else {
+              // Backend still down — keep mock
+              setToken('mock-demo-token');
+              setUser(MOCK_USER);
+            }
+          })
+          .finally(() => setIsLoading(false));
+      }
     } else {
       // No saved token — check backend, show login or use mock
       checkBackendAvailable()
         .then((available) => {
-          if (!available) {
-            // Backend offline — auto-mock for demo
+          if (!available && process.env.NODE_ENV === 'development') {
+            // Backend offline — auto-mock for demo (development only)
             localStorage.setItem('muse_token', 'mock-demo-token');
             setToken('mock-demo-token');
             setUser(MOCK_USER);
           }
-          // If backend available, user stays null → login page
+          // If backend available (or production), user stays null → login page
         })
         .finally(() => setIsLoading(false));
     }
@@ -114,8 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(data.user);
     } catch (err) {
       // Distinguish network error (backend offline) from auth error
-      if (err instanceof TypeError && err.message.includes('fetch')) {
-        // Network error — backend unavailable, use mock
+      if (err instanceof TypeError && err.message.includes('fetch') && process.env.NODE_ENV === 'development') {
+        // Network error — backend unavailable, use mock (development only)
         localStorage.setItem('muse_token', 'mock-demo-token');
         setToken('mock-demo-token');
         setUser(MOCK_USER);

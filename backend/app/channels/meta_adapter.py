@@ -27,7 +27,7 @@ class MetaAdapter(ChannelAdapter):
         app_secret = current_app.config.get('META_APP_SECRET')
         if not app_secret:
             logger.warning("META_APP_SECRET 未配置，跳過簽名驗證")
-            return True
+            return False
 
         if not signature.startswith('sha256='):
             return False

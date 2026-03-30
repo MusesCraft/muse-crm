@@ -144,8 +144,8 @@ class LLMService:
         token_limit = SystemSetting.get_int('llm_monthly_token_limit')
 
         # 查詢本月累計
-        from datetime import datetime
-        now = datetime.utcnow()
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
         from sqlalchemy import func

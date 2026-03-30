@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   contactsApi,
@@ -194,10 +194,14 @@ export function CustomerSidebar({
 
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
+  const analyzeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => () => { if (analyzeTimerRef.current) clearTimeout(analyzeTimerRef.current); }, []);
 
   // Persist collapsed state
   useEffect(() => {
     localStorage.setItem('muse_sidebar_collapsed', String(collapsed));
+    window.dispatchEvent(new Event('sidebar-toggle'));
   }, [collapsed]);
 
   // Fetch contact detail
@@ -231,7 +235,8 @@ export function CustomerSidebar({
     try {
       await inboxApi.analyzeConversation(conversationId);
       // Simulate analysis result for mock
-      setTimeout(() => {
+      if (analyzeTimerRef.current) clearTimeout(analyzeTimerRef.current);
+      analyzeTimerRef.current = setTimeout(() => {
         setAnalysisResult({
           demand_summary: '客戶正在詢問產品規格與報價，有明確購買意向',
           mentioned_products: ['岩板', '電視牆', 'Laminam'],

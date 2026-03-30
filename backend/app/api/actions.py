@@ -141,7 +141,11 @@ def create_action():
     
     if not contact_id or not description:
         return jsonify({'error': 'contact_id 和 description 為必填'}), 400
-    
+
+    priority = data.get('priority', 'medium')
+    if priority not in ['high', 'medium', 'low']:
+        return jsonify({'error': '無效的 priority，允許值為 high/medium/low'}), 400
+
     contact = Contact.query.get(contact_id)
     if not contact:
         return jsonify({'error': '客戶不存在'}), 404
@@ -151,7 +155,7 @@ def create_action():
         conversation_id=data.get('conversation_id'),
         description=description,
         source='manual',
-        priority=data.get('priority', 'medium'),
+        priority=priority,
         assigned_to=data.get('assigned_to'),
         due_date=data.get('due_date')  # ISO date string, SQLAlchemy will parse
     )

@@ -48,6 +48,7 @@ export function Sidebar() {
     const next = !collapsed;
     setCollapsed(next);
     localStorage.setItem('muse_sidebar_collapsed', String(next));
+    window.dispatchEvent(new Event('sidebar-toggle'));
   };
 
   const handleLogout = () => {

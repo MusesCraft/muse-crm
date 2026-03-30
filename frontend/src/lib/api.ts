@@ -28,6 +28,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (res.status === 401) {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('muse_token');
+      window.dispatchEvent(new Event('auth-expired'));
+    }
     throw new ApiError(401, 'Unauthorized');
   }
 
@@ -571,6 +575,10 @@ export const uploadApi = {
     });
 
     if (res.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('muse_token');
+        window.dispatchEvent(new Event('auth-expired'));
+      }
       throw new ApiError(401, 'Unauthorized');
     }
     if (!res.ok) {

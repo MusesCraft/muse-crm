@@ -6,7 +6,7 @@ MUSE CRM — Contact Service
 
 import logging
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..models import Contact, ChannelIdentifier
 from .. import db
@@ -47,7 +47,7 @@ class ContactService:
             logger.info(f"找到現有客戶：{contact.id}")
             
             # 更新最後活躍時間
-            contact.last_active_at = datetime.utcnow()
+            contact.last_active_at = datetime.now(timezone.utc)
             
             # 更新 profile 資料（如有）
             if profile_data:
@@ -77,7 +77,7 @@ class ContactService:
                 db.session.add(new_channel_id)
                 
                 # 更新最後活躍時間
-                contact.last_active_at = datetime.utcnow()
+                contact.last_active_at = datetime.now(timezone.utc)
                 
                 return contact
         
@@ -107,8 +107,8 @@ class ContactService:
             locale=locale,
             source_channel=channel,
             source_type=source_type,
-            first_seen_at=datetime.utcnow(),
-            last_active_at=datetime.utcnow()
+            first_seen_at=datetime.now(timezone.utc),
+            last_active_at=datetime.now(timezone.utc)
         )
         
         db.session.add(contact)
@@ -231,7 +231,7 @@ class ContactService:
                 if field in allowed_fields:
                     setattr(contact, field, value)
             
-            contact.updated_at = datetime.utcnow()
+            contact.updated_at = datetime.now(timezone.utc)
             db.session.commit()
             
             return True

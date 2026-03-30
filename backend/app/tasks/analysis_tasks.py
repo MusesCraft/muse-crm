@@ -12,7 +12,7 @@ Tasks:
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import current_app
 
@@ -110,7 +110,7 @@ def quick_triage_message(self, message_id: str):
 
         message.quick_intent = intent if intent in valid_intents else "other"
         message.quick_identity = identity if identity in valid_identities else "unknown"
-        message.quick_analyzed_at = datetime.utcnow()
+        message.quick_analyzed_at = datetime.now(timezone.utc)
 
         db.session.commit()
 
@@ -436,7 +436,7 @@ def batch_analyze_pending(self):
         return {
             "success": True,
             "queued_count": queued_count,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     except Exception as e:
@@ -444,7 +444,7 @@ def batch_analyze_pending(self):
         return {
             "success": False,
             "error": str(e),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
 
@@ -521,6 +521,7 @@ def process_analysis_queue(self):
                     f"LLM 錯誤處理佇列項目 {queue_item.conversation_id}: {e}"
                 )
                 try:
+                    db.session.rollback()
                     queue_item.mark_as_failed(str(e))
                     db.session.commit()
                 except Exception:
@@ -528,11 +529,13 @@ def process_analysis_queue(self):
                 processed_count += 1
 
             except Exception as e:
+                # 確保任何未預期的例外都不會讓項目卡在 "processing" 狀態
                 logger.error(
                     f"處理佇列項目失敗 {queue_item.conversation_id}: {e}",
                     exc_info=True,
                 )
                 try:
+                    db.session.rollback()
                     queue_item.mark_as_failed(str(e))
                     db.session.commit()
                 except Exception:
@@ -547,7 +550,7 @@ def process_analysis_queue(self):
             "success": True,
             "processed_count": processed_count,
             "success_count": success_count,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     except Exception as e:
@@ -555,7 +558,7 @@ def process_analysis_queue(self):
         return {
             "success": False,
             "error": str(e),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
 
@@ -596,6 +599,7 @@ def retry_failed_analysis(self):
 
         for item in failed_items:
             try:
+                item.retry_count = (item.retry_count or 0) + 1
                 item.status = "pending"
                 item.error_message = None
                 db.session.commit()
@@ -613,7 +617,7 @@ def retry_failed_analysis(self):
         return {
             "success": True,
             "retried_count": retried_count,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     except Exception as e:
@@ -621,7 +625,7 @@ def retry_failed_analysis(self):
         return {
             "success": False,
             "error": str(e),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
 

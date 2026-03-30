@@ -5,9 +5,10 @@ MUSE CRM — Sync API
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import request, jsonify
+from sqlalchemy.orm import selectinload
 
 from . import api_bp
 from .. import db
@@ -50,7 +51,7 @@ def sync_meta_history():
 
     _last_sync_status = {
         'status': 'running',
-        'started_at': datetime.utcnow().isoformat(),
+        'started_at': datetime.now(timezone.utc).isoformat(),
         'channel': channel,
         'limit': limit,
     }
@@ -62,7 +63,7 @@ def sync_meta_history():
         _last_sync_status = {
             'status': 'completed',
             'started_at': _last_sync_status['started_at'],
-            'completed_at': datetime.utcnow().isoformat(),
+            'completed_at': datetime.now(timezone.utc).isoformat(),
             'channel': channel,
             'limit': limit,
             'result': stats,
@@ -77,7 +78,7 @@ def sync_meta_history():
         _last_sync_status = {
             'status': 'failed',
             'started_at': _last_sync_status['started_at'],
-            'completed_at': datetime.utcnow().isoformat(),
+            'completed_at': datetime.now(timezone.utc).isoformat(),
             'channel': channel,
             'error': str(e),
         }
@@ -98,7 +99,7 @@ def analyze_all_conversations():
     Returns:
         打標統計
     """
-    conversations = Conversation.query.all()
+    conversations = Conversation.query.options(selectinload(Conversation.messages)).all()
     stats = {
         'total_conversations': len(conversations),
         'tagged_conversations': 0,
@@ -106,9 +107,8 @@ def analyze_all_conversations():
     }
 
     for conv in conversations:
-        messages = Message.query.filter_by(conversation_id=conv.id).all()
         conversation_text = ' '.join(
-            m.content for m in messages if m.content
+            m.content for m in conv.messages if m.content
         )
         if not conversation_text.strip():
             continue
@@ -135,7 +135,7 @@ def tag_all_conversations():
     Returns:
         打標統計
     """
-    conversations = Conversation.query.all()
+    conversations = Conversation.query.options(selectinload(Conversation.messages)).all()
     stats = {
         'total_conversations': len(conversations),
         'tagged_conversations': 0,
@@ -143,9 +143,8 @@ def tag_all_conversations():
     }
 
     for conv in conversations:
-        messages = Message.query.filter_by(conversation_id=conv.id).all()
         conversation_text = ' '.join(
-            m.content for m in messages if m.content
+            m.content for m in conv.messages if m.content
         )
         if not conversation_text.strip():
             continue

@@ -5,9 +5,11 @@ MUSE CRM — Webhook API
 實作完整的訊息存儲、客戶建檔和冪等性處理。
 """
 
+import concurrent.futures
+import hmac
 import logging
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from flask import request, current_app, jsonify
 from sqlalchemy.exc import IntegrityError
@@ -27,6 +29,8 @@ from ..channels.registry import channel_registry
 
 logger = logging.getLogger(__name__)
 
+_webhook_executor = concurrent.futures.ThreadPoolExecutor(max_workers=20, thread_name_prefix='webhook')
+
 
 @api_bp.route('/webhook', methods=['GET'])
 def webhook_verify():
@@ -45,7 +49,7 @@ def webhook_verify():
     
     verify_token = current_app.config.get('META_VERIFY_TOKEN')
     
-    if mode == 'subscribe' and token == verify_token:
+    if mode == 'subscribe' and verify_token and hmac.compare_digest(token or '', verify_token):
         logger.info("✅ Meta Webhook 驗證成功")
         return challenge, 200
     else:
@@ -94,11 +98,10 @@ def webhook_receive():
 
     # ── 先回 200 給 Meta，再背景處理（避免超時重發） ──
     for event in channel_events:
-        threading.Thread(
-            target=_handle_channel_event_with_context,
-            args=(current_app._get_current_object(), event),
-            daemon=True,
-        ).start()
+        _webhook_executor.submit(
+            _handle_channel_event_with_context,
+            current_app._get_current_object(), event,
+        )
 
     logger.info(f"✅ Meta Webhook 收到 {len(channel_events)} 個訊息事件")
     return 'OK', 200
@@ -109,6 +112,8 @@ def _handle_channel_event_with_context(app, event: 'ChannelEvent'):
     with app.app_context():
         try:
             _handle_channel_event(event)
+        except Exception:
+            db.session.rollback()
         finally:
             db.session.remove()
 
@@ -181,7 +186,7 @@ def _handle_channel_event(event: 'ChannelEvent'):
             media_url=attachments.get('media_url'),
             message_metadata=attachments.get('metadata'),
             meta_message_id=meta_message_id,
-            sent_at=datetime.utcnow()
+            sent_at=datetime.now(timezone.utc)
         )
 
         try:
@@ -189,10 +194,10 @@ def _handle_channel_event(event: 'ChannelEvent'):
 
             # ── 4. 更新對話統計 ──
             conversation.message_count += 1
-            conversation.last_message_at = datetime.utcnow()
+            conversation.last_message_at = datetime.now(timezone.utc)
 
             # ── 5. 更新客戶最後活躍時間 ──
-            contact.last_active_at = datetime.utcnow()
+            contact.last_active_at = datetime.now(timezone.utc)
 
             db.session.commit()
 
@@ -437,24 +442,19 @@ def webhook_line():
 
     # ── 先回 200 給 LINE，再背景處理 ──
     for event in channel_events:
+        app = current_app._get_current_object()
         if event.event_type == 'message':
-            threading.Thread(
-                target=_handle_channel_event_with_context,
-                args=(current_app._get_current_object(), event),
-                daemon=True,
-            ).start()
+            _webhook_executor.submit(
+                _handle_channel_event_with_context, app, event,
+            )
         elif event.event_type == 'follow':
-            threading.Thread(
-                target=_handle_line_follow_with_context,
-                args=(current_app._get_current_object(), event),
-                daemon=True,
-            ).start()
+            _webhook_executor.submit(
+                _handle_line_follow_with_context, app, event,
+            )
         elif event.event_type == 'unfollow':
-            threading.Thread(
-                target=_handle_line_unfollow_with_context,
-                args=(current_app._get_current_object(), event),
-                daemon=True,
-            ).start()
+            _webhook_executor.submit(
+                _handle_line_unfollow_with_context, app, event,
+            )
 
     logger.info(f"✅ LINE Webhook 收到 {len(channel_events)} 個事件")
     return 'OK', 200
@@ -465,6 +465,8 @@ def _handle_line_follow_with_context(app, event: 'ChannelEvent'):
     with app.app_context():
         try:
             _handle_line_follow(event)
+        except Exception:
+            db.session.rollback()
         finally:
             db.session.remove()
 
@@ -483,7 +485,7 @@ def _handle_line_follow(event: 'ChannelEvent'):
             channel='line',
             external_id=sender_id,
         )
-        contact.last_active_at = datetime.utcnow()
+        contact.last_active_at = datetime.now(timezone.utc)
         db.session.commit()
         logger.info(f"✅ [webhook/line] follow 客戶已建立/更新：{contact.id}")
     except Exception as e:
@@ -496,6 +498,8 @@ def _handle_line_unfollow_with_context(app, event: 'ChannelEvent'):
     with app.app_context():
         try:
             _handle_line_unfollow(event)
+        except Exception:
+            db.session.rollback()
         finally:
             db.session.remove()
 
@@ -557,7 +561,7 @@ def health_check():
     
     health_data = {
         'status': 'ok',
-        'timestamp': datetime.utcnow().isoformat(),
+        'timestamp': datetime.now(timezone.utc).isoformat(),
         'service': 'muse-crm',
         'version': '1.0.0'
     }
@@ -597,7 +601,7 @@ def health_check():
     
     # ── 最近訊息統計 ──
     try:
-        last_24h = datetime.utcnow() - timedelta(hours=24)
+        last_24h = datetime.now(timezone.utc) - timedelta(hours=24)
         recent_messages = Message.query.filter(Message.created_at >= last_24h).count()
         recent_contacts = Contact.query.filter(Contact.last_active_at >= last_24h).count()
         active_conversations = Conversation.query.filter(Conversation.status == 'active').count()

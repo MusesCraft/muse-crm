@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from flask import jsonify, request
 from sqlalchemy import desc
+from sqlalchemy.orm import joinedload, subqueryload
 
 from . import api_bp
 from ..models import Conversation, Message, Contact, ChannelIdentifier, ContactTag, Tag
@@ -17,9 +18,21 @@ from ..tasks.analysis_tasks import analyze_conversation
 from ..utils import escape_like
 from ..utils.auth import login_required
 from ..utils.permissions import get_current_user, require_role
-from ..utils.scope import apply_conversation_scope
+from ..utils.scope import apply_contact_scope, apply_conversation_scope
 
 logger = logging.getLogger(__name__)
+
+
+def _check_conversation_access(conversation):
+    """檢查當前用戶是否有權存取此對話。回傳 403 response 或 None。"""
+    user = get_current_user()
+    if user and user.role not in ('admin', 'manager'):
+        scoped = apply_contact_scope(
+            Contact.query.filter(Contact.id == conversation.contact_id), user
+        ).first()
+        if not scoped:
+            return jsonify({'error': '權限不足'}), 403
+    return None
 
 # 根據 tags 推斷 contact priority
 _HIGH_PRIORITY_TAGS = {'VIP', '投訴者'}
@@ -71,6 +84,11 @@ def list_conversations():
     query = (
         db.session.query(Conversation)
         .join(Contact, Conversation.contact_id == Contact.id)
+        .options(
+            joinedload(Conversation.contact)
+            .subqueryload(Contact.tags)
+            .joinedload(ContactTag.tag)
+        )
         .order_by(desc(Conversation.last_message_at))
     )
 
@@ -129,7 +147,11 @@ def list_conversations():
 def get_conversation_detail(conversation_id):
     """取得對話詳情（包含所有訊息）"""
     conversation = Conversation.query.get_or_404(conversation_id)
-    
+
+    denied = _check_conversation_access(conversation)
+    if denied:
+        return denied
+
     # 取得所有訊息
     messages = (
         Message.query
@@ -159,7 +181,11 @@ def trigger_manual_analysis(conversation_id):
         202 Accepted（非同步處理）
     """
     conversation = Conversation.query.get_or_404(conversation_id)
-    
+
+    denied = _check_conversation_access(conversation)
+    if denied:
+        return denied
+
     # 檢查是否有訊息
     message_count = (
         Message.query
@@ -198,6 +224,11 @@ def send_message(conversation_id):
         - media_url: 圖片 URL（message_type='image' 時必填）
     """
     conversation = Conversation.query.get_or_404(conversation_id)
+
+    denied = _check_conversation_access(conversation)
+    if denied:
+        return denied
+
     data = request.get_json() or {}
 
     content = (data.get('content') or '').strip()
@@ -256,6 +287,7 @@ def send_message(conversation_id):
 
 @api_bp.route('/inbox/conversations/<conversation_id>/send-image', methods=['POST'])
 @login_required
+@require_role('admin', 'manager', 'user')
 def send_image_message(conversation_id):
     """
     發送圖片訊息（舊版端點，保留向下相容）
@@ -265,6 +297,11 @@ def send_image_message(conversation_id):
         - caption: 圖片說明文字（選填）
     """
     conversation = Conversation.query.get_or_404(conversation_id)
+
+    denied = _check_conversation_access(conversation)
+    if denied:
+        return denied
+
     data = request.get_json() or {}
 
     image_url = data.get('image_url')
@@ -315,7 +352,11 @@ def send_image_message(conversation_id):
 def close_conversation(conversation_id):
     """手動關閉對話"""
     conversation = Conversation.query.get_or_404(conversation_id)
-    
+
+    denied = _check_conversation_access(conversation)
+    if denied:
+        return denied
+
     if conversation.status == 'active':
         conversation.close_conversation()
         db.session.commit()

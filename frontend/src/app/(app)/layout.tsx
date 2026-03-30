@@ -26,10 +26,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     };
     check();
     window.addEventListener('storage', check);
-    const interval = setInterval(check, 500);
+    window.addEventListener('sidebar-toggle', check);
     return () => {
       window.removeEventListener('storage', check);
-      clearInterval(interval);
+      window.removeEventListener('sidebar-toggle', check);
     };
   }, []);
 

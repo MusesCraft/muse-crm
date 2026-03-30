@@ -43,7 +43,7 @@ class LineAdapter(ChannelAdapter):
         channel_secret = current_app.config.get('LINE_CHANNEL_SECRET')
         if not channel_secret:
             logger.warning("LINE_CHANNEL_SECRET 未配置，跳過簽名驗證")
-            return True
+            return False
 
         hash_value = hmac.new(
             channel_secret.encode('utf-8'),

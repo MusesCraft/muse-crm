@@ -46,6 +46,7 @@ function formatDateTime(dateStr: string): string {
 function MessageBubble({ message, onOcr }: { message: Message; onOcr?: (mediaUrl: string) => void }) {
   const isCustomer = message.sender_type === 'customer';
   const isSystem = message.sender_type === 'system';
+  const [imgError, setImgError] = useState(false);
 
   if (isSystem) {
     return (
@@ -70,26 +71,29 @@ function MessageBubble({ message, onOcr }: { message: Message; onOcr?: (mediaUrl
         {/* Image message */}
         {message.message_type === 'image' && message.media_url && (
           <div className="mb-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={message.media_url}
-              alt="image"
-              className="max-w-[240px] max-h-[180px] object-cover rounded-lg cursor-pointer"
-              onClick={() => window.open(message.media_url!, '_blank')}
-              onError={(e) => {
-                // 圖片載入失敗（URL 過期等），顯示 placeholder
-                const target = e.currentTarget;
-                target.style.display = 'none';
-                target.parentElement!.innerHTML = `<div class="w-48 h-36 bg-zinc-200 dark:bg-zinc-700 rounded-lg flex items-center justify-center"><span class="text-xs text-zinc-400">圖片已過期</span></div>`;
-              }}
-            />
-            {onOcr && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onOcr(message.media_url!); }}
-                className="mt-1 text-[11px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
-              >
-                📇 辨識名片
-              </button>
+            {imgError ? (
+              <div className="w-48 h-36 bg-zinc-200 dark:bg-zinc-700 rounded-lg flex items-center justify-center">
+                <span className="text-xs text-zinc-400">圖片已過期</span>
+              </div>
+            ) : (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={message.media_url}
+                  alt="image"
+                  className="max-w-[240px] max-h-[180px] object-cover rounded-lg cursor-pointer"
+                  onClick={() => window.open(message.media_url!, '_blank')}
+                  onError={() => setImgError(true)}
+                />
+                {onOcr && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onOcr(message.media_url!); }}
+                    className="mt-1 text-[11px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                  >
+                    📇 辨識名片
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
@@ -369,6 +373,10 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const sendingRef = useRef(false);
+  const ocrLoadingRef = useRef(false);
+  const ocrToastTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const msgCountRef = useRef(0);
 
   const { data: conv, loading, error, refetch } = useAsync<Conversation>(
     () => inboxApi.getConversation(conversationId),
@@ -386,13 +394,17 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   // Auto polling every 5 seconds (pause when tab hidden or just sent a message)
   // 使用 silent fetch 避免觸發 loading/error state → 防止不必要的 re-render 和 scroll 重置
   const lastSentRef = useRef(0);
+
+  useEffect(() => {
+    msgCountRef.current = conv?.messages?.length || 0;
+  }, [conv?.messages?.length]);
+
   useEffect(() => {
     const id = setInterval(async () => {
       if (document.hidden || Date.now() - lastSentRef.current < 8000) return;
       try {
         const freshData = await inboxApi.getConversation(conversationId);
-        // 只在有新訊息時才 refetch（更新完整 state）
-        if (freshData?.messages && freshData.messages.length > (conv?.messages?.length || 0)) {
+        if (freshData?.messages && freshData.messages.length > msgCountRef.current) {
           refetch();
         }
       } catch {
@@ -400,7 +412,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
       }
     }, 5000);
     return () => clearInterval(id);
-  }, [conversationId, conv?.messages?.length, refetch]);
+  }, [conversationId, refetch]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -433,7 +445,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     const hasImage = !!imagePreview;
 
     if (!text && !hasImage) return;
-    if (sending) return;
+    if (sendingRef.current) return;
 
     // 發送前確認
     const confirmMsg = hasImage && text
@@ -443,6 +455,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
         : '確定要發送這則訊息？';
     if (!window.confirm(confirmMsg)) return;
 
+    sendingRef.current = true;
     setSending(true);
     setSendError(null);
 
@@ -499,9 +512,10 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
       const msg = err instanceof Error ? err.message : '發送失敗';
       setSendError(msg);
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
-  }, [inputText, imagePreview, conversationId, sending]);
+  }, [inputText, imagePreview, conversationId]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -529,6 +543,16 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     }
   };
 
+  // 清理 imagePreview URL 和 OCR toast timer（組件卸載時）
+  const imagePreviewRef = useRef(imagePreview);
+  imagePreviewRef.current = imagePreview;
+  useEffect(() => {
+    return () => {
+      if (imagePreviewRef.current) URL.revokeObjectURL(imagePreviewRef.current.url);
+      if (ocrToastTimerRef.current) clearTimeout(ocrToastTimerRef.current);
+    };
+  }, []);
+
   // ── Quick Reply ──
 
   const handleQuickReplySelect = (text: string) => {
@@ -548,7 +572,8 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   // ── OCR ──
 
   const handleOcr = useCallback(async (mediaUrl: string) => {
-    if (ocrLoading) return;
+    if (ocrLoadingRef.current) return;
+    ocrLoadingRef.current = true;
     setOcrLoading(true);
     setOcrToast(null);
     try {
@@ -568,10 +593,12 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     } catch {
       setOcrToast({ message: '名片辨識失敗，請重試', type: 'error' });
     } finally {
+      ocrLoadingRef.current = false;
       setOcrLoading(false);
-      setTimeout(() => setOcrToast(null), 5000);
+      if (ocrToastTimerRef.current) clearTimeout(ocrToastTimerRef.current);
+      ocrToastTimerRef.current = setTimeout(() => setOcrToast(null), 5000);
     }
-  }, [ocrLoading, conv?.contact?.id, refetch]);
+  }, [conv?.contact?.id, refetch]);
 
   // ── Conversation Actions ──
 

@@ -6,7 +6,7 @@ MUSE CRM — Notification Service
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import requests
@@ -112,7 +112,7 @@ class NotificationService:
 
         contact_name = contact.display_name or '未知客戶'
         content_preview = message_content[:100] if message_content else '（無文字內容）'
-        now = datetime.utcnow().isoformat() + 'Z'
+        now = datetime.now(timezone.utc).isoformat() + 'Z'
 
         # Discord Embed
         discord_payload = {

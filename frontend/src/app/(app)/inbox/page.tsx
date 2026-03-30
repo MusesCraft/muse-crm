@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { inboxApi, type Conversation, type PaginatedResponse } from '@/lib/api';
 import { mockConversations } from '@/lib/mock-data';
 import { useAsync } from '@/lib/hooks';
@@ -29,11 +29,20 @@ export default function InboxPage() {
     [page, status, channel, search]
   );
 
+  // Track current total in a ref to avoid stale closure
+  const totalRef = useRef(0);
+  useEffect(() => { totalRef.current = data?.pagination?.total || 0; }, [data?.pagination?.total]);
+
+  // Guard against overlapping polling calls
+  const pollingRef = useRef(false);
+
   // Auto polling every 10 seconds (pause when tab hidden)
   // 使用 silent fetch 避免觸發 loading/error state → 防止不必要的 re-render
   useEffect(() => {
     const id = setInterval(async () => {
       if (document.hidden) return;
+      if (pollingRef.current) return;
+      pollingRef.current = true;
       try {
         const fresh = await inboxApi.getConversations({
           page,
@@ -43,15 +52,17 @@ export default function InboxPage() {
           search: search || undefined,
         });
         // 只在筆數變化時才 refetch（更新完整 state）
-        if (fresh.pagination?.total !== data?.pagination?.total) {
+        if (fresh.pagination?.total !== totalRef.current) {
           refetch();
         }
       } catch {
         // 靜默忽略所有 polling 錯誤
+      } finally {
+        pollingRef.current = false;
       }
     }, 10000);
     return () => clearInterval(id);
-  }, [page, status, channel, search, data?.pagination?.total, refetch]);
+  }, [page, status, channel, search, refetch]);
 
   const handleSelect = useCallback((id: string | number) => {
     setSelectedId(id);

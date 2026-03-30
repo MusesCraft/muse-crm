@@ -14,6 +14,15 @@ Prompt 類別：
 from typing import List, Dict, Any
 
 
+def _sanitize_user_input(text: str) -> str:
+    """防止 prompt injection：跳脫可能干擾 prompt 結構的字元"""
+    if not text:
+        return ''
+    # 跳脫大括號防止 format() 注入
+    text = text.replace('{', '{{').replace('}', '}}')
+    return text
+
+
 # ============================================================
 # 1. 意圖辨識 Prompt
 # ============================================================
@@ -234,7 +243,7 @@ def build_quick_triage_prompt(message_content: str) -> List[Dict[str, str]]:
     return [
         {"role": "system", "content": QUICK_TRIAGE_SYSTEM},
         {"role": "user", "content": QUICK_TRIAGE_USER.format(
-            message_content=message_content
+            message_content=_sanitize_user_input(message_content)
         )}
     ]
 
@@ -280,7 +289,7 @@ def build_intent_prompt(message_content: str) -> List[Dict[str, str]]:
     return [
         {"role": "system", "content": INTENT_CLASSIFICATION_SYSTEM},
         {"role": "user", "content": INTENT_CLASSIFICATION_USER.format(
-            message_content=message_content
+            message_content=_sanitize_user_input(message_content)
         )}
     ]
 
@@ -298,7 +307,7 @@ def build_entity_extraction_prompt(conversation_text: str) -> List[Dict[str, str
     return [
         {"role": "system", "content": ENTITY_EXTRACTION_SYSTEM},
         {"role": "user", "content": ENTITY_EXTRACTION_USER.format(
-            conversation_text=conversation_text
+            conversation_text=_sanitize_user_input(conversation_text)
         )}
     ]
 
@@ -316,7 +325,7 @@ def build_summary_prompt(conversation_text: str) -> List[Dict[str, str]]:
     return [
         {"role": "system", "content": CONVERSATION_SUMMARY_SYSTEM},
         {"role": "user", "content": CONVERSATION_SUMMARY_USER.format(
-            conversation_text=conversation_text
+            conversation_text=_sanitize_user_input(conversation_text)
         )}
     ]
 
@@ -342,7 +351,7 @@ def build_action_prompt(
     return [
         {"role": "system", "content": SUGGESTED_ACTION_SYSTEM},
         {"role": "user", "content": SUGGESTED_ACTION_USER.format(
-            conversation_text=conversation_text,
+            conversation_text=_sanitize_user_input(conversation_text),
             channel=channel,
             status=status,
             message_count=message_count
@@ -371,7 +380,7 @@ def build_full_analysis_prompt(
     return [
         {"role": "system", "content": FULL_ANALYSIS_SYSTEM},
         {"role": "user", "content": FULL_ANALYSIS_USER.format(
-            conversation_text=conversation_text,
+            conversation_text=_sanitize_user_input(conversation_text),
             channel=channel,
             status=status,
             message_count=message_count

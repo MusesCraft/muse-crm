@@ -6,7 +6,7 @@ Meta 歷史對話同步服務，從 Graph API 拉取歷史訊息並匯入 DB。
 
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
 import requests
@@ -430,7 +430,7 @@ class HistorySyncService:
         # 更新對話統計
         if result['messages'] > 0:
             conversation.message_count = (conversation.message_count or 0) + result['messages']
-            conversation.last_message_at = datetime.utcnow()
+            conversation.last_message_at = datetime.now(timezone.utc)
 
         # 同步完成後跑 keyword-based auto-tagging
         try:
@@ -510,7 +510,7 @@ class HistorySyncService:
             message_type = 'text'
 
         # 解析 created_time
-        sent_at = datetime.utcnow()
+        sent_at = datetime.now(timezone.utc)
         created_time = msg_data.get('created_time')
         if created_time:
             try:

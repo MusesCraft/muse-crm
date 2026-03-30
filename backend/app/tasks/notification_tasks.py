@@ -8,7 +8,7 @@ Tasks:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from .. import celery, db
 from ..models import Action, Contact
@@ -41,7 +41,7 @@ def check_due_actions(self):
             return {"success": True, "skipped": True, "reason": "notification_disabled"}
 
         reminder_hours = SystemSetting.get_int('action_reminder_hours', default=24)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # 查詢所有 pending 且尚未提醒、有 due_date 的 Action
         pending_actions = (
@@ -51,6 +51,7 @@ def check_due_actions(self):
                 Action.due_date.isnot(None),
                 Action.reminder_sent_at.is_(None),
             )
+            .limit(500)
             .all()
         )
 
@@ -77,7 +78,7 @@ def check_due_actions(self):
                 _send_action_reminder(action, contact_name)
 
                 # 標記已提醒
-                action.reminder_sent_at = datetime.utcnow()
+                action.reminder_sent_at = datetime.now(timezone.utc)
                 sent_count += 1
 
             except Exception as e:
@@ -94,7 +95,7 @@ def check_due_actions(self):
             "success": True,
             "sent_count": sent_count,
             "checked_count": len(pending_actions),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     except Exception as e:
@@ -103,7 +104,7 @@ def check_due_actions(self):
         return {
             "success": False,
             "error": str(e),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
 
@@ -129,7 +130,7 @@ def _send_action_reminder(action: Action, contact_name: str) -> None:
                 f"**優先級**: {priority_label}"
             ),
             'color': 15158332 if action.priority == 'high' else 16776960,  # 紅色 / 黃色
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'timestamp': datetime.now(timezone.utc).isoformat() + 'Z',
         }]
     }
     NotificationService.send_discord_webhook(discord_payload)

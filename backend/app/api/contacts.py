@@ -19,6 +19,18 @@ from ..services.contact_service import ContactService
 from ..services.merge_service import MergeService
 
 
+def _check_contact_access(contact):
+    """檢查當前用戶是否有權存取此客戶。回傳 403 response 或 None。"""
+    user = get_current_user()
+    if user and user.role not in ('admin', 'manager'):
+        scoped = apply_contact_scope(
+            Contact.query.filter(Contact.id == contact.id), user
+        ).first()
+        if not scoped:
+            return jsonify({'error': '權限不足'}), 403
+    return None
+
+
 @api_bp.route('/contacts', methods=['GET'])
 @login_required
 @require_role('admin', 'manager', 'user')
@@ -41,7 +53,7 @@ def list_contacts():
     channel = request.args.get('channel')
     source_type = request.args.get('source_type')
     
-    query = Contact.query.filter(Contact.is_merged == False)
+    query = Contact.query.filter(Contact.is_merged.is_(False))
 
     # 套用資料可見範圍
     user = get_current_user()
@@ -122,7 +134,11 @@ def list_contacts():
 def get_contact_detail(contact_id):
     """取得客戶 360 檢視"""
     contact = Contact.query.get_or_404(contact_id)
-    
+
+    denied = _check_contact_access(contact)
+    if denied:
+        return denied
+
     if contact.is_merged:
         return jsonify({'error': '此客戶已被合併'}), 400
     
@@ -175,6 +191,11 @@ def get_contact_detail(contact_id):
 def add_contact_note(contact_id):
     """新增客戶備註"""
     contact = Contact.query.get_or_404(contact_id)
+
+    denied = _check_contact_access(contact)
+    if denied:
+        return denied
+
     data = request.get_json()
     
     if not data or not data.get('content', '').strip():
@@ -201,6 +222,11 @@ def add_contact_note(contact_id):
 def add_contact_tag(contact_id):
     """為客戶新增標籤"""
     contact = Contact.query.get_or_404(contact_id)
+
+    denied = _check_contact_access(contact)
+    if denied:
+        return denied
+
     data = request.get_json()
     
     tag_name = data.get('tag_name', '').strip()
@@ -248,11 +274,17 @@ def add_contact_tag(contact_id):
 @login_required
 def remove_contact_tag(contact_id, tag_id):
     """移除客戶標籤"""
+    contact = Contact.query.get_or_404(contact_id)
+
+    denied = _check_contact_access(contact)
+    if denied:
+        return denied
+
     contact_tag = ContactTag.query.filter_by(
         contact_id=contact_id,
         tag_id=tag_id
     ).first_or_404()
-    
+
     db.session.delete(contact_tag)
     db.session.commit()
     
@@ -414,7 +446,7 @@ def search_contacts():
 
     query = (
         Contact.query
-        .filter(Contact.is_merged == False)
+        .filter(Contact.is_merged.is_(False))
         .filter(
             or_(
                 Contact.display_name.ilike(like_pattern, escape='\\'),
@@ -473,7 +505,7 @@ def get_merge_candidates(contact_id):
             .filter(
                 Contact.phone == contact.phone,
                 Contact.id != contact.id,
-                Contact.is_merged == False
+                Contact.is_merged.is_(False)
             )
             .all()
         )
@@ -489,7 +521,7 @@ def get_merge_candidates(contact_id):
             .filter(
                 Contact.email == contact.email,
                 Contact.id != contact.id,
-                Contact.is_merged == False
+                Contact.is_merged.is_(False)
             )
             .all()
         )
@@ -507,7 +539,7 @@ def get_merge_candidates(contact_id):
             .filter(
                 Contact.display_name.ilike(like_pattern, escape='\\'),
                 Contact.id != contact.id,
-                Contact.is_merged == False
+                Contact.is_merged.is_(False)
             )
             .limit(20)
             .all()
@@ -522,7 +554,7 @@ def get_merge_candidates(contact_id):
             Contact.query
             .filter(
                 Contact.id != contact.id,
-                Contact.is_merged == False,
+                Contact.is_merged.is_(False),
                 Contact.display_name.isnot(None),
                 func.length(Contact.display_name) >= 2
             )

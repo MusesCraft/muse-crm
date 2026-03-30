@@ -105,7 +105,7 @@ def _update_contact_from_ocr(contact: Contact, ocr_result: dict) -> bool:
 
 def _add_ocr_system_message(conversation_id: str, contact: Contact, ocr_result: dict) -> None:
     """在對話中新增 OCR 辨識結果的 system message。"""
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     parts = []
     if ocr_result.get('name'):
@@ -123,7 +123,7 @@ def _add_ocr_system_message(conversation_id: str, contact: Contact, ocr_result: 
         sender_type='system',
         message_type='text',
         content=content,
-        sent_at=datetime.utcnow(),
+        sent_at=datetime.now(timezone.utc),
     )
     db.session.add(msg)
 
@@ -131,4 +131,4 @@ def _add_ocr_system_message(conversation_id: str, contact: Contact, ocr_result: 
     conv = Conversation.query.get(conversation_id)
     if conv:
         conv.message_count += 1
-        conv.last_message_at = datetime.utcnow()
+        conv.last_message_at = datetime.now(timezone.utc)

@@ -12,6 +12,7 @@ from typing import Optional
 
 from flask import jsonify, request
 from . import api_bp
+from ..utils.auth import login_required
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,7 @@ def _search_responses(query: str, category: Optional[str] = None, limit: int = 2
 # ── API 端點 ────────────────────────────────────────────
 
 @api_bp.route('/quick-replies', methods=['GET'])
+@login_required
 def list_quick_replies():
     """
     列出所有語錄
@@ -112,6 +114,7 @@ def list_quick_replies():
 
 
 @api_bp.route('/quick-replies/search', methods=['GET'])
+@login_required
 def search_quick_replies():
     """
     搜尋語錄
@@ -138,6 +141,7 @@ def search_quick_replies():
 
 
 @api_bp.route('/quick-replies/<response_id>', methods=['GET'])
+@login_required
 def get_quick_reply(response_id: str):
     """取得單一語錄"""
     _load()

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { mockQuickReplies, type QuickReply } from '@/lib/mock-data';
 import { quickRepliesApi, llmApi, type QuickReplyItem, type LlmUsageSummary, type LlmBudget } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -41,6 +41,9 @@ const tabs: { id: TabId; label: string; icon: React.ComponentType<{ className?: 
 
 function IntegrationCard() {
   const [copied, setCopied] = useState<string | null>(null);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => () => { if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current); }, []);
 
   const configs = [
     { label: 'Webhook URL', value: 'https://crm.musecraft.com/api/v1/webhook/line', readonly: true },
@@ -52,7 +55,8 @@ function IntegrationCard() {
   const handleCopy = (label: string, value: string) => {
     navigator.clipboard.writeText(value);
     setCopied(label);
-    setTimeout(() => setCopied(null), 2000);
+    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    copiedTimerRef.current = setTimeout(() => setCopied(null), 2000);
   };
 
   return (

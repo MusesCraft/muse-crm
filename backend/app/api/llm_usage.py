@@ -5,7 +5,7 @@ MUSE CRM — LLM Usage API
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from flask import current_app, jsonify, request
 from sqlalchemy import func, cast, Date
@@ -31,7 +31,7 @@ def llm_usage_summary():
         period: day | week | month（預設 day）
     """
     period = request.args.get('period', 'day')
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     if period == 'week':
         start_date = (now - timedelta(days=7)).date()
@@ -191,7 +191,7 @@ def llm_budget_status():
     token_limit = SystemSetting.get_int('llm_monthly_token_limit')
 
     # 查詢本月累計
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     result = db.session.query(

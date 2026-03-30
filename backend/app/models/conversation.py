@@ -139,7 +139,7 @@ class Conversation(db.Model):
     def close_conversation(self) -> None:
         """關閉對話"""
         self.status = 'closed'
-        self.closed_at = datetime.utcnow()
+        self.closed_at = datetime.now(timezone.utc)
     
     def to_dict(self) -> dict:
         """轉換為字典格式"""

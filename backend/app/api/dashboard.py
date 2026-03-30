@@ -25,8 +25,8 @@ def dashboard_overview():
     Query parameters:
         - days: 統計天數（預設 30）
     """
-    days = request.args.get('days', 30, type=int)
-    start_date = datetime.utcnow() - timedelta(days=days)
+    days = max(1, min(request.args.get('days', 30, type=int), 365))
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
     user = get_current_user()
 
     # 基礎 Contact 查詢（套用 scope）
@@ -66,7 +66,7 @@ def dashboard_overview():
 
     overdue_actions = action_q.filter(
         and_(
-            Action.due_date < datetime.utcnow().date(),
+            Action.due_date < datetime.now(timezone.utc).date(),
             Action.status.in_(['pending', 'assigned', 'in_progress'])
         )
     ).count()
@@ -113,9 +113,9 @@ def conversation_trends():
     Query parameters:
         - days: 統計天數（預設 30）
     """
-    days = request.args.get('days', 30, type=int)
-    start_date = datetime.utcnow() - timedelta(days=days)
-    
+    days = max(1, min(request.args.get('days', 30, type=int), 365))
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+
     # 按日統計對話數
     results = (
         db.session.query(
@@ -290,7 +290,7 @@ def dashboard_stats():
     # 對話狀態分布
     silent_conversations = conv_q.filter(
         Conversation.status == 'active',
-        Conversation.last_message_at < (datetime.utcnow() - timedelta(hours=24))
+        Conversation.last_message_at < (datetime.now(timezone.utc) - timedelta(hours=24))
     ).count()
     unanswered_conversations = conv_q.filter(
         Conversation.status == 'active',
@@ -306,7 +306,7 @@ def dashboard_stats():
     except Exception:
         tz = timezone(timedelta(hours=8))  # fallback UTC+8
     now_local = datetime.now(tz)
-    today_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc).replace(tzinfo=None)
+    today_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
     yesterday_start = today_start - timedelta(days=1)
     today_messages = msg_q.filter(Message.sent_at >= today_start).count()
     yesterday_messages = msg_q.filter(
@@ -362,8 +362,8 @@ def dashboard_activity():
     
     Returns: [{ date, messages, conversations }]
     """
-    days = request.args.get('days', 30, type=int)
-    start_date = datetime.utcnow() - timedelta(days=days)
+    days = max(1, min(request.args.get('days', 30, type=int), 365))
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
     
     # 按日統計對話數
     conv_results = dict(

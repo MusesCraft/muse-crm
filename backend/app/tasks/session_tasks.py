@@ -5,8 +5,9 @@ MUSE CRM — Session Tasks
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from celery import current_task
+from sqlalchemy.exc import IntegrityError
 
 from .. import celery, db
 from ..models import Conversation, Message, AnalysisQueue
@@ -37,30 +38,37 @@ def trigger_analysis_task(self, conversation_id: str):
             logger.info(f"對話已有分析結果，跳過：{conversation_id}")
             return
         
-        # 檢查是否已在分析佇列中
-        existing_queue = AnalysisQueue.query.filter_by(
-            conversation_id=conversation.id,
-            status='pending'
-        ).first()
-        
-        if existing_queue:
-            logger.info(f"對話已在分析佇列中：{conversation_id}")
-            return
-        
-        # 加入分析佇列
+        # 加入分析佇列（用 try/except IntegrityError 取代 TOCTOU check-then-insert）
         queue_entry = AnalysisQueue(
             conversation_id=conversation.id,
             status='pending'
         )
-        
-        db.session.add(queue_entry)
-        db.session.commit()
-        
+
+        try:
+            db.session.add(queue_entry)
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            logger.info(f"對話已在分析佇列中（重複插入被攔截）：{conversation_id}")
+            return
+
         logger.info(f"對話已加入分析佇列：{conversation_id}")
-        
-        # 立即嘗試處理分析
-        from .analysis_tasks import process_analysis_queue
-        process_analysis_queue.delay()
+
+        # 立即嘗試處理分析；若 dispatch 失敗（如 Redis 不可用），
+        # 將佇列項目標記為 failed 以便後續重試機制撿回
+        try:
+            from .analysis_tasks import process_analysis_queue
+            process_analysis_queue.delay()
+        except Exception as dispatch_err:
+            logger.error(
+                f"分析任務 dispatch 失敗 {conversation_id}: {dispatch_err}",
+                exc_info=True,
+            )
+            try:
+                queue_entry.mark_as_failed(f"Dispatch 失敗: {dispatch_err}")
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
         
     except Exception as e:
         logger.error(f"觸發對話分析失敗 {conversation_id}: {e}", exc_info=True)
@@ -114,7 +122,7 @@ def analyze_message(self, message_id: str):
             'message_id': message_id,
             'conversation_id': conversation_id,
             'action': 'delegated_to_conversation_analysis',
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
         
     except Exception as e:
@@ -147,7 +155,7 @@ def cleanup_expired_sessions():
         return {
             'success': True,
             'closed_count': closed_count,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
         
     except Exception as e:
@@ -155,7 +163,7 @@ def cleanup_expired_sessions():
         return {
             'success': False,
             'error': str(e),
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
 
 

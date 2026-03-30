@@ -4,7 +4,7 @@ MUSE CRM — Action Model
 待辦動作模型。
 """
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Optional
 from sqlalchemy import String, Text, DateTime, Date, CheckConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
@@ -143,7 +143,7 @@ class Action(db.Model):
     def complete(self) -> None:
         """標記為完成"""
         self.status = 'completed'
-        self.completed_at = func.now()
+        self.completed_at = datetime.now(timezone.utc)
     
     def cancel(self) -> None:
         """取消動作"""

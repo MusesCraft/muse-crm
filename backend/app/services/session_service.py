@@ -6,7 +6,7 @@ MUSE CRM — Session Service
 
 import logging
 from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.exc import IntegrityError
 
@@ -70,7 +70,7 @@ class SessionService:
             contact_id=contact.id,
             channel=channel,
             status='active',
-            started_at=datetime.utcnow(),
+            started_at=datetime.now(timezone.utc),
             timeout_minutes=timeout_minutes,
             ad_referral=ad_referral
         )
@@ -94,7 +94,7 @@ class SessionService:
                 contact_id=contact.id,
                 channel=channel,
                 status='active',
-                started_at=datetime.utcnow(),
+                started_at=datetime.now(timezone.utc),
                 timeout_minutes=timeout_minutes,
                 ad_referral=ad_referral
             )
@@ -238,7 +238,7 @@ class SessionService:
         if conversation.closed_at:
             duration = conversation.closed_at - conversation.started_at
         else:
-            duration = datetime.utcnow() - conversation.started_at
+            duration = datetime.now(timezone.utc) - conversation.started_at
         
         summary['duration_minutes'] = int(duration.total_seconds() / 60)
         

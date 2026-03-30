@@ -17,7 +17,7 @@ MUSE CRM — 錯誤處理與 Fallback 模組
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from flask import Blueprint
 from sqlalchemy import text
@@ -127,7 +127,7 @@ def _log_error(error_type: str, context: Dict[str, Any], conversation_id: Option
                 )
             """),
             {
-                'timestamp': datetime.utcnow(),
+                'timestamp': datetime.now(timezone.utc),
                 'error_type': error_type,
                 'conversation_id': conversation_id,
                 'model_used': context.get('model_used'),

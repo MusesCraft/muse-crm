@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import List, Optional
 from sqlalchemy import String, DateTime, Boolean, CheckConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 from sqlalchemy.sql import func
 import uuid
 
@@ -46,6 +46,11 @@ class Tag(db.Model):
         cascade="all, delete-orphan"
     )
     
+    @validates('name')
+    def validate_name(self, key, name):
+        """正規化標籤名稱：去除前後空白並轉小寫，確保不區分大小寫的唯一性"""
+        return name.strip().lower() if name else name
+
     def __repr__(self) -> str:
         system_indicator = " (系統)" if self.is_system else ""
         return f"<Tag {self.name}{system_indicator}>"

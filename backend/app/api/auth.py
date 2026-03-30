@@ -5,18 +5,21 @@ MUSE CRM — Auth API
 """
 
 import logging
+import time
 
-from flask import jsonify, request, g
+import jwt as pyjwt
+from flask import jsonify, request, g, current_app
 
 from . import api_bp
 from ..models.user import User
-from .. import db
-from ..utils.auth import generate_token, generate_refresh_token, decode_jwt_token, login_required, admin_required
+from .. import db, limiter
+from ..utils.auth import generate_token, generate_refresh_token, decode_jwt_token, login_required, admin_required, blacklist_token
 
 logger = logging.getLogger(__name__)
 
 
 @api_bp.route('/auth/login', methods=['POST'])
+@limiter.limit("5/minute")
 def auth_login():
     """
     用戶登入
@@ -138,7 +141,6 @@ def auth_refresh():
     if not data or not data.get('refresh_token'):
         return jsonify({'error': '缺少 refresh_token'}), 400
 
-    import jwt as pyjwt
     try:
         payload = decode_jwt_token(data['refresh_token'])
     except pyjwt.ExpiredSignatureError:
@@ -202,5 +204,22 @@ def auth_change_password():
     db.session.commit()
     
     logger.info(f"✅ 用戶修改密碼成功: {user.email}")
-    
+
     return jsonify({'message': '密碼已更新'})
+
+
+@api_bp.route('/auth/logout', methods=['POST'])
+@login_required
+def logout():
+    """登出並撤銷 token"""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        payload = pyjwt.decode(token, current_app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+        jti = payload.get('jti')
+        exp = payload.get('exp', 0)
+        if jti:
+            ttl = max(exp - int(time.time()), 0)
+            blacklist_token(jti, ttl)
+    except Exception:
+        pass
+    return jsonify({'message': '已登出'}), 200

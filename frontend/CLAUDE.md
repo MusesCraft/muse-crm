@@ -2,44 +2,71 @@
 
 ## 技術棧
 
-Next.js 16 (App Router) + TypeScript + Tailwind CSS 4 + shadcn/ui + Radix UI
+Next.js 16（App Router）+ React 19 + TypeScript 5（strict）+ Tailwind CSS 4 + shadcn/ui（radix-nova style）
 
 ## 目錄結構
 
 ```
 src/
-├── app/              # Next.js App Router
-│   ├── (app)/        # 需登入的保護路由（layout 包含 sidebar）
-│   │   ├── inbox/    # 對話收件匣
-│   │   ├── contacts/ # 聯絡人管理
-│   │   ├── dashboard/# 數據儀表板
-│   │   ├── actions/  # 待辦事項
-│   │   └── settings/ # 設定
-│   ├── login/        # 登入頁（無 sidebar）
-│   └── layout.tsx    # Root layout
-├── components/       # 自訂元件
-│   └── ui/           # shadcn/ui 基礎元件（勿手動修改，用 shadcn CLI 管理）
-└── lib/              # 工具與 hooks
-    ├── api.ts        # API client（fetch wrapper，統一處理 auth header）
-    ├── auth.tsx      # AuthContext provider + useAuth hook
-    ├── hooks.ts      # 共用 React hooks
-    ├── theme.tsx     # 主題 provider
-    ├── mock-data.ts  # 開發用模擬資料
-    └── utils.ts      # cn() 等工具函數
+├── app/
+│   ├── (app)/           # 需登入的保護路由（共享 sidebar layout）
+│   │   ├── inbox/       # 對話收件匣（conversation-detail.tsx, customer-sidebar.tsx）
+│   │   ├── contacts/    # 聯絡人管理 + [id] 詳情頁
+│   │   ├── dashboard/   # 數據儀表板
+│   │   ├── actions/     # 待辦事項
+│   │   ├── settings/    # 系統設定
+│   │   └── layout.tsx   # 認證檢查 + sidebar（狀態存 localStorage）
+│   ├── login/           # 登入頁（無 sidebar）
+│   └── layout.tsx       # Root（AuthProvider + ThemeProvider）
+├── components/
+│   ├── ui/              # shadcn/ui 元件（勿手動改，用 npx shadcn add）
+│   └── *.tsx            # 自訂元件（kebab-case 檔名）
+└── lib/
+    ├── api.ts           # API client（自動 JWT + refresh token 重試）
+    ├── auth.tsx         # AuthContext + useAuth hook
+    ├── hooks.ts         # 共用 hooks
+    ├── theme.tsx        # ThemeProvider
+    ├── mock-data.ts     # 開發模擬資料（backend 離線時用）
+    └── utils.ts         # cn() 等工具
 ```
 
-## 慣例
+## 關鍵機制
 
-- Route Group `(app)` 用於所有需認證的頁面，共享含 sidebar 的 layout
-- API 呼叫統一透過 `lib/api.ts`，自動帶 JWT token
-- 元件以 kebab-case 命名檔案（如 `channel-icon.tsx`）
-- 建置模式為 standalone（`next.config.ts` 設定 `output: 'standalone'`）
-- Icons 使用 lucide-react
+### 認證流程
+1. 登入成功 → 儲存 `muse_token`（access）+ `muse_refresh_token`（refresh）到 localStorage
+2. API 請求自動帶 `Authorization: Bearer <token>`
+3. 收到 401 → 用 refresh token 自動換發新 access token → 重試原請求
+4. Refresh 也失敗 → dispatch `auth-expired` event → AuthContext 清除狀態 → 跳轉登入
+5. 防止並發 refresh：`isRefreshing` flag + shared `refreshPromise`
+
+### 路由保護
+- `(app)/layout.tsx` 用 `useAuth()` 檢查 `isAuthenticated`
+- 未登入 → `router.replace('/login')`
+- Sidebar 折疊狀態存 `muse_sidebar_collapsed`（localStorage），emit `sidebar-toggle` event
+
+### API Client（lib/api.ts）
+- 所有 API 呼叫必須透過此檔案，不要直接 fetch
+- `ensureArray()` helper 處理後端回傳格式不一致的情況
+- `ApiError` class 攜帶 HTTP status code
+- 每個 API 模組獨立匯出：`inboxApi`, `contactsApi`, `tagsApi`, `actionsApi`, `dashboardApi`
+
+## 開發慣例
+
+- 新增 UI 元件：`npx shadcn add <component>`（配置在 `components.json`）
+- Icons：lucide-react
+- 樣式：Tailwind utility classes，不寫自訂 CSS
+- 檔案命名：kebab-case（`channel-icon.tsx`）
+- Path alias：`@/components`, `@/lib`
+- 建置模式：standalone（`next.config.ts` → `output: 'standalone'`）
 
 ## 指令
 
 ```bash
 npm run dev    # 開發（http://localhost:3000）
 npm run build  # 建置
-npm run lint   # ESLint 檢查
+npm run lint   # ESLint 9
 ```
+
+## 部署
+
+Railway（`railway.json`），Dockerfile multi-stage build（node:22-alpine）。

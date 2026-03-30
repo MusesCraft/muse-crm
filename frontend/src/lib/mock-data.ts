@@ -40,18 +40,18 @@ function minutesAgo(minutes: number): string {
 // ── Tags ───────────────────────────────────────────────
 
 export const mockTags: Tag[] = [
-  { id: 1, tag_name: '潛在客戶', category: 'system', contact_count: 4, created_at: daysAgo(30) },
-  { id: 2, tag_name: 'VIP', category: 'system', contact_count: 2, created_at: daysAgo(30) },
-  { id: 3, tag_name: '投訴者', category: 'system', contact_count: 1, created_at: daysAgo(30) },
-  { id: 4, tag_name: '復購客戶', category: 'system', contact_count: 1, created_at: daysAgo(30) },
-  { id: 5, tag_name: '設計師', category: 'system', contact_count: 2, created_at: daysAgo(30) },
-  { id: 6, tag_name: '屋主', category: 'system', contact_count: 2, created_at: daysAgo(30) },
-  { id: 7, tag_name: '建材行', category: 'system', contact_count: 1, created_at: daysAgo(30) },
-  { id: 8, tag_name: '工班', category: 'system', contact_count: 1, created_at: daysAgo(30) },
-  { id: 9, tag_name: '岩板', category: 'product', contact_count: 5, created_at: daysAgo(30) },
-  { id: 10, tag_name: '檯面', category: 'product', contact_count: 2, created_at: daysAgo(30) },
-  { id: 11, tag_name: '一體盆', category: 'product', contact_count: 1, created_at: daysAgo(30) },
-  { id: 12, tag_name: '電視牆', category: 'product', contact_count: 2, created_at: daysAgo(30) },
+  { id: 1, name: '潛在客戶', tag_name: '潛在客戶', category: 'system', contact_count: 4, created_at: daysAgo(30) },
+  { id: 2, name: 'VIP', tag_name: 'VIP', category: 'system', contact_count: 2, created_at: daysAgo(30) },
+  { id: 3, name: '投訴者', tag_name: '投訴者', category: 'system', contact_count: 1, created_at: daysAgo(30) },
+  { id: 4, name: '復購客戶', tag_name: '復購客戶', category: 'system', contact_count: 1, created_at: daysAgo(30) },
+  { id: 5, name: '設計師', tag_name: '設計師', category: 'system', contact_count: 2, created_at: daysAgo(30) },
+  { id: 6, name: '屋主', tag_name: '屋主', category: 'system', contact_count: 2, created_at: daysAgo(30) },
+  { id: 7, name: '建材行', tag_name: '建材行', category: 'system', contact_count: 1, created_at: daysAgo(30) },
+  { id: 8, name: '工班', tag_name: '工班', category: 'system', contact_count: 1, created_at: daysAgo(30) },
+  { id: 9, name: '岩板', tag_name: '岩板', category: 'product', contact_count: 5, created_at: daysAgo(30) },
+  { id: 10, name: '檯面', tag_name: '檯面', category: 'product', contact_count: 2, created_at: daysAgo(30) },
+  { id: 11, name: '一體盆', tag_name: '一體盆', category: 'product', contact_count: 1, created_at: daysAgo(30) },
+  { id: 12, name: '電視牆', tag_name: '電視牆', category: 'product', contact_count: 2, created_at: daysAgo(30) },
 ];
 
 // ── Contacts ───────────────────────────────────────────
@@ -782,7 +782,7 @@ export const mockQuickTriage: Record<string | number, { quick_intent: string; qu
 export const mockActions: Action[] = [
   {
     id: 1, contact_id: 1, conversation_id: 1,
-    action_type: 'quote', description: '週五前提供正式報價單（電視牆 Laminam 大板）',
+    source: 'manual', action_type: 'quote', description: '週五前提供正式報價單（電視牆 Laminam 大板）',
     priority: 'medium', status: 'pending',
     due_date: (() => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString(); })(),
     completed_at: null, created_at: daysAgo(1),
@@ -790,7 +790,7 @@ export const mockActions: Action[] = [
   },
   {
     id: 2, contact_id: 7, conversation_id: 7,
-    action_type: 'visit', description: '安排展間參觀 — 週三下午兩點',
+    source: 'manual', action_type: 'visit', description: '安排展間參觀 — 週三下午兩點',
     priority: 'medium', status: 'pending',
     due_date: (() => { const d = new Date(); d.setDate(d.getDate() + 4); return d.toISOString(); })(),
     completed_at: null, created_at: daysAgo(0, 3),
@@ -798,7 +798,7 @@ export const mockActions: Action[] = [
   },
   {
     id: 3, contact_id: 6, conversation_id: 6,
-    action_type: 'after_sales', description: '派師傅到場處理裂縫 — 黃太太電視牆保固維修',
+    source: 'manual', action_type: 'after_sales', description: '派師傅到場處理裂縫 — 黃太太電視牆保固維修',
     priority: 'high', status: 'pending',
     due_date: (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString(); })(),
     completed_at: null, created_at: hoursAgo(1),
@@ -806,7 +806,7 @@ export const mockActions: Action[] = [
   },
   {
     id: 4, contact_id: 3, conversation_id: 3,
-    action_type: 'delivery', description: '寄送 Dekton 色卡（Kelya、Natura）到宏達建材行',
+    source: 'manual', action_type: 'delivery', description: '寄送 Dekton 色卡（Kelya、Natura）到宏達建材行',
     priority: 'low', status: 'pending',
     due_date: (() => { const d = new Date(); d.setDate(d.getDate() + 3); return d.toISOString(); })(),
     completed_at: null, created_at: hoursAgo(5),
@@ -814,7 +814,7 @@ export const mockActions: Action[] = [
   },
   {
     id: 5, contact_id: 5, conversation_id: 5,
-    action_type: 'proposal', description: '準備飯店案實績資料和商業報價方案',
+    source: 'llm', action_type: 'proposal', description: '準備飯店案實績資料和商業報價方案',
     priority: 'high', status: 'pending',
     due_date: (() => { const d = new Date(); d.setDate(d.getDate() + 5); return d.toISOString(); })(),
     completed_at: null, created_at: hoursAgo(8),
@@ -822,7 +822,7 @@ export const mockActions: Action[] = [
   },
   {
     id: 6, contact_id: 4, conversation_id: 4,
-    action_type: 'quote', description: '提供切割+膠+掛件的組合報價',
+    source: 'manual', action_type: 'quote', description: '提供切割+膠+掛件的組合報價',
     priority: 'medium', status: 'pending',
     due_date: (() => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString(); })(),
     completed_at: null, created_at: daysAgo(1),
@@ -830,7 +830,7 @@ export const mockActions: Action[] = [
   },
   {
     id: 9, contact_id: 2, conversation_id: 2,
-    action_type: 'measure', description: '安排丈量 — 陳先生新房',
+    source: 'manual', action_type: 'measure', description: '安排丈量 — 陳先生新房',
     priority: 'medium', status: 'pending',
     due_date: (() => { const d = new Date(); d.setDate(d.getDate() + 3); return d.toISOString(); })(),
     completed_at: null, created_at: hoursAgo(2),
@@ -838,7 +838,7 @@ export const mockActions: Action[] = [
   },
   {
     id: 10, contact_id: 4, conversation_id: 4,
-    action_type: 'construction', description: '張工班施工進場',
+    source: 'manual', action_type: 'construction', description: '張工班施工進場',
     priority: 'high', status: 'pending',
     due_date: (() => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString(); })(),
     completed_at: null, created_at: hoursAgo(1),
@@ -847,7 +847,7 @@ export const mockActions: Action[] = [
   // Some completed actions
   {
     id: 7, contact_id: 3, conversation_id: 10,
-    action_type: 'delivery', description: '追加 3 片 Dekton Entzo 出貨至中和店',
+    source: 'manual', action_type: 'delivery', description: '追加 3 片 Dekton Entzo 出貨至中和店',
     priority: 'medium', status: 'completed',
     due_date: daysAgo(4), completed_at: daysAgo(4, 6),
     created_at: daysAgo(5),
@@ -855,7 +855,7 @@ export const mockActions: Action[] = [
   },
   {
     id: 8, contact_id: 4, conversation_id: 11,
-    action_type: 'processing', description: '45度導角加工 6米',
+    source: 'manual', action_type: 'processing', description: '45度導角加工 6米',
     priority: 'low', status: 'completed',
     due_date: daysAgo(6), completed_at: daysAgo(6, 4),
     created_at: daysAgo(7),
@@ -867,18 +867,18 @@ export const mockActions: Action[] = [
 
 export const mockNotes: Record<string | number, Note[]> = {
   1: [
-    { id: 1, contact_id: 1, content: '王設計師很專業，熟悉各品牌岩板，決策速度快。預算 3-5 萬可推 Laminam。', created_by: 'admin', created_at: daysAgo(2) },
-    { id: 2, contact_id: 1, content: '已加 LINE，後續大案可直接聯繫。', created_by: 'admin', created_at: daysAgo(6) },
+    { id: 1, contact_id: 1, content: '王設計師很專業，熟悉各品牌岩板，決策速度快。預算 3-5 萬可推 Laminam。', author_id: 'admin', created_by: 'admin', created_at: daysAgo(2) },
+    { id: 2, contact_id: 1, content: '已加 LINE，後續大案可直接聯繫。', author_id: 'admin', created_by: 'admin', created_at: daysAgo(6) },
   ],
   3: [
-    { id: 3, contact_id: 3, content: 'VIP 批發客戶，每月平均進貨 10-15 片。維持好關係。', created_by: 'admin', created_at: daysAgo(30) },
+    { id: 3, contact_id: 3, content: 'VIP 批發客戶，每月平均進貨 10-15 片。維持好關係。', author_id: 'admin', created_by: 'admin', created_at: daysAgo(30) },
   ],
   5: [
-    { id: 4, contact_id: 5, content: '飯店案預算估計 200-300 萬以上，重點客戶。需準備完整提案資料。', created_by: 'admin', created_at: daysAgo(3) },
+    { id: 4, contact_id: 5, content: '飯店案預算估計 200-300 萬以上，重點客戶。需準備完整提案資料。', author_id: 'admin', created_by: 'admin', created_at: daysAgo(3) },
   ],
   6: [
-    { id: 5, contact_id: 6, content: '保固客戶，上次電視牆安裝 2 個月出現裂縫。需優先處理以維護口碑。', created_by: 'admin', created_at: hoursAgo(1) },
-    { id: 6, contact_id: 6, content: '之前消費紀錄：電視牆 + 餐廳牆，總消費約 6 萬。', created_by: 'admin', created_at: daysAgo(4) },
+    { id: 5, contact_id: 6, content: '保固客戶，上次電視牆安裝 2 個月出現裂縫。需優先處理以維護口碑。', author_id: 'admin', created_by: 'admin', created_at: hoursAgo(1) },
+    { id: 6, contact_id: 6, content: '之前消費紀錄：電視牆 + 餐廳牆，總消費約 6 萬。', author_id: 'admin', created_by: 'admin', created_at: daysAgo(4) },
   ],
 };
 

@@ -57,10 +57,10 @@ class LlmUsageLog(db.Model):
 
     # 關聯（nullable）
     conversation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True
+        UUID(as_uuid=True), db.ForeignKey('conversations.id', ondelete='SET NULL'), nullable=True
     )
     message_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True
+        UUID(as_uuid=True), db.ForeignKey('messages.id', ondelete='SET NULL'), nullable=True
     )
 
     # 是否為 fallback 呼叫

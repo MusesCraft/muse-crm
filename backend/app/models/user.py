@@ -30,7 +30,7 @@ class User(db.Model):
 
     # 基本資訊
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    email: Mapped[Optional[str]] = mapped_column(String(255), unique=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
     # 認證
     password_hash: Mapped[Optional[str]] = mapped_column(String(255))

@@ -8,12 +8,15 @@ from flask import Flask
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from celery import Celery
 
 # 初始化擴展（但不綁定到 app）
 db = SQLAlchemy()
 migrate = Migrate()
 celery = Celery(__name__)
+limiter = Limiter(key_func=get_remote_address)
 
 # SocketIO 在 realtime 模組中初始化
 from .realtime import socketio
@@ -58,7 +61,8 @@ def create_app(config_name: str = 'development') -> Flask:
     if isinstance(cors_origins, str) and ',' in cors_origins:
         cors_origins = [o.strip() for o in cors_origins.split(',')]
     CORS(app, resources={r"/api/*": {"origins": cors_origins}})
-    
+    limiter.init_app(app)
+
     # 配置 Celery
     _configure_celery(app, celery)
 

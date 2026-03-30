@@ -27,6 +27,9 @@ class BaseConfig:
     # Redis
     REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 
+    # Rate Limiting（Flask-Limiter）
+    RATELIMIT_STORAGE_URI = os.environ.get('REDIS_URL', 'memory://')
+
     # LLM（OpenRouter）— 可選，沒設定則 LLM 功能不可用
     OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
     OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
@@ -48,7 +51,7 @@ class BaseConfig:
     JWT_REFRESH_EXPIRY_DAYS = int(os.environ.get('JWT_REFRESH_EXPIRY_DAYS', '30'))
 
     # CORS — 逗號分隔的允許來源（production 建議明確指定）
-    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*')
+    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', 'http://localhost:3000')
 
     # Celery
     CELERY_BROKER_URL = REDIS_URL

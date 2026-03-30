@@ -87,6 +87,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function ensureArray(val: any): any[] {
+  return Array.isArray(val) ? val : [];
+}
+
 // ── Types ──────────────────────────────────────────────
 
 export interface PaginatedResponse<T> {
@@ -379,7 +384,7 @@ export const inboxApi = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw = await request<any>(`/inbox/conversations${qs ? `?${qs}` : ''}`);
     return {
-      data: (raw.data || []).map(transformConversation),
+      data: ensureArray(raw.data).map(transformConversation),
       pagination: raw.pagination,
     } as PaginatedResponse<Conversation>;
   },
@@ -435,7 +440,7 @@ export const contactsApi = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw = await request<any>(`/contacts${qs ? `?${qs}` : ''}`);
     return {
-      data: (raw.data || []).map(transformContact),
+      data: ensureArray(raw.data).map(transformContact),
       pagination: raw.pagination,
     } as PaginatedResponse<Contact>;
   },
@@ -481,7 +486,7 @@ export const tagsApi = {
   async getTags() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw = await request<any[]>('/tags');
-    return (raw || []).map(transformTag);
+    return ensureArray(raw).map(transformTag);
   },
 };
 
@@ -498,7 +503,7 @@ export const actionsApi = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw = await request<any>(`/actions${qs ? `?${qs}` : ''}`);
     // Support both { data, pagination } and plain array (backward compat)
-    const items = Array.isArray(raw) ? raw : (raw.data || []);
+    const items = Array.isArray(raw) ? raw : ensureArray(raw?.data);
     return items.map(transformAction);
   },
 

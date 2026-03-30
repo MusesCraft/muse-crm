@@ -5,10 +5,12 @@ JWT 認證 decorator 和工具函數。
 """
 
 import logging
+import uuid
 from functools import wraps
 from datetime import datetime, timedelta, timezone
 
 import jwt
+import redis as redis_lib
 from flask import request, g, current_app, jsonify
 
 from ..models.user import User
@@ -49,6 +51,7 @@ def create_jwt_token(user_id: str, role: str, email: str = None, token_type: str
         'user_id': str(user_id),
         'role': role,
         'type': token_type,
+        'jti': str(uuid.uuid4()),
         'iat': now,
         'exp': exp,
     }
@@ -86,6 +89,24 @@ def decode_jwt_token(token: str) -> dict:
 decode_token = decode_jwt_token
 
 
+def blacklist_token(jti: str, exp_seconds: int = 86400):
+    """將 token JTI 加入黑名單"""
+    try:
+        r = redis_lib.from_url(current_app.config.get('REDIS_URL', 'redis://localhost:6379/0'))
+        r.setex(f'token_blacklist:{jti}', exp_seconds, '1')
+    except Exception:
+        pass  # Redis 不可用時不阻塞登出
+
+
+def is_token_blacklisted(jti: str) -> bool:
+    """檢查 token JTI 是否在黑名單中"""
+    try:
+        r = redis_lib.from_url(current_app.config.get('REDIS_URL', 'redis://localhost:6379/0'))
+        return r.exists(f'token_blacklist:{jti}') > 0
+    except Exception:
+        return False
+
+
 def _extract_current_user():
     """
     從 Authorization header 提取並驗證 JWT，
@@ -108,6 +129,10 @@ def _extract_current_user():
     except jwt.InvalidTokenError as e:
         logger.warning(f"Invalid JWT token: {e}")
         return None, (jsonify({'error': '無效的 token'}), 401)
+
+    jti = payload.get('jti')
+    if jti and is_token_blacklisted(jti):
+        return None, (jsonify({'error': 'Token已撤銷'}), 401)
 
     user_id = payload.get('sub') or payload.get('user_id')
     user = User.query.get(user_id)

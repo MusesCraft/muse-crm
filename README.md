@@ -7,14 +7,14 @@
 ## 🏗️ 技術棧
 
 ### 後端
-- **框架**: Flask 3.0 + SQLAlchemy
+- **框架**: Flask 3.1 + SQLAlchemy 2.0
 - **資料庫**: PostgreSQL 15
 - **佇列**: Celery + Redis  
 - **LLM**: OpenRouter (Claude/GPT)
-- **部署**: Fly.io Tokyo
+- **部署**: Railway
 
 ### 前端
-- **框架**: Next.js 14 + TypeScript
+- **框架**: Next.js 16 + TypeScript
 - **樣式**: Tailwind CSS + shadcn/ui
 - **狀態管理**: React Hooks
 
@@ -27,7 +27,7 @@
 
 ### 1. 複製專案
 ```bash
-git clone https://github.com/kiresakura/muse-crm.git
+git clone https://github.com/MusesCraft/muse-crm.git
 cd muse-crm
 ```
 
@@ -238,7 +238,7 @@ pytest tests/test_webhook.py -v
 
 ## 📞 技術支援
 
-- **GitHub Issues**: [問題回報](https://github.com/kiresakura/muse-crm/issues)
+- **GitHub Issues**: [問題回報](https://github.com/MusesCraft/muse-crm/issues)
 - **技術文件**: 參考 `docs/` 目錄
 - **架構決策**: 參考 ADR (Architecture Decision Records)
 

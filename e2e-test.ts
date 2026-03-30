@@ -1,7 +1,7 @@
 import { chromium, type Page } from 'playwright';
 
-const BASE = 'https://muse-crm-web.fly.dev';
-const API_BASE = 'https://muse-crm.fly.dev/api/v1';
+const BASE = 'https://miraculous-flow-production-e93d.up.railway.app';
+const API_BASE = 'https://inspiring-strength-production-a8ca.up.railway.app/api/v1';
 const results: { page: string; status: string; detail: string }[] = [];
 
 function log(page: string, status: 'PASS' | 'FAIL' | 'WARN', detail: string) {
@@ -15,7 +15,7 @@ async function screenshot(page: Page, name: string) {
 }
 
 async function main() {
-  console.log('🚀 Fly.io Post-Deploy Verification');
+  console.log('🚀 Railway Post-Deploy Verification');
   console.log(`   Frontend: ${BASE}`);
   console.log(`   Backend:  ${API_BASE}\n`);
 

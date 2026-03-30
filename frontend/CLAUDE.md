@@ -59,14 +59,25 @@ src/
 - Path alias：`@/components`, `@/lib`
 - 建置模式：standalone（`next.config.ts` → `output: 'standalone'`）
 
-## 指令
+## 修改後驗證
 
+修改前端後的標準流程：
 ```bash
-npm run dev    # 開發（http://localhost:3000）
-npm run build  # 建置
-npm run lint   # ESLint 9
+# 1. 靜態檢查
+npm run lint
+npm run build
+
+# 2. 部署到 Railway
+railway link -p "muse-crm-frontend"
+railway up --detach
+
+# 3. 瀏覽器驗證
+# https://miraculous-flow-production-e93d.up.railway.app
 ```
+
+不使用 `npm run dev` 本地跑。所有測試直接在 Railway 線上環境進行。
 
 ## 部署
 
 Railway（`railway.json`），Dockerfile multi-stage build（node:22-alpine）。
+環境變數 `NEXT_PUBLIC_API_BASE` 指向後端 Railway URL。

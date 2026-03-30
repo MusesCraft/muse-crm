@@ -36,11 +36,16 @@ app/
 
 Alembic（Flask-Migrate）：
 ```bash
-flask db migrate -m "描述"    # 產生 migration
-flask db upgrade              # 套用
-flask db downgrade            # 回退
+flask db migrate -m "描述"    # 本地產生 migration 檔案
+railway run -- flask db upgrade   # 在 Railway 上執行 migration
 ```
 Migration 檔命名含 CRM ticket（如 `crm_023_`）。
+
+查詢 Railway DB：
+```bash
+export PATH="/opt/homebrew/opt/libpq/bin:/opt/homebrew/bin:$PATH"
+echo "SQL語句" | railway connect Postgres-g1oi
+```
 
 關鍵 table 關係：
 ```
@@ -84,16 +89,27 @@ async_mode='threading'，可選 Redis message queue。
 - 事件處理：`realtime/events.py`
 - 廣播：`realtime/emitter.py`
 
-## 部署
+## 部署與驗證
 
-- Production：`Dockerfile`（gunicorn 1 worker / 4 threads / 120s timeout）
-- Development：`Dockerfile.dev`（flask run --reload）
-- `entrypoint.sh`：自動初始化 DB schema（psycopg2 直連）
-- Railway：`railway.json`（health check `/api/health`）
-
-## 測試
-
+部署到 Railway，不使用本地環境：
 ```bash
-pytest --cov
+# 確認已 link
+railway link -p "muse-crm-backend" -s "inspiring-strength"
+
+# 部署
+railway up --detach
+
+# 驗證
+curl -s https://inspiring-strength-production-a8ca.up.railway.app/api/v1/health
+
+# 測試 API 端點（帶認證）
+TOKEN=$(curl -s -X POST https://inspiring-strength-production-a8ca.up.railway.app/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@muse-crm.com","password":"Muse@2026!"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+curl -s https://inspiring-strength-production-a8ca.up.railway.app/api/v1/contacts \
+  -H "Authorization: Bearer $TOKEN"
 ```
-TestingConfig 用獨立資料庫 `muse_crm_test`，固定 API keys。
+
+Production Dockerfile：gunicorn 1 worker / 4 threads / 120s timeout
+`entrypoint.sh`：自動初始化 DB schema（psycopg2 直連）

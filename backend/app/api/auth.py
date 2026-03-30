@@ -11,7 +11,7 @@ from flask import jsonify, request, g
 from . import api_bp
 from ..models.user import User
 from .. import db
-from ..utils.auth import generate_token, login_required, admin_required
+from ..utils.auth import generate_token, generate_refresh_token, decode_jwt_token, login_required, admin_required
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +43,13 @@ def auth_login():
         return jsonify({'error': '帳號已停用'}), 403
     
     token = generate_token(user)
-    
+    refresh_token = generate_refresh_token(user)
+
     logger.info(f"✅ 用戶登入成功: {user.email}")
-    
+
     return jsonify({
         'token': token,
+        'refresh_token': refresh_token,
         'user': user.to_dict()
     })
 
@@ -122,6 +124,39 @@ def auth_register():
         'message': '用戶已建立',
         'user': user.to_dict()
     }), 201
+
+
+@api_bp.route('/auth/refresh', methods=['POST'])
+def auth_refresh():
+    """
+    用 refresh token 換發新的 access token
+
+    Body: { refresh_token }
+    Response: { token }
+    """
+    data = request.get_json()
+    if not data or not data.get('refresh_token'):
+        return jsonify({'error': '缺少 refresh_token'}), 400
+
+    import jwt as pyjwt
+    try:
+        payload = decode_jwt_token(data['refresh_token'])
+    except pyjwt.ExpiredSignatureError:
+        return jsonify({'error': 'Refresh token 已過期，請重新登入'}), 401
+    except pyjwt.InvalidTokenError:
+        return jsonify({'error': '無效的 refresh token'}), 401
+
+    if payload.get('type') != 'refresh':
+        return jsonify({'error': '無效的 token 類型'}), 401
+
+    user = User.query.get(payload.get('sub'))
+    if not user or not user.is_active:
+        return jsonify({'error': '用戶不存在或已停用'}), 401
+
+    new_token = generate_token(user)
+    logger.info(f"🔄 Token 已刷新: {user.email}")
+
+    return jsonify({'token': new_token})
 
 
 @api_bp.route('/auth/me', methods=['GET'])

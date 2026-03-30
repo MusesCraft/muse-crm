@@ -45,6 +45,7 @@ class BaseConfig:
     # JWT Authentication — 無預設值，必須由環境變數或子類別提供
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET')
     JWT_EXPIRY_HOURS = int(os.environ.get('JWT_EXPIRY_HOURS', '24'))
+    JWT_REFRESH_EXPIRY_DAYS = int(os.environ.get('JWT_REFRESH_EXPIRY_DAYS', '30'))
 
     # CORS — 逗號分隔的允許來源（production 建議明確指定）
     CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*')

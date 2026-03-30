@@ -54,31 +54,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // 驗證 real token 有效性
       fetchMe(savedToken)
         .then((u) => setUser(u))
-        .catch((err) => {
+        .catch(async (err) => {
           if (err.message === 'BACKEND_OFFLINE' && process.env.NODE_ENV === 'development') {
-            // Backend unreachable — use mock user for offline dev only
             setUser(MOCK_USER);
           } else {
-            // Token invalid (401) — clear and show login
-            localStorage.removeItem('muse_token');
-            setToken(null);
+            // Token invalid/expired — try refresh
+            const refreshed = await tryRefreshToken();
+            if (!refreshed) {
+              localStorage.removeItem('muse_token');
+              localStorage.removeItem('muse_refresh_token');
+              setToken(null);
+            }
           }
         })
         .finally(() => setIsLoading(false));
     } else if (savedToken === 'mock-demo-token') {
-      // Had mock token — check if backend is now available
       if (process.env.NODE_ENV !== 'development') {
-        // Production: never use mock token
         localStorage.removeItem('muse_token');
         setIsLoading(false);
       } else {
         checkBackendAvailable()
           .then((available) => {
             if (available) {
-              // Backend is up — clear mock, show login for real auth
               localStorage.removeItem('muse_token');
             } else {
-              // Backend still down — keep mock
               setToken('mock-demo-token');
               setUser(MOCK_USER);
             }
@@ -86,16 +85,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .finally(() => setIsLoading(false));
       }
     } else {
-      // No saved token — check backend, show login or use mock
       checkBackendAvailable()
         .then((available) => {
           if (!available && process.env.NODE_ENV === 'development') {
-            // Backend offline — auto-mock for demo (development only)
             localStorage.setItem('muse_token', 'mock-demo-token');
             setToken('mock-demo-token');
             setUser(MOCK_USER);
           }
-          // If backend available (or production), user stays null → login page
         })
         .finally(() => setIsLoading(false));
     }
@@ -116,6 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const data = await res.json();
       localStorage.setItem('muse_token', data.token);
+      if (data.refresh_token) {
+        localStorage.setItem('muse_refresh_token', data.refresh_token);
+      }
       setToken(data.token);
       setUser(data.user);
     } catch (err) {
@@ -134,8 +133,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     localStorage.removeItem('muse_token');
+    localStorage.removeItem('muse_refresh_token');
     setToken(null);
     setUser(null);
+  }, []);
+
+  // 用 refresh token 換發新 access token
+  const tryRefreshToken = useCallback(async (): Promise<boolean> => {
+    const refreshToken = localStorage.getItem('muse_refresh_token');
+    if (!refreshToken) return false;
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!res.ok) return false;
+
+      const data = await res.json();
+      localStorage.setItem('muse_token', data.token);
+      setToken(data.token);
+
+      const u = await fetchMe(data.token);
+      setUser(u);
+      return true;
+    } catch {
+      return false;
+    }
   }, []);
 
   // API 層偵測到 401 時自動清除登入狀態

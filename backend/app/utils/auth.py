@@ -24,19 +24,33 @@ def _get_expiry_hours():
     return current_app.config.get('JWT_EXPIRY_HOURS', 24)
 
 
-def create_jwt_token(user_id: str, role: str, email: str = None) -> str:
+def _get_refresh_expiry_days():
+    return current_app.config.get('JWT_REFRESH_EXPIRY_DAYS', 30)
+
+
+def create_jwt_token(user_id: str, role: str, email: str = None, token_type: str = 'access') -> str:
     """
     產生 JWT token。
 
-    Payload: { sub, user_id, role, email, iat, exp }
+    Args:
+        token_type: 'access'（短期）或 'refresh'（長期）
+
+    Payload: { sub, user_id, role, email, type, iat, exp }
     """
     now = datetime.now(timezone.utc)
+
+    if token_type == 'refresh':
+        exp = now + timedelta(days=_get_refresh_expiry_days())
+    else:
+        exp = now + timedelta(hours=_get_expiry_hours())
+
     payload = {
         'sub': str(user_id),
         'user_id': str(user_id),
         'role': role,
+        'type': token_type,
         'iat': now,
-        'exp': now + timedelta(hours=_get_expiry_hours()),
+        'exp': exp,
     }
     if email:
         payload['email'] = email
@@ -44,11 +58,22 @@ def create_jwt_token(user_id: str, role: str, email: str = None) -> str:
 
 
 def generate_token(user: User) -> str:
-    """產生 JWT token（便捷包裝，接受 User 物件）。"""
+    """產生 access token（便捷包裝，接受 User 物件）。"""
     return create_jwt_token(
         user_id=str(user.id),
         role=user.role,
         email=user.email,
+        token_type='access',
+    )
+
+
+def generate_refresh_token(user: User) -> str:
+    """產生 refresh token（長效，用於續期 access token）。"""
+    return create_jwt_token(
+        user_id=str(user.id),
+        role=user.role,
+        email=user.email,
+        token_type='refresh',
     )
 
 

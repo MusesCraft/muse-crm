@@ -16,6 +16,28 @@ function getAuthHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefresh(): Promise<boolean> {
+  const refreshToken = localStorage.getItem('muse_refresh_token');
+  if (!refreshToken) return false;
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    localStorage.setItem('muse_token', data.token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
   const res = await fetch(url, {
@@ -27,11 +49,33 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     },
   });
 
-  if (res.status === 401) {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('muse_token');
-      window.dispatchEvent(new Event('auth-expired'));
+  if (res.status === 401 && typeof window !== 'undefined') {
+    // 嘗試用 refresh token 續期（防止多個請求同時 refresh）
+    if (!isRefreshing) {
+      isRefreshing = true;
+      refreshPromise = tryRefresh();
     }
+    const refreshed = await refreshPromise;
+    isRefreshing = false;
+    refreshPromise = null;
+
+    if (refreshed) {
+      // 用新 token 重試原請求
+      const retryRes = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+          ...options?.headers,
+        },
+      });
+      if (retryRes.ok) return retryRes.json();
+    }
+
+    // Refresh 也失敗 — 登出
+    localStorage.removeItem('muse_token');
+    localStorage.removeItem('muse_refresh_token');
+    window.dispatchEvent(new Event('auth-expired'));
     throw new ApiError(401, 'Unauthorized');
   }
 

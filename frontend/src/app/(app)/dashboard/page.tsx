@@ -198,7 +198,7 @@ function RecentCustomersCard({ contacts = [] }: { contacts?: Contact[] }) {
 }
 
 export default function DashboardPage() {
-  const { data: stats, loading: loadingStats } = useAsync(
+  const { data: stats, loading: loadingStats, error: statsError, refetch: refetchStats } = useAsync(
     () => dashboardApi.getStats(),
     []
   );
@@ -209,6 +209,20 @@ export default function DashboardPage() {
   );
 
   if (loadingStats) return <LoadingSpinner className="min-h-screen" />;
+
+  if (statsError) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center py-8">
+        <p className="text-red-500 text-sm mb-3">{statsError}</p>
+        <button
+          onClick={() => refetchStats()}
+          className="text-sm px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+        >
+          重試
+        </button>
+      </div>
+    </div>
+  );
 
   const now = new Date();
   const dateStr = now.toLocaleDateString('zh-TW', {

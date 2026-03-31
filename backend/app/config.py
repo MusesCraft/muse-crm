@@ -50,8 +50,15 @@ class BaseConfig:
     JWT_EXPIRY_HOURS = int(os.environ.get('JWT_EXPIRY_HOURS', '24'))
     JWT_REFRESH_EXPIRY_DAYS = int(os.environ.get('JWT_REFRESH_EXPIRY_DAYS', '30'))
 
-    # CORS — 逗號分隔的允許來源（production 建議明確指定）
-    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', 'http://localhost:3000')
+    # CORS — 逗號分隔的允許來源
+    # Railway 環境自動允許同專案域名；本地開發允許 localhost
+    _cors_env = os.environ.get('CORS_ORIGINS', '')
+    if _cors_env:
+        CORS_ORIGINS = _cors_env
+    elif os.environ.get('RAILWAY_ENVIRONMENT'):
+        CORS_ORIGINS = '*'  # Railway 內部部署，由 Railway 網路層保護
+    else:
+        CORS_ORIGINS = 'http://localhost:3000,http://127.0.0.1:3000'
 
     # Celery
     CELERY_BROKER_URL = REDIS_URL

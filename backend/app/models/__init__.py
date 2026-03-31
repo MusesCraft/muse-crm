@@ -15,6 +15,7 @@ from .llm_usage_log import LlmUsageLog
 from .system_setting import SystemSetting
 from .llm_fallback_event import LlmFallbackEvent
 from .notification_preference import NotificationPreference
+from .quick_reply import QuickReply
 
 # 匯出所有模型供其他模組使用
 __all__ = [
@@ -33,4 +34,5 @@ __all__ = [
     'SystemSetting',
     'LlmFallbackEvent',
     'NotificationPreference',
+    'QuickReply',
 ]

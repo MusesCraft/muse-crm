@@ -17,7 +17,9 @@ import {
 import { useAsync } from '@/lib/hooks';
 import { Avatar } from '@/components/avatar';
 import { ChannelBadge } from '@/components/channel-icon';
+import { SentimentBadge, UrgencyBadge } from '@/components/badges';
 import { LoadingSpinner } from '@/components/loading';
+import { formatDate, formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import {
   ChevronRight,
@@ -37,10 +39,6 @@ import {
   StickyNote,
   Tag,
   TrendingUp,
-  AlertTriangle,
-  Smile,
-  Meh,
-  Frown,
   ShoppingBag,
   Lightbulb,
   ExternalLink,
@@ -53,57 +51,6 @@ interface CustomerSidebarProps {
   onSelectConversation: (id: string | number) => void;
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('zh-TW', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function formatDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString('zh-TW', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-// ── Sentiment / Urgency Badges ─────────────────────────
-
-function SentimentBadge({ sentiment }: { sentiment: string }) {
-  const config: Record<string, { icon: typeof Smile; color: string; label: string }> = {
-    positive: { icon: Smile, color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25', label: '正面' },
-    neutral: { icon: Meh, color: 'bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border-zinc-500/25', label: '中性' },
-    negative: { icon: Frown, color: 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/25', label: '負面' },
-  };
-  const c = config[sentiment] || config.neutral;
-  const Icon = c.icon;
-
-  return (
-    <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium', c.color)}>
-      <Icon className="w-3 h-3" />
-      {c.label}
-    </span>
-  );
-}
-
-function UrgencyBadge({ urgency }: { urgency: string }) {
-  const config: Record<string, { color: string; label: string }> = {
-    high: { color: 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/25', label: '高' },
-    medium: { color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25', label: '中' },
-    low: { color: 'bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border-zinc-500/25', label: '低' },
-  };
-  const c = config[urgency] || config.low;
-
-  return (
-    <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium', c.color)}>
-      <AlertTriangle className="w-3 h-3" />
-      緊急度：{c.label}
-    </span>
-  );
-}
 
 // ── Source Badge ────────────────────────────────────────
 
@@ -273,7 +220,7 @@ export function CustomerSidebar({
       <div className="w-10 bg-zinc-50 border-l border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 flex flex-col items-center pt-3 transition-all duration-200">
         <button
           onClick={() => setCollapsed(false)}
-          className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+          className="p-2 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
           title="展開客戶快訊"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -308,7 +255,7 @@ export function CustomerSidebar({
         </div>
         <button
           onClick={() => setCollapsed(true)}
-          className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 transition-colors flex-shrink-0"
+          className="p-2 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 transition-colors flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
           title="收合"
         >
           <ChevronRight className="w-4 h-4" />
@@ -381,9 +328,9 @@ export function CustomerSidebar({
                   {tag.tag_name}
                   <button
                     onClick={() => handleRemoveTag(tag.id)}
-                    className="hover:text-red-400 transition-colors"
+                    className="hover:text-red-400 transition-colors p-1.5 -m-1 md:p-0 md:m-0"
                   >
-                    <X className="w-2.5 h-2.5" />
+                    <X className="w-3 h-3 md:w-2.5 md:h-2.5" />
                   </button>
                 </span>
               ))
@@ -440,7 +387,7 @@ export function CustomerSidebar({
                 <button
                   key={conv.id}
                   onClick={() => onSelectConversation(conv.id)}
-                  className="w-full flex items-center justify-between p-2 rounded-md bg-zinc-100/50 hover:bg-zinc-100 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/60 transition-colors text-left"
+                  className="w-full flex items-center justify-between p-2.5 md:p-2 rounded-md bg-zinc-100/50 hover:bg-zinc-100 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/60 transition-colors text-left min-h-[44px] md:min-h-0"
                 >
                   <div className="min-w-0">
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
@@ -473,7 +420,7 @@ export function CustomerSidebar({
             </h4>
             <Link
               href={`/contacts/${contactId}`}
-              className="text-[10px] text-indigo-500 dark:text-indigo-400 hover:text-indigo-400 dark:hover:text-indigo-300 flex items-center gap-0.5"
+              className="text-[10px] text-indigo-500 dark:text-indigo-400 hover:text-indigo-400 dark:hover:text-indigo-300 flex items-center gap-0.5 py-2 md:py-0 min-h-[44px] md:min-h-0"
             >
               查看全部
               <ExternalLink className="w-2.5 h-2.5" />

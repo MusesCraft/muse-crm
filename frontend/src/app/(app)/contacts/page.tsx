@@ -1,53 +1,38 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { contactsApi, type Contact, type PaginatedResponse } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { Avatar } from '@/components/avatar';
 import { ChannelBadge } from '@/components/channel-icon';
+import { PriorityBadge } from '@/components/badges';
 import { LoadingSpinner, EmptyState } from '@/components/loading';
+import { formatDateTime } from '@/lib/format';
 import { Search, ChevronLeft, ChevronRight, Users, ExternalLink, ArrowUpDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('zh-TW', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-const priorityConfig: Record<string, { label: string; color: string }> = {
-  high: { label: '高', color: 'bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-400' },
-  medium: { label: '中', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400' },
-  low: { label: '低', color: 'bg-zinc-500/10 text-zinc-600 border-zinc-500/20 dark:text-zinc-400' },
-};
-
-function PriorityBadge({ priority }: { priority?: string }) {
-  const config = priorityConfig[priority || 'low'] || priorityConfig.low;
-  return (
-    <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium', config.color)}>
-      {config.label}
-    </span>
-  );
-}
 
 type SortKey = 'last_seen' | 'priority' | 'conversation_count' | 'name';
 const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
 export default function ContactsPage() {
   const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [channel, setChannel] = useState('');
   const [sourceType, setSourceType] = useState('');
   const [sort, setSort] = useState<SortKey>('last_seen');
+  const debounceTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const { data, loading, error } = useAsync<PaginatedResponse<Contact>>(
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setSearch(value);
+      setPage(1);
+    }, 300);
+  };
+
+  const { data, loading, error, refetch } = useAsync<PaginatedResponse<Contact>>(
     () =>
       contactsApi.getContacts({
         page,
@@ -92,14 +77,16 @@ export default function ContactsPage() {
           <input
             type="text"
             placeholder="搜尋客戶名稱..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            aria-label="搜尋客戶名稱"
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition-colors"
           />
         </div>
         <select
           value={channel}
           onChange={(e) => { setChannel(e.target.value); setPage(1); }}
+          aria-label="篩選渠道"
           className="px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
         >
           <option value="">全部渠道</option>
@@ -110,6 +97,7 @@ export default function ContactsPage() {
         <select
           value={sourceType}
           onChange={(e) => { setSourceType(e.target.value); setPage(1); }}
+          aria-label="篩選來源"
           className="px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
         >
           <option value="">全部來源</option>
@@ -125,6 +113,7 @@ export default function ContactsPage() {
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as SortKey)}
+          aria-label="排序方式"
           className="px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
         >
           <option value="last_seen">按最後活躍</option>
@@ -139,7 +128,15 @@ export default function ContactsPage() {
         {loading && !data ? (
           <LoadingSpinner />
         ) : error ? (
-          <div className="p-6 text-red-400 text-sm text-center">{error}</div>
+          <div className="text-center py-8">
+            <p className="text-red-500 text-sm mb-3">{error}</p>
+            <button
+              onClick={() => refetch()}
+              className="text-sm px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+            >
+              重試
+            </button>
+          </div>
         ) : !data || data.data.length === 0 ? (
           <EmptyState icon={Users} title="沒有客戶" description="目前沒有符合條件的客戶" />
         ) : (
@@ -202,7 +199,7 @@ export default function ContactsPage() {
                           </span>
                         ))
                       ) : (
-                        <span className="text-xs text-zinc-400 dark:text-zinc-600">—</span>
+                        <span className="text-xs text-zinc-400 dark:text-zinc-600">&mdash;</span>
                       )}
                       {contact.tags && contact.tags.length > 3 && (
                         <span className="text-xs text-zinc-400 dark:text-zinc-500">
@@ -212,7 +209,7 @@ export default function ContactsPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">{formatDate(contact.last_seen)}</span>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">{formatDateTime(contact.last_seen)}</span>
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className="text-sm text-zinc-600 dark:text-zinc-300">{contact.conversation_count}</span>

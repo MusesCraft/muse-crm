@@ -27,30 +27,8 @@ import {
   AlertTriangle,
   ListTodo,
 } from 'lucide-react';
+import { formatDate, formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
-
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('zh-TW', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
-function formatDateTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '—';
-  return d.toLocaleString('zh-TW', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 // ── Tag Section ────────────────────────────────────────
 

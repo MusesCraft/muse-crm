@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { actionsApi, type Action } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { Avatar } from '@/components/avatar';
+import { PriorityBadge, TypeBadge } from '@/components/badges';
 import { LoadingSpinner, EmptyState } from '@/components/loading';
+import { formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import {
   CheckSquare,
@@ -15,78 +17,24 @@ import {
   AlertTriangle,
   ArrowUpDown,
   Filter,
-  ChevronDown,
   ClipboardList,
 } from 'lucide-react';
 
-// ── Helpers ────────────────────────────────────────────
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('zh-TW', {
-    month: 'short',
-    day: 'numeric',
-  });
-}
+// -- Helpers --
 
 function isOverdue(dateStr: string | null): boolean {
   if (!dateStr) return false;
   return new Date(dateStr).getTime() < Date.now();
 }
 
-// ── Type Badge ─────────────────────────────────────────
-
-const typeConfig: Record<string, { label: string; color: string }> = {
-  quote: { label: '報價', color: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
-  visit: { label: '參觀', color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
-  call: { label: '通話', color: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' },
-  sample: { label: '寄樣', color: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' },
-  service: { label: '維修', color: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' },
-  followup: { label: '跟進', color: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20' },
-  delivery: { label: '出貨', color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
-  processing: { label: '加工', color: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' },
-  proposal: { label: '提案', color: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
-  dispatch: { label: '派工中', color: 'bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border-indigo-600/20' },
-  dispatched: { label: '已派工', color: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20' },
-  construction: { label: '施工中', color: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20' },
-  measure: { label: '待丈量', color: 'bg-yellow-700/10 text-yellow-700 dark:text-yellow-400 border-yellow-700/20' },
-  after_sales: { label: '售後處理', color: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
-};
-
-function TypeBadge({ type }: { type: string }) {
-  const config = typeConfig[type] || { label: type, color: 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20' };
-  return (
-    <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium', config.color)}>
-      {config.label}
-    </span>
-  );
-}
-
-// ── Priority Badge ─────────────────────────────────────
-
-const priorityConfig: Record<string, { label: string; color: string }> = {
-  high: { label: '高', color: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
-  medium: { label: '中', color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
-  low: { label: '低', color: 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20' },
-};
-
-function PriorityBadge({ priority }: { priority: string }) {
-  const config = priorityConfig[priority] || priorityConfig.low;
-  return (
-    <span className={cn('inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-medium', config.color)}>
-      {priority === 'high' && <AlertTriangle className="w-2.5 h-2.5" />}
-      {config.label}
-    </span>
-  );
-}
-
-// ── Status Select ──────────────────────────────────────
+// -- Status Select --
 
 const statusOptions = [
-  { value: 'pending', label: '待處理' },
-  { value: 'assigned', label: '已指派' },
-  { value: 'in_progress', label: '進行中' },
-  { value: 'completed', label: '已完成' },
-  { value: 'cancelled', label: '已取消' },
+  { value: 'pending', label: '\u5F85\u8655\u7406' },
+  { value: 'assigned', label: '\u5DF2\u6307\u6D3E' },
+  { value: 'in_progress', label: '\u9032\u884C\u4E2D' },
+  { value: 'completed', label: '\u5DF2\u5B8C\u6210' },
+  { value: 'cancelled', label: '\u5DF2\u53D6\u6D88' },
 ];
 
 function StatusSelect({
@@ -100,6 +48,7 @@ function StatusSelect({
     <select
       value={status}
       onChange={(e) => onChange(e.target.value)}
+      aria-label="變更狀態"
       className={cn(
         'px-2 py-1 rounded-md text-xs font-medium border focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer appearance-none bg-no-repeat',
         status === 'completed'
@@ -122,7 +71,7 @@ function StatusSelect({
   );
 }
 
-// ── Action Card ────────────────────────────────────────
+// -- Action Card --
 
 function ActionCard({
   action,
@@ -194,7 +143,7 @@ function ActionCard({
                 overdue ? 'text-red-500 dark:text-red-400' : 'text-zinc-400 dark:text-zinc-500'
               )}>
                 <Calendar className="w-3 h-3" />
-                {formatDate(action.due_date)}
+                {formatDateTime(action.due_date)}
                 {overdue && <span className="text-[10px]">(逾期)</span>}
               </span>
             )}
@@ -213,7 +162,7 @@ function ActionCard({
   );
 }
 
-// ── Main Page ──────────────────────────────────────────
+// -- Main Page --
 
 type SortKey = 'priority' | 'due_date' | 'created_at';
 
@@ -321,7 +270,7 @@ export default function ActionsPage() {
           </h1>
           <p className="text-sm text-zinc-500 mt-1">
             <span className="text-amber-500 dark:text-amber-400 font-medium">{pendingCount}</span> 待處理
-            {' · '}
+            {' \u00B7 '}
             <span className="text-emerald-500 dark:text-emerald-400 font-medium">{completedCount}</span> 已完成
           </p>
         </div>
@@ -338,6 +287,7 @@ export default function ActionsPage() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label="篩選狀態"
           className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
         >
           <option value="">全部狀態</option>
@@ -352,6 +302,7 @@ export default function ActionsPage() {
         <select
           value={priorityFilter}
           onChange={(e) => setPriorityFilter(e.target.value)}
+          aria-label="篩選優先度"
           className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
         >
           <option value="">全部優先度</option>
@@ -364,6 +315,7 @@ export default function ActionsPage() {
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
+          aria-label="篩選類型"
           className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
         >
           <option value="">全部類型</option>
@@ -390,6 +342,7 @@ export default function ActionsPage() {
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as SortKey)}
+          aria-label="排序方式"
           className="px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
         >
           <option value="priority">按優先度</option>
@@ -402,12 +355,20 @@ export default function ActionsPage() {
       {loading ? (
         <LoadingSpinner />
       ) : error ? (
-        <div className="p-6 text-red-400 text-sm text-center">{error}</div>
+        <div className="text-center py-8">
+          <p className="text-red-500 text-sm mb-3">{error}</p>
+          <button
+            onClick={() => refetch()}
+            className="text-sm px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+          >
+            重試
+          </button>
+        </div>
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={ClipboardList}
           title={statusFilter || priorityFilter || typeFilter ? '沒有符合條件的待辦事項' : '目前沒有待辦事項'}
-          description={statusFilter || priorityFilter || typeFilter ? '試試調整篩選條件' : '🎉 所有工作都完成了！'}
+          description={statusFilter || priorityFilter || typeFilter ? '試試調整篩選條件' : '所有工作都完成了！'}
         />
       ) : (
         <div className="space-y-3">

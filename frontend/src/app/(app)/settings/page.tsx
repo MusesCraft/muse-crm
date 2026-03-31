@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { mockQuickReplies, type QuickReply } from '@/lib/mock-data';
+import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import { quickRepliesApi, llmApi, type QuickReplyItem, type LlmUsageSummary, type LlmBudget } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
 import {
   Settings,
   Plus,
   Trash2,
   Pencil,
-  X,
   Save,
   Clock,
   AlertTriangle,
@@ -42,14 +42,15 @@ const tabs: { id: TabId; label: string; icon: React.ComponentType<{ className?: 
 function IntegrationCard() {
   const [copied, setCopied] = useState<string | null>(null);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const idPrefix = useId();
 
   useEffect(() => () => { if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current); }, []);
 
   const configs = [
-    { label: 'Webhook URL', value: 'https://crm.musecraft.com/api/v1/webhook/line', readonly: true },
-    { label: 'Channel Access Token', value: '••••••••••••••••••••••••Abc123', readonly: true },
-    { label: 'Channel Secret', value: '••••••••••••def456', readonly: true },
-    { label: '狀態', value: '✅ 已連接', readonly: true, isStatus: true },
+    { key: 'webhook-url', label: 'Webhook URL', value: 'https://crm.musecraft.com/api/v1/webhook/line', readonly: true },
+    { key: 'channel-token', label: 'Channel Access Token', value: '••••••••••••••••••••••••Abc123', readonly: true },
+    { key: 'channel-secret', label: 'Channel Secret', value: '••••••••••••def456', readonly: true },
+    { key: 'status', label: '狀態', value: '已連接', readonly: true, isStatus: true },
   ];
 
   const handleCopy = (label: string, value: string) => {
@@ -62,31 +63,36 @@ function IntegrationCard() {
   return (
     <div className="space-y-4">
       <p className="text-xs text-zinc-400 dark:text-zinc-500">LINE 官方帳號整合設定，Webhook 資訊為唯讀。</p>
-      {configs.map((config) => (
-        <div key={config.label} className="flex items-center gap-3">
-          <div className="flex-1">
-            <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">{config.label}</label>
-            {config.isStatus ? (
-              <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">{config.value}</span>
-            ) : (
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={config.value}
-                  readOnly
-                  className="flex-1 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-zinc-600 dark:text-zinc-300 font-mono"
-                />
-                <button
-                  onClick={() => handleCopy(config.label, config.value)}
-                  className="p-2 rounded-lg text-zinc-400 hover:text-indigo-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                >
-                  {copied === config.label ? <CheckCircle className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </div>
-            )}
+      {configs.map((config) => {
+        const inputId = `${idPrefix}-${config.key}`;
+        return (
+          <div key={config.key} className="flex items-center gap-3">
+            <div className="flex-1">
+              <Label htmlFor={inputId} className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{config.label}</Label>
+              {config.isStatus ? (
+                <span id={inputId} className="text-sm text-emerald-600 dark:text-emerald-400 font-medium block">&#x2705; {config.value}</span>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    id={inputId}
+                    type="text"
+                    value={config.value}
+                    readOnly
+                    className="flex-1 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-zinc-600 dark:text-zinc-300 font-mono"
+                  />
+                  <button
+                    onClick={() => handleCopy(config.label, config.value)}
+                    aria-label={`複製${config.label}`}
+                    className="p-2 rounded-lg text-zinc-400 hover:text-indigo-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    {copied === config.label ? <CheckCircle className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -97,14 +103,16 @@ function AIModelCard() {
   const [model, setModel] = useState('gpt-4o');
   const [temperature, setTemperature] = useState(0.3);
   const [autoAnalysis, setAutoAnalysis] = useState(true);
+  const idPrefix = useId();
 
   return (
     <div className="space-y-5">
       <p className="text-xs text-zinc-400 dark:text-zinc-500">配置 AI 分析模型與參數。</p>
 
       <div>
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-200 mb-1.5 block">分析模型</label>
+        <Label htmlFor={`${idPrefix}-model`} className="text-sm font-medium text-zinc-700 dark:text-zinc-200 mb-1.5">分析模型</Label>
         <select
+          id={`${idPrefix}-model`}
           value={model}
           onChange={(e) => setModel(e.target.value)}
           className="w-full text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2.5 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
@@ -117,10 +125,11 @@ function AIModelCard() {
       </div>
 
       <div>
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-200 mb-1.5 block">
+        <Label htmlFor={`${idPrefix}-temperature`} className="text-sm font-medium text-zinc-700 dark:text-zinc-200 mb-1.5">
           溫度（Temperature）: {temperature}
-        </label>
+        </Label>
         <input
+          id={`${idPrefix}-temperature`}
           type="range"
           min={0}
           max={1}
@@ -137,10 +146,13 @@ function AIModelCard() {
 
       <div className="flex items-center justify-between py-2">
         <div>
-          <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">自動分析</p>
+          <Label htmlFor={`${idPrefix}-auto-analysis`} className="text-sm font-medium text-zinc-700 dark:text-zinc-200">自動分析</Label>
           <p className="text-xs text-zinc-400 dark:text-zinc-500">對話結束後自動觸發 AI 分析</p>
         </div>
         <button
+          id={`${idPrefix}-auto-analysis`}
+          role="switch"
+          aria-checked={autoAnalysis}
           onClick={() => setAutoAnalysis(!autoAnalysis)}
           className={cn(
             'w-11 h-6 rounded-full transition-colors relative',
@@ -166,6 +178,7 @@ function NotificationsCard() {
     dailyDigest: true,
     sound: true,
   });
+  const idPrefix = useId();
 
   const toggle = (key: keyof typeof settings) => {
     setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -184,10 +197,13 @@ function NotificationsCard() {
       {items.map((item) => (
         <div key={item.key} className="flex items-center justify-between py-3 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
           <div>
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{item.label}</p>
+            <Label htmlFor={`${idPrefix}-${item.key}`} className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{item.label}</Label>
             <p className="text-xs text-zinc-400 dark:text-zinc-500">{item.desc}</p>
           </div>
           <button
+            id={`${idPrefix}-${item.key}`}
+            role="switch"
+            aria-checked={settings[item.key]}
             onClick={() => toggle(item.key)}
             className={cn(
               'w-11 h-6 rounded-full transition-colors relative',
@@ -211,24 +227,26 @@ function CustomerStatusCard() {
   const [activeDays, setActiveDays] = useState(3);
   const [silentDays, setSilentDays] = useState(3);
   const [unansweredHours, setUnansweredHours] = useState(24);
+  const idPrefix = useId();
 
   const items = [
-    { label: '活躍門檻', desc: '最後互動在 X 天內視為「活躍」', value: activeDays, onChange: setActiveDays, unit: '天', min: 1, max: 30 },
-    { label: '沉默門檻', desc: '超過 X 天未互動視為「沉默」', value: silentDays, onChange: setSilentDays, unit: '天', min: 1, max: 30 },
-    { label: '未回定義', desc: '我方最後訊息後客戶 X 小時未回', value: unansweredHours, onChange: setUnansweredHours, unit: '小時', min: 1, max: 168 },
+    { key: 'active', label: '活躍門檻', desc: '最後互動在 X 天內視為「活躍」', value: activeDays, onChange: setActiveDays, unit: '天', min: 1, max: 30 },
+    { key: 'silent', label: '沉默門檻', desc: '超過 X 天未互動視為「沉默」', value: silentDays, onChange: setSilentDays, unit: '天', min: 1, max: 30 },
+    { key: 'unanswered', label: '未回定義', desc: '我方最後訊息後客戶 X 小時未回', value: unansweredHours, onChange: setUnansweredHours, unit: '小時', min: 1, max: 168 },
   ];
 
   return (
     <div className="space-y-1">
       <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-4">定義客戶活躍狀態的時間門檻。</p>
       {items.map((item) => (
-        <div key={item.label} className="flex items-center justify-between py-3 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+        <div key={item.key} className="flex items-center justify-between py-3 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
           <div>
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{item.label}</p>
+            <Label htmlFor={`${idPrefix}-${item.key}`} className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{item.label}</Label>
             <p className="text-xs text-zinc-400 dark:text-zinc-500">{item.desc}</p>
           </div>
           <div className="flex items-center gap-2">
             <input
+              id={`${idPrefix}-${item.key}`}
               type="number"
               min={item.min}
               max={item.max}
@@ -296,6 +314,7 @@ function UrgencyRulesCard() {
             <select
               value={rule.condition}
               onChange={(e) => updateRule(rule.id, 'condition', e.target.value)}
+              aria-label="條件類型"
               className="text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             >
               {conditions.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -305,17 +324,19 @@ function UrgencyRulesCard() {
               value={rule.keyword}
               onChange={(e) => updateRule(rule.id, 'keyword', e.target.value)}
               placeholder="關鍵字..."
+              aria-label="關鍵字"
               className="flex-1 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
-            <span className="text-xs text-zinc-400">→</span>
+            <span className="text-xs text-zinc-400" aria-hidden="true">&#x2192;</span>
             <select
               value={rule.urgency}
               onChange={(e) => updateRule(rule.id, 'urgency', e.target.value)}
+              aria-label="緊急度"
               className={cn('text-xs border-0 rounded-lg px-2 py-1.5 font-medium', urgencyColors[rule.urgency])}
             >
               {urgencies.map((u) => <option key={u} value={u}>{urgencyLabels[u]}</option>)}
             </select>
-            <button onClick={() => removeRule(rule.id)} className="p-1 text-zinc-400 hover:text-red-500 transition-colors">
+            <button onClick={() => removeRule(rule.id)} aria-label="刪除規則" className="p-1 text-zinc-400 hover:text-red-500 transition-colors">
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -329,30 +350,16 @@ function UrgencyRulesCard() {
 // ── Quick Replies Management ───────────────────────────
 
 function QuickRepliesManagementCard() {
-  const [replies, setReplies] = useState<QuickReply[]>([...mockQuickReplies]);
   const [apiReplies, setApiReplies] = useState<QuickReplyItem[]>([]);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [formCategory, setFormCategory] = useState('問候語');
+  const [formCategory, setFormCategory] = useState('');
   const [formTitle, setFormTitle] = useState('');
   const [formContent, setFormContent] = useState('');
-
-  // Try to load from API
-  useEffect(() => {
-    quickRepliesApi.getAll().then((res) => {
-      if (res.data && res.data.length > 0) {
-        setApiReplies(res.data);
-      }
-      if (res.categories && res.categories.length > 0) {
-        setApiCategories(res.categories);
-      }
-    }).catch((err) => {
-      console.error('Quick replies load failed:', err);
-    });
-  }, []);
-
-  const [apiCategories, setApiCategories] = useState<string[]>([]);
-  const categories = apiCategories.length > 0 ? apiCategories : ['問候語', '產品介紹', '報價相關', '售後回覆'];
 
   const categoryLabels: Record<string, string> = {
     basin: '一體盆', dm: 'DM資料', hot_bend: '熱彎', identity: '身分確認',
@@ -361,74 +368,148 @@ function QuickRepliesManagementCard() {
     store: '商城', follow_up: '回訪跟進',
   };
 
-  const handleAdd = () => {
-    if (!formTitle.trim() || !formContent.trim()) return;
-    setReplies((prev) => [...prev, { id: Date.now(), category: formCategory, title: formTitle.trim(), content: formContent.trim() }]);
-    setFormTitle(''); setFormContent(''); setShowAddForm(false);
+  const loadReplies = useCallback(async () => {
+    try {
+      setError(null);
+      const res = await quickRepliesApi.getAll();
+      setApiReplies(res.data || []);
+      if (res.categories && res.categories.length > 0) {
+        setCategories(res.categories);
+      }
+    } catch (err) {
+      console.error('Quick replies load failed:', err);
+      setError('無法載入語錄資料');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadReplies(); }, [loadReplies]);
+
+  const handleAdd = async () => {
+    if (!formTitle.trim() || !formContent.trim() || !formCategory.trim()) return;
+    setSaving(true);
+    try {
+      await quickRepliesApi.create({ category: formCategory.trim(), title: formTitle.trim(), content: formContent.trim() });
+      setFormTitle(''); setFormContent(''); setShowAddForm(false);
+      await loadReplies();
+    } catch (err) {
+      console.error('Create failed:', err);
+      setError('新增失敗');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDelete = (id: number) => setReplies((prev) => prev.filter((r) => r.id !== id));
-
-  const handleEdit = (reply: QuickReply) => {
-    setEditingId(reply.id); setFormCategory(reply.category); setFormTitle(reply.title); setFormContent(reply.content);
+  const handleDelete = async (id: string) => {
+    setSaving(true);
+    try {
+      await quickRepliesApi.delete(id);
+      await loadReplies();
+    } catch (err) {
+      console.error('Delete failed:', err);
+      setError('刪除失敗');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSaveEdit = () => {
+  const handleEdit = (reply: QuickReplyItem) => {
+    setEditingId(reply.id);
+    setFormCategory(reply.category);
+    setFormTitle(reply.title);
+    setFormContent(reply.content);
+    setShowAddForm(false);
+  };
+
+  const handleSaveEdit = async () => {
     if (!formTitle.trim() || !formContent.trim() || !editingId) return;
-    setReplies((prev) => prev.map((r) => r.id === editingId ? { ...r, category: formCategory, title: formTitle.trim(), content: formContent.trim() } : r));
-    setEditingId(null); setFormTitle(''); setFormContent('');
+    setSaving(true);
+    try {
+      await quickRepliesApi.update(editingId, { category: formCategory.trim(), title: formTitle.trim(), content: formContent.trim() });
+      setEditingId(null); setFormTitle(''); setFormContent('');
+      await loadReplies();
+    } catch (err) {
+      console.error('Update failed:', err);
+      setError('更新失敗');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleCancelEdit = () => { setEditingId(null); setFormTitle(''); setFormContent(''); setShowAddForm(false); };
+  const handleCancelEdit = () => { setEditingId(null); setShowAddForm(false); setFormTitle(''); setFormContent(''); };
 
-  // Show API replies if available, otherwise mock
-  const displayReplies = apiReplies.length > 0 ? apiReplies.map((r, i) => ({
-    id: i + 10000,
-    category: r.category,
-    title: r.title,
-    content: r.content,
-  })) : replies;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-5 h-5 animate-spin text-zinc-400" />
+        <span className="ml-2 text-sm text-zinc-400">載入中...</span>
+      </div>
+    );
+  }
+
+  if (error && apiReplies.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">{error}</p>
+        <button onClick={() => { setLoading(true); loadReplies(); }} className="mt-2 text-xs text-indigo-500 hover:text-indigo-600">重新載入</button>
+      </div>
+    );
+  }
+
+  const displayCategories = categories.length > 0 ? categories : ['general'];
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs text-zinc-400 dark:text-zinc-500">
           管理預存語錄，供收件匣快速回覆使用。
-          {apiReplies.length > 0 && <span className="text-emerald-500 ml-1">（已連接 API，{apiReplies.length} 條語錄）</span>}
+          <span className="text-emerald-500 ml-1">（{apiReplies.length} 條語錄）</span>
         </p>
         <button
-          onClick={() => { setShowAddForm(true); setEditingId(null); setFormTitle(''); setFormContent(''); }}
+          onClick={() => { setShowAddForm(true); setEditingId(null); setFormTitle(''); setFormContent(''); setFormCategory(displayCategories[0] || 'general'); }}
           className="flex items-center gap-1 text-xs font-medium text-indigo-500 hover:text-indigo-600 dark:text-indigo-400"
         >
           <Plus className="w-3.5 h-3.5" /> 新增語錄
         </button>
       </div>
 
+      {error && <p className="text-xs text-red-500">{error}</p>}
+
       {(showAddForm || editingId) && (
         <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-zinc-700 space-y-3">
           <div className="flex items-center gap-3">
-            <select value={formCategory} onChange={(e) => setFormCategory(e.target.value)}
-              className="text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <input type="text" value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="標題..."
-              className="flex-1 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            <div>
+              <Label htmlFor="qr-category" className="sr-only">分類</Label>
+              <select id="qr-category" value={formCategory} onChange={(e) => setFormCategory(e.target.value)}
+                className="text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                {displayCategories.map((c) => <option key={c} value={c}>{categoryLabels[c] || c}</option>)}
+              </select>
+            </div>
+            <div className="flex-1">
+              <Label htmlFor="qr-title" className="sr-only">標題</Label>
+              <input id="qr-title" type="text" value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="標題..."
+                className="w-full text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            </div>
           </div>
-          <textarea value={formContent} onChange={(e) => setFormContent(e.target.value)} placeholder="內容..." rows={2}
-            className="w-full text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" />
+          <div>
+            <Label htmlFor="qr-content" className="sr-only">內容</Label>
+            <textarea id="qr-content" value={formContent} onChange={(e) => setFormContent(e.target.value)} placeholder="內容..." rows={2}
+              className="w-full text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" />
+          </div>
           <div className="flex items-center gap-2 justify-end">
             <button onClick={handleCancelEdit} className="text-xs font-medium text-zinc-500 px-3 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-700">取消</button>
-            <button onClick={editingId ? handleSaveEdit : handleAdd} disabled={!formTitle.trim() || !formContent.trim()}
+            <button onClick={editingId ? handleSaveEdit : handleAdd} disabled={!formTitle.trim() || !formContent.trim() || saving}
               className="flex items-center gap-1 text-xs font-medium bg-indigo-500 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors">
-              <Save className="w-3 h-3" /> {editingId ? '儲存' : '新增'}
+              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} {editingId ? '儲存' : '新增'}
             </button>
           </div>
         </div>
       )}
 
       <div className="space-y-2">
-        {categories.map((cat) => {
-          const items = displayReplies.filter((r) => r.category === cat);
+        {displayCategories.map((cat) => {
+          const items = apiReplies.filter((r) => r.category === cat);
           if (items.length === 0) return null;
           return (
             <div key={cat}>
@@ -440,8 +521,8 @@ function QuickRepliesManagementCard() {
                     <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">{item.content}</p>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                    <button onClick={() => handleEdit(item as QuickReply)} className="p-1 text-zinc-400 hover:text-indigo-500"><Pencil className="w-3 h-3" /></button>
-                    <button onClick={() => handleDelete(item.id)} className="p-1 text-zinc-400 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                    <button onClick={() => handleEdit(item)} className="p-1 text-zinc-400 hover:text-indigo-500"><Pencil className="w-3 h-3" /></button>
+                    <button onClick={() => handleDelete(item.id)} disabled={saving} className="p-1 text-zinc-400 hover:text-red-500 disabled:opacity-50"><Trash2 className="w-3 h-3" /></button>
                   </div>
                 </div>
               ))}
@@ -626,23 +707,21 @@ function LlmCostCard() {
   );
 }
 
+// ── Tab content mapping ──────────────────────────────────
+
+const tabContentMap: Record<TabId, React.ComponentType> = {
+  integration: IntegrationCard,
+  ai: AIModelCard,
+  'quick-replies': QuickRepliesManagementCard,
+  notifications: NotificationsCard,
+  status: CustomerStatusCard,
+  urgency: UrgencyRulesCard,
+  'llm-cost': LlmCostCard,
+};
+
 // ── Main Settings Page ─────────────────────────────────
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('integration');
-
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'integration': return <IntegrationCard />;
-      case 'ai': return <AIModelCard />;
-      case 'quick-replies': return <QuickRepliesManagementCard />;
-      case 'notifications': return <NotificationsCard />;
-      case 'status': return <CustomerStatusCard />;
-      case 'urgency': return <UrgencyRulesCard />;
-      case 'llm-cost': return <LlmCostCard />;
-    }
-  };
-
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-4xl mx-auto">
@@ -658,39 +737,41 @@ export default function SettingsPage() {
         </div>
 
         {/* Tabs + Content */}
-        <div className="flex gap-6">
+        <Tabs defaultValue="integration" orientation="vertical" className="flex flex-row gap-6">
           {/* Tab Navigation */}
-          <div className="w-48 flex-shrink-0">
-            <nav className="space-y-0.5">
-              {tabs.map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={cn(
-                      'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left',
-                      isActive
-                        ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400'
-                        : 'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800'
-                    )}
-                  >
-                    <tab.icon className="w-4 h-4" />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
+          <TabsList variant="line" className="w-48 flex-shrink-0 flex-col items-stretch h-auto bg-transparent p-0">
+            {tabs.map((tab) => (
+              <TabsTrigger
+                key={tab.id}
+                value={tab.id}
+                className={cn(
+                  'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors justify-start',
+                  'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800',
+                  'data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-600 dark:data-[state=active]:bg-indigo-500/10 dark:data-[state=active]:text-indigo-400',
+                  'after:hidden'
+                )}
+              >
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
           {/* Tab Content */}
-          <div className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
-              {tabs.find((t) => t.id === activeTab)?.label}
-            </h2>
-            {renderTabContent()}
-          </div>
-        </div>
+          {tabs.map((tab) => {
+            const Content = tabContentMap[tab.id];
+            return (
+              <TabsContent key={tab.id} value={tab.id} className="flex-1 mt-0">
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                  <h2 className="text-sm font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
+                    {tab.label}
+                  </h2>
+                  <Content />
+                </div>
+              </TabsContent>
+            );
+          })}
+        </Tabs>
       </div>
     </div>
   );

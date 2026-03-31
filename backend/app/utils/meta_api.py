@@ -126,7 +126,7 @@ class MetaGraphAPI:
                         'type': 'image',
                         'payload': {
                             'url': image_url,
-                            'is_reusable': True
+                            'is_reusable': False
                         }
                     }
                 }

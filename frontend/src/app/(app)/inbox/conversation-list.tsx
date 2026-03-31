@@ -3,50 +3,17 @@
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Avatar } from '@/components/avatar';
 import { ChannelIcon } from '@/components/channel-icon';
+import { UrgencyBadgeCompact as UrgencyBadge } from '@/components/badges';
 import { StatusBadge } from '@/components/status-badge';
 import { LoadingSpinner, EmptyState } from '@/components/loading';
+import { formatTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { Conversation } from '@/lib/api';
 import { Inbox } from 'lucide-react';
 
-function formatTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) {
-    return d.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
-  } else if (diffDays === 1) {
-    return '昨天';
-  } else if (diffDays < 7) {
-    return `${diffDays} 天前`;
-  }
-  return d.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' });
-}
-
 function truncate(str: string | null | undefined, len: number): string {
   if (!str) return '';
   return str.length > len ? str.slice(0, len) + '…' : str;
-}
-
-function UrgencyBadge({ urgency }: { urgency?: string }) {
-  if (!urgency || urgency === 'low') return null;
-  if (urgency === 'high') {
-    return (
-      <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white dark:bg-red-600">
-        急
-      </span>
-    );
-  }
-  if (urgency === 'medium') {
-    return (
-      <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-orange-500 text-white dark:bg-orange-600">
-        中
-      </span>
-    );
-  }
-  return null;
 }
 
 interface ConversationListProps {
@@ -94,6 +61,7 @@ export function ConversationList({
           <input
             type="text"
             placeholder="搜尋對話..."
+            aria-label="搜尋對話"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition-colors"
@@ -105,6 +73,7 @@ export function ConversationList({
           <select
             value={status}
             onChange={(e) => onStatusChange(e.target.value)}
+            aria-label="篩選狀態"
             className="flex-1 px-2 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
           >
             <option value="">全部狀態</option>
@@ -116,6 +85,7 @@ export function ConversationList({
           <select
             value={channel}
             onChange={(e) => onChannelChange(e.target.value)}
+            aria-label="篩選渠道"
             className="flex-1 px-2 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
           >
             <option value="">全部渠道</option>
@@ -182,7 +152,7 @@ export function ConversationList({
             <button
               onClick={() => onPageChange(page - 1)}
               disabled={page <= 1}
-              className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-2 md:p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center"
             >
               <ChevronLeft className="w-4 h-4 text-zinc-400" />
             </button>
@@ -192,7 +162,7 @@ export function ConversationList({
             <button
               onClick={() => onPageChange(page + 1)}
               disabled={page >= pagination.pages}
-              className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-2 md:p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center"
             >
               <ChevronRight className="w-4 h-4 text-zinc-400" />
             </button>

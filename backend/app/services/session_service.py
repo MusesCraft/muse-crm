@@ -17,6 +17,20 @@ from ..realtime.emitter import emit_scoped
 logger = logging.getLogger(__name__)
 
 
+def _get_min_messages_for_analysis() -> int:
+    """取得觸發 LLM 分析的最低訊息數門檻（CRM-017）"""
+    from flask import current_app
+    from ..models.system_setting import SystemSetting
+    val = (
+        current_app.config.get('MIN_MESSAGES_FOR_ANALYSIS')
+        or SystemSetting.get_int('min_messages_for_analysis', default=3)
+    )
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return 3
+
+
 class SessionService:
     """對話 Session 服務類別"""
     
@@ -146,10 +160,19 @@ class SessionService:
             except Exception as ws_err:
                 logger.warning(f"[close_conversation] WebSocket 推送失敗: {ws_err}")
 
-            # 觸發 LLM 分析（如果尚未分析）— 直接 dispatch，不繞 queue
+            # 觸發 LLM 分析（如果尚未分析且訊息量足夠）
+            # CRM-017: 短對話跳過分析，避免浪費 LLM token
+            min_messages = _get_min_messages_for_analysis()
+            msg_count = conversation.message_count or 0
             if reason in ('manual', 'timeout') and not conversation.analyses:
-                from ..tasks.analysis_tasks import analyze_conversation
-                analyze_conversation.delay(str(conversation_id), 'auto')
+                if msg_count >= min_messages:
+                    from ..tasks.analysis_tasks import analyze_conversation
+                    analyze_conversation.delay(str(conversation_id), 'auto')
+                else:
+                    logger.info(
+                        f"跳過分析：conversation={conversation_id} "
+                        f"訊息數 {msg_count} < 門檻 {min_messages}"
+                    )
             
             return True
             
@@ -184,8 +207,10 @@ class SessionService:
                     conv.close_conversation()
                     closed_count += 1
                     
-                    # 觸發 LLM 分析 — 直接 dispatch，不繞 queue
-                    if not conv.analyses:
+                    # 觸發 LLM 分析（短對話跳過，CRM-017）
+                    _min_msgs = _get_min_messages_for_analysis()
+                    conv_msg_count = conv.message_count or 0
+                    if not conv.analyses and conv_msg_count >= _min_msgs:
                         from ..tasks.analysis_tasks import analyze_conversation
                         analyze_conversation.delay(str(conv.id), 'auto')
                         

@@ -18,6 +18,27 @@ from ..utils.auth import generate_token, generate_refresh_token, decode_jwt_toke
 logger = logging.getLogger(__name__)
 
 
+def _validate_password_strength(password: str) -> str | None:
+    """
+    驗證密碼強度。回傳錯誤訊息或 None。
+
+    規則：
+    - 至少 8 個字元
+    - 至少包含一個大寫字母
+    - 至少包含一個小寫字母
+    - 至少包含一個數字
+    """
+    if len(password) < 8:
+        return '密碼至少 8 個字元'
+    if not any(c.isupper() for c in password):
+        return '密碼須包含至少一個大寫字母'
+    if not any(c.islower() for c in password):
+        return '密碼須包含至少一個小寫字母'
+    if not any(c.isdigit() for c in password):
+        return '密碼須包含至少一個數字'
+    return None
+
+
 @api_bp.route('/auth/login', methods=['POST'])
 @limiter.limit("5/minute")
 def auth_login():
@@ -94,8 +115,10 @@ def auth_register():
     if not name or not email or not password:
         return jsonify({'error': 'name、email、password 為必填'}), 400
 
-    if len(password) < 6:
-        return jsonify({'error': '密碼至少 6 個字元'}), 400
+    # 密碼強度驗證
+    pwd_errors = _validate_password_strength(password)
+    if pwd_errors:
+        return jsonify({'error': pwd_errors}), 400
 
     if role not in ('admin', 'manager', 'user'):
         return jsonify({'error': '無效的角色'}), 400
@@ -192,8 +215,9 @@ def auth_change_password():
     if not old_password or not new_password:
         return jsonify({'error': 'old_password 和 new_password 為必填'}), 400
     
-    if len(new_password) < 6:
-        return jsonify({'error': '新密碼至少 6 個字元'}), 400
+    pwd_errors = _validate_password_strength(new_password)
+    if pwd_errors:
+        return jsonify({'error': pwd_errors}), 400
     
     user = g.current_user
     

@@ -543,12 +543,17 @@ export interface QuickReplyItem {
   title: string;
   category: string;
   priority: string;
-  trigger: string;
   trigger_keywords: string[];
-  user_identity: string | null;
-  channel: string;
   content: string;
-  attachments: { type: string; label: string; value: string }[];
+  is_system?: boolean;
+  created_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  // Legacy fields from JSON (optional)
+  trigger?: string;
+  user_identity?: string | null;
+  channel?: string;
+  attachments?: { type: string; label: string; value: string }[];
 }
 
 export const quickRepliesApi = {
@@ -572,6 +577,26 @@ export const quickRepliesApi = {
   async getById(id: string) {
     return await request<QuickReplyItem>(`/quick-replies/${id}`);
   },
+
+  async create(data: { category: string; title: string; content: string; trigger_keywords?: string[]; priority?: string }) {
+    return await request<QuickReplyItem>('/quick-replies', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async update(id: string, data: Partial<{ category: string; title: string; content: string; trigger_keywords: string[]; priority: string }>) {
+    return await request<QuickReplyItem>(`/quick-replies/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async delete(id: string) {
+    return await request<{ message: string }>(`/quick-replies/${id}`, {
+      method: 'DELETE',
+    });
+  },
 };
 
 // ── Inbox Send API ─────────────────────────────────────
@@ -581,6 +606,7 @@ export interface SendMessageResponse {
   sent_via_api: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: any;
+  api_error?: string;
 }
 
 export const inboxSendApi = {

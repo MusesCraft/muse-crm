@@ -106,3 +106,7 @@ class ChannelAdapter(ABC):
             是否發送成功
         """
         ...
+
+    def send_image(self, recipient_id: str, image_url: str, preview_url: str = None) -> bool:
+        """發送圖片訊息（子類別可選擇性實作）"""
+        return False

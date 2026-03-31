@@ -244,20 +244,33 @@ def send_message(conversation_id):
     contact = conversation.contact
     psid = _get_contact_external_id(contact, channel=conversation.channel)
 
-    # 嘗試透過 Meta API 發送
-    from ..utils.meta_api import meta_api
+    # 依渠道選擇發送方式
     sent_via_api = False
+    api_error = None
+    channel = conversation.channel
+
     try:
-        if psid:
+        if psid and channel in ('messenger', 'instagram'):
+            from ..utils.meta_api import meta_api
             if message_type == 'text':
                 sent_via_api = meta_api.send_message(psid, content)
             elif message_type == 'image':
                 sent_via_api = meta_api.send_image(psid, media_url)
-                # 如果有 caption，額外發一則文字
                 if content and sent_via_api:
                     meta_api.send_message(psid, content)
+        elif psid and channel == 'line':
+            from ..channels.registry import channel_registry
+            line_adapter = channel_registry.get_adapter('line')
+            if line_adapter:
+                if message_type == 'text':
+                    sent_via_api = line_adapter.send_message(psid, content)
+                elif message_type == 'image':
+                    sent_via_api = line_adapter.send_image(psid, media_url)
+                    if content and sent_via_api:
+                        line_adapter.send_message(psid, content)
     except Exception as e:
-        logger.warning(f"Meta API 發送失敗: {e}")
+        logger.warning(f"[{channel}] API 發送失敗: {e}")
+        api_error = str(e)
 
     # 不管 API 是否成功，都建立 Message 記錄
     now = datetime.now(timezone.utc)
@@ -278,11 +291,16 @@ def send_message(conversation_id):
 
     db.session.commit()
 
-    return jsonify({
+    response = {
         'message': '訊息已發送' if sent_via_api else '訊息已記錄（Meta API 未連接）',
         'sent_via_api': sent_via_api,
         'data': msg.to_dict(),
-    })
+    }
+    if api_error:
+        response['api_error'] = api_error
+        response['message'] = f'訊息已記錄，但發送至平台失敗：{api_error}'
+
+    return jsonify(response)
 
 
 @api_bp.route('/inbox/conversations/<conversation_id>/send-image', methods=['POST'])

@@ -16,6 +16,7 @@ export default function InboxPage() {
   const [status, setStatus] = useState<string>('');
   const [channel, setChannel] = useState<string>('');
   const [search, setSearch] = useState<string>('');
+  const [mobileView, setMobileView] = useState<'list' | 'detail'>('list');
 
   const { data, loading, error, refetch } = useAsync<PaginatedResponse<Conversation>>(
     () =>
@@ -66,6 +67,7 @@ export default function InboxPage() {
 
   const handleSelect = useCallback((id: string | number) => {
     setSelectedId(id);
+    setMobileView('detail');
   }, []);
 
   const handleConversationClosed = useCallback(() => {
@@ -80,7 +82,8 @@ export default function InboxPage() {
   return (
     <div className="flex h-screen">
       {/* Left panel: Conversation list */}
-      <div className="w-80 border-r border-zinc-200 dark:border-zinc-800 flex flex-col bg-zinc-50/50 dark:bg-zinc-950/50 flex-shrink-0">
+      {/* Mobile: 只在 mobileView === 'list' 時顯示；md+ 永遠顯示 */}
+      <div className={`w-full md:w-80 border-r border-zinc-200 dark:border-zinc-800 flex flex-col bg-zinc-50/50 dark:bg-zinc-950/50 md:flex-shrink-0 ${mobileView === 'list' ? 'flex' : 'hidden md:flex'}`}>
         <ConversationList
           conversations={data?.data || []}
           pagination={data?.pagination}
@@ -100,11 +103,13 @@ export default function InboxPage() {
       </div>
 
       {/* Center panel: Conversation detail */}
-      <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 min-w-0">
+      {/* Mobile: 只在 mobileView === 'detail' 時顯示；md+ 永遠顯示 */}
+      <div className={`flex-1 flex flex-col bg-white dark:bg-zinc-900 min-w-0 ${mobileView === 'detail' ? 'flex' : 'hidden md:flex'}`}>
         {selectedId ? (
           <ConversationDetail
             conversationId={selectedId}
             onClose={handleConversationClosed}
+            onBack={() => setMobileView('list')}
           />
         ) : (
           <EmptyState
@@ -116,13 +121,16 @@ export default function InboxPage() {
       </div>
 
       {/* Right panel: Customer sidebar */}
+      {/* lg+ 才顯示 */}
       {selectedConv && selectedConv.contact_id && (
-        <CustomerSidebar
-          contactId={selectedConv.contact_id}
-          channel={selectedConv.channel}
-          conversationId={selectedId!}
-          onSelectConversation={handleSelect}
-        />
+        <div className="hidden lg:block">
+          <CustomerSidebar
+            contactId={selectedConv.contact_id}
+            channel={selectedConv.channel}
+            conversationId={selectedId!}
+            onSelectConversation={handleSelect}
+          />
+        </div>
       )}
     </div>
   );

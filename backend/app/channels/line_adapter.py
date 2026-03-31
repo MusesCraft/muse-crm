@@ -142,6 +142,40 @@ class LineAdapter(ChannelAdapter):
             logger.error(f"LINE Push 訊息發送失敗 {user_id}: {e}")
             return False
 
+    def send_image(self, recipient_id: str, image_url: str, preview_url: str = None) -> bool:
+        """透過 LINE Push API 發送圖片訊息"""
+        access_token = current_app.config.get('LINE_CHANNEL_ACCESS_TOKEN')
+        if not access_token:
+            logger.warning("LINE_CHANNEL_ACCESS_TOKEN 未配置，無法發送圖片")
+            return False
+
+        try:
+            url = f"{self.LINE_API_BASE}/message/push"
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json',
+            }
+            payload = {
+                'to': recipient_id,
+                'messages': [{
+                    'type': 'image',
+                    'originalContentUrl': image_url,
+                    'previewImageUrl': preview_url or image_url,
+                }],
+            }
+
+            response = requests.post(
+                url, headers=headers, json=payload, timeout=self.TIMEOUT
+            )
+            response.raise_for_status()
+
+            logger.info(f"LINE 圖片發送成功：{recipient_id}")
+            return True
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"LINE 圖片發送失敗 {recipient_id}: {e}")
+            return False
+
     def send_reply(self, reply_token: str, message: str) -> bool:
         """透過 LINE Reply API 回覆訊息（免費，但 token 30 秒內過期）"""
         access_token = current_app.config.get('LINE_CHANNEL_ACCESS_TOKEN')

@@ -60,7 +60,7 @@ def create_app(config_name: str = 'development') -> Flask:
     cors_origins = app.config.get('CORS_ORIGINS', '*')
     if isinstance(cors_origins, str) and ',' in cors_origins:
         cors_origins = [o.strip() for o in cors_origins.split(',')]
-    CORS(app, resources={r"/api/*": {"origins": cors_origins}})
+    CORS(app, resources={r"/api/*": {"origins": cors_origins}, r"/uploads/*": {"origins": cors_origins}})
     limiter.init_app(app)
 
     # 配置 Celery

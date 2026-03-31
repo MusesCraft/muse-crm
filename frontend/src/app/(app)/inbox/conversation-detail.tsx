@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { inboxApi, inboxSendApi, uploadApi, quickRepliesApi, ocrApi, type Conversation, type Message, type Analysis, type QuickReplyItem, type OcrResult } from '@/lib/api';
 import { mockQuickReplies, getConversationAnalysis } from '@/lib/mock-data';
 import { useAsync } from '@/lib/hooks';
@@ -26,21 +26,16 @@ import {
   Zap,
   X,
   Lightbulb,
+  ArrowLeft,
 } from 'lucide-react';
+import { formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 interface ConversationDetailProps {
   conversationId: string | number;
   onClose: () => void;
-}
-
-function formatDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString('zh-TW', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  /** 手機版返回列表 */
+  onBack?: () => void;
 }
 
 function MessageBubble({ message, onOcr }: { message: Message; onOcr?: (mediaUrl: string) => void }) {
@@ -88,7 +83,7 @@ function MessageBubble({ message, onOcr }: { message: Message; onOcr?: (mediaUrl
                 {onOcr && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onOcr(message.media_url!); }}
-                    className="mt-1 text-[11px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                    className="mt-1 text-[11px] px-3 py-2 md:px-2 md:py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors min-h-[44px] md:min-h-0"
                   >
                     📇 辨識名片
                   </button>
@@ -252,12 +247,12 @@ function QuickRepliesPanel({ onSelect, onClose }: { onSelect: (text: string) => 
     : filteredMock;
 
   return (
-    <div className="absolute bottom-full left-0 mb-2 w-80 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg z-50 max-h-80 flex flex-col">
+    <div className="absolute bottom-full left-0 mb-2 w-[calc(100vw-2rem)] md:w-80 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg z-50 max-h-80 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-3 pt-3 pb-2">
         <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">⚡ 預存語錄</span>
-        <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
-          <X className="w-3.5 h-3.5" />
+        <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-2 -m-1 md:p-0 md:m-0 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center">
+          <X className="w-4 h-4 md:w-3.5 md:h-3.5" />
         </button>
       </div>
       {/* Search */}
@@ -287,7 +282,7 @@ function QuickRepliesPanel({ onSelect, onClose }: { onSelect: (text: string) => 
                     onSelect(item.content);
                     onClose();
                   }}
-                  className="w-full text-left px-2 py-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-700/60 transition-colors"
+                  className="w-full text-left px-2 py-2.5 md:py-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-700/60 transition-colors min-h-[44px] md:min-h-0"
                 >
                   <p className="text-xs font-medium text-zinc-700 dark:text-zinc-200">{item.title}</p>
                   <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">{item.content}</p>
@@ -341,13 +336,13 @@ function AiSuggestionCard({
       <div className="flex items-center gap-2">
         <button
           onClick={() => onUse(suggestedReply)}
-          className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-purple-500 text-white hover:bg-purple-600 transition-colors"
+          className="text-[11px] font-medium px-3 py-2 md:px-2.5 md:py-1 rounded-md bg-purple-500 text-white hover:bg-purple-600 transition-colors min-h-[44px] md:min-h-0"
         >
           使用此回覆
         </button>
         <button
           onClick={() => setDismissed(true)}
-          className="text-[11px] font-medium px-2.5 py-1 rounded-md text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          className="text-[11px] font-medium px-3 py-2 md:px-2.5 md:py-1 rounded-md text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors min-h-[44px] md:min-h-0"
         >
           忽略
         </button>
@@ -358,7 +353,7 @@ function AiSuggestionCard({
 
 // ── Main Component ─────────────────────────────────────
 
-export function ConversationDetail({ conversationId, onClose }: ConversationDetailProps) {
+export function ConversationDetail({ conversationId, onClose, onBack }: ConversationDetailProps) {
   const [closing, setClosing] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [sending, setSending] = useState(false);
@@ -397,7 +392,11 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
   useEffect(() => {
     msgCountRef.current = conv?.messages?.length || 0;
-  }, [conv?.messages?.length]);
+    // Server 資料更新後，清除已被 server 包含的 local 樂觀訊息
+    if (localMessages.length > 0 && conv?.messages?.length) {
+      setLocalMessages([]);
+    }
+  }, [conv?.messages?.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const id = setInterval(async () => {
@@ -433,10 +432,15 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     }
   }, [conv?.messages, localMessages]);
 
-  const allMessages = [
-    ...(conv?.messages || []),
-    ...localMessages,
-  ];
+  // 去重：polling refetch 後 conv.messages 會包含已發送的訊息，
+  // 需排除 localMessages 中已出現在 server 資料的項目
+  const allMessages = useMemo(() => {
+    const serverMessages = conv?.messages || [];
+    if (localMessages.length === 0) return serverMessages;
+    const serverIds = new Set(serverMessages.map(m => String(m.id)));
+    const uniqueLocal = localMessages.filter(m => !serverIds.has(String(m.id)));
+    return [...serverMessages, ...uniqueLocal];
+  }, [conv?.messages, localMessages]);
 
   // ── Send Message ──
 
@@ -467,6 +471,12 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
         try {
           const uploaded = await uploadApi.uploadImage(imagePreview.file);
           mediaUrl = uploaded.url;
+          if (!mediaUrl) {
+            setSendError('圖片上傳成功但未取得 URL');
+            sendingRef.current = false;
+            setSending(false);
+            return;
+          }
         } catch {
           setSendError('圖片上傳失敗，請重試');
           setSending(false);
@@ -500,6 +510,11 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           platform_message_id: null,
         };
         setLocalMessages((prev) => [...prev, newMsg]);
+      }
+
+      // 檢查平台 API 是否送達失敗
+      if (result.api_error) {
+        setSendError(`訊息已記錄但未送達客戶：${result.api_error}`);
       }
 
       setInputText('');
@@ -636,15 +651,25 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   return (
     <>
       {/* Header */}
-      <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 px-6 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 px-3 md:px-6 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0">
+          {/* 手機版返回按鈕 */}
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="md:hidden p-2 -ml-1 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center flex-shrink-0"
+              title="返回列表"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          )}
           <Avatar
             name={conv.contact?.name || '未知'}
             url={conv.contact?.avatar_url}
             size="sm"
           />
-          <div>
-            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white truncate">
               {conv.contact?.name || '未知客戶'}
             </h2>
             <div className="flex items-center gap-2">
@@ -654,8 +679,8 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-4 text-xs text-zinc-400 dark:text-zinc-500">
+        <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
+          <div className="hidden md:flex items-center gap-4 text-xs text-zinc-400 dark:text-zinc-500">
             <span className="flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {formatDateTime(conv.started_at)}
@@ -671,14 +696,14 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             size="sm"
             onClick={handleAnalyze}
             disabled={analyzing}
-            className="text-zinc-500 hover:text-purple-500 dark:text-zinc-400 dark:hover:text-purple-400"
+            className="text-zinc-500 hover:text-purple-500 dark:text-zinc-400 dark:hover:text-purple-400 min-h-[44px] md:min-h-0"
           >
             {analyzing ? (
-              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 md:mr-1 animate-spin" />
             ) : (
-              <Search className="w-3.5 h-3.5 mr-1" />
+              <Search className="w-3.5 h-3.5 md:mr-1" />
             )}
-            {analyzing ? '分析中...' : '🔍 深度分析'}
+            <span className="hidden md:inline">{analyzing ? '分析中...' : '深度分析'}</span>
           </Button>
 
           {conv.status === 'active' && (
@@ -687,10 +712,10 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               size="sm"
               onClick={handleClose}
               disabled={closing}
-              className="text-zinc-500 hover:text-red-500 dark:text-zinc-400 dark:hover:text-red-400"
+              className="text-zinc-500 hover:text-red-500 dark:text-zinc-400 dark:hover:text-red-400 min-h-[44px] md:min-h-0"
             >
-              <XCircle className="w-3.5 h-3.5 mr-1" />
-              {closing ? '關閉中...' : '關閉對話'}
+              <XCircle className="w-3.5 h-3.5 md:mr-1" />
+              <span className="hidden md:inline">{closing ? '關閉中...' : '關閉對話'}</span>
             </Button>
           )}
         </div>
@@ -741,7 +766,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               />
               <button
                 onClick={removeImagePreview}
-                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                className="absolute -top-2.5 -right-2.5 w-7 h-7 md:w-5 md:h-5 md:-top-1.5 md:-right-1.5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
               >
                 <X className="w-3 h-3" />
               </button>

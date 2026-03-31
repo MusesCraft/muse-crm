@@ -16,6 +16,7 @@ from .system_setting import SystemSetting
 from .llm_fallback_event import LlmFallbackEvent
 from .notification_preference import NotificationPreference
 from .quick_reply import QuickReply
+from .broadcast import Broadcast
 
 # 匯出所有模型供其他模組使用
 __all__ = [
@@ -35,4 +36,5 @@ __all__ = [
     'LlmFallbackEvent',
     'NotificationPreference',
     'QuickReply',
+    'Broadcast',
 ]

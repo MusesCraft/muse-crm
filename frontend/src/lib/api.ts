@@ -796,3 +796,65 @@ export const llmApi = {
     };
   },
 };
+
+// ── Broadcast API ──────────────────────────────────────
+
+export interface Broadcast {
+  id: string;
+  title: string;
+  content: string;
+  image_url: string | null;
+  include_tags: string[];
+  exclude_tags: string[];
+  target_channels: string[];
+  status: 'draft' | 'scheduled' | 'sending' | 'completed' | 'failed';
+  scheduled_at: string | null;
+  sent_at: string | null;
+  total_recipients: number;
+  sent_count: number;
+  failed_count: number;
+  created_by: string | null;
+  created_at: string;
+}
+
+export const broadcastApi = {
+  async list(page = 1, perPage = 20) {
+    return await request<PaginatedResponse<Broadcast>>(`/broadcasts?page=${page}&per_page=${perPage}`);
+  },
+
+  async create(data: {
+    title: string;
+    content: string;
+    image_url?: string;
+    include_tags: string[];
+    exclude_tags?: string[];
+    target_channels?: string[];
+  }) {
+    return await request<{ message: string; broadcast: Broadcast }>('/broadcasts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async get(id: string) {
+    return await request<Broadcast>(`/broadcasts/${id}`);
+  },
+
+  async preview(id: string) {
+    return await request<{ broadcast_id: string; recipient_count: number }>(`/broadcasts/${id}/preview`, {
+      method: 'POST',
+    });
+  },
+
+  async send(id: string) {
+    return await request<{ message: string; broadcast: Broadcast }>(`/broadcasts/${id}/send`, {
+      method: 'POST',
+    });
+  },
+
+  async remove(id: string) {
+    return await request<{ message: string }>(`/broadcasts/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};

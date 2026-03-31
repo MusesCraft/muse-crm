@@ -33,6 +33,9 @@ class Broadcast(db.Model):
     include_tags: Mapped[List[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
     exclude_tags: Mapped[Optional[List[str]]] = mapped_column(ARRAY(Text), default=list)
 
+    # 活躍天數篩選（只發送 N 天內有互動的客戶，0 或 null 表示不限）
+    active_within_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
     # 目標渠道
     target_channels: Mapped[List[str]] = mapped_column(
         ARRAY(Text), nullable=False, default=lambda: ['messenger', 'instagram', 'line']
@@ -83,6 +86,7 @@ class Broadcast(db.Model):
             'image_url': self.image_url,
             'include_tags': self.include_tags or [],
             'exclude_tags': self.exclude_tags or [],
+            'active_within_days': self.active_within_days,
             'target_channels': self.target_channels or [],
             'status': self.status,
             'scheduled_at': self.scheduled_at.isoformat() if self.scheduled_at else None,

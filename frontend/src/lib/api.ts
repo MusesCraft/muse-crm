@@ -806,6 +806,7 @@ export interface Broadcast {
   image_url: string | null;
   include_tags: string[];
   exclude_tags: string[];
+  active_within_days: number | null;
   target_channels: string[];
   status: 'draft' | 'scheduled' | 'sending' | 'completed' | 'failed';
   scheduled_at: string | null;
@@ -828,6 +829,7 @@ export const broadcastApi = {
     image_url?: string;
     include_tags: string[];
     exclude_tags?: string[];
+    active_within_days?: number;
     target_channels?: string[];
     scheduled_at?: string;
   }) {

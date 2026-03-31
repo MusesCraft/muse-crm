@@ -31,6 +31,7 @@ export default function BroadcastPage() {
   const [includeTags, setIncludeTags] = useState<string[]>([]);
   const [excludeTags, setExcludeTags] = useState<string[]>([]);
   const [targetChannels, setTargetChannels] = useState<string[]>(['messenger', 'instagram', 'line']);
+  const [activeWithinDays, setActiveWithinDays] = useState<string>('');
   const [scheduledAt, setScheduledAt] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -79,6 +80,7 @@ export default function BroadcastPage() {
         include_tags: includeTags,
         exclude_tags: excludeTags.length > 0 ? excludeTags : undefined,
         target_channels: targetChannels,
+        active_within_days: activeWithinDays ? parseInt(activeWithinDays) : undefined,
         scheduled_at: scheduledAt || undefined,
       });
       setShowCreate(false);
@@ -128,7 +130,7 @@ export default function BroadcastPage() {
     setTitle(''); setContent(''); setImageFile(null); setImagePreview(null);
     setIncludeTags([]); setExcludeTags([]);
     setTargetChannels(['messenger', 'instagram', 'line']);
-    setScheduledAt('');
+    setActiveWithinDays(''); setScheduledAt('');
   };
 
   if (loading) return <div className="p-8 text-zinc-400">載入中...</div>;
@@ -169,6 +171,7 @@ export default function BroadcastPage() {
                     <span>📌 標籤：{b.include_tags.join(', ')}</span>
                     {b.exclude_tags?.length > 0 && <span>🚫 排除：{b.exclude_tags.join(', ')}</span>}
                     <span>📡 渠道：{b.target_channels.join(', ')}</span>
+                    {b.active_within_days && <span>📅 {b.active_within_days}天內互動</span>}
                     {b.scheduled_at && <span>⏰ 排程：{new Date(b.scheduled_at).toLocaleString('zh-TW')}</span>}
                   </div>
                   {b.status === 'completed' && (
@@ -303,6 +306,24 @@ export default function BroadcastPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* 活躍度篩選 */}
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">互動時間篩選（選填）</label>
+                <select value={activeWithinDays} onChange={e => setActiveWithinDays(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-sm text-zinc-100 focus:border-brand-gold focus:outline-none">
+                  <option value="">不限（所有客戶）</option>
+                  <option value="7">7 天內有互動</option>
+                  <option value="30">30 天內有互動</option>
+                  <option value="60">60 天內有互動</option>
+                  <option value="90">90 天內有互動</option>
+                  <option value="180">180 天內有互動</option>
+                  <option value="365">1 年內有互動</option>
+                </select>
+                {activeWithinDays && (
+                  <p className="text-xs text-blue-400 mt-1">📅 只發送 {activeWithinDays} 天內有互動的客戶</p>
+                )}
               </div>
 
               {/* 排程時間 */}

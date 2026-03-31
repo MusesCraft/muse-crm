@@ -23,6 +23,7 @@ def upgrade():
         sa.Column('image_url', sa.Text, nullable=True),
         sa.Column('include_tags', postgresql.ARRAY(sa.Text), nullable=False, server_default='{}'),
         sa.Column('exclude_tags', postgresql.ARRAY(sa.Text), nullable=True, server_default='{}'),
+        sa.Column('active_within_days', sa.Integer, nullable=True),
         sa.Column('target_channels', postgresql.ARRAY(sa.Text), nullable=False, server_default='{messenger,instagram,line}'),
         sa.Column('status', sa.String(20), nullable=False, server_default='draft'),
         sa.Column('scheduled_at', sa.DateTime(timezone=True), nullable=True),

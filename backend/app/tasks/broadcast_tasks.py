@@ -71,6 +71,11 @@ def execute_broadcast(self, broadcast_id: str):
         # 查詢符合條件的客戶
         query = Contact.query.filter(Contact.is_merged == False)
 
+        # 活躍度篩選
+        if broadcast.active_within_days and broadcast.active_within_days > 0:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=broadcast.active_within_days)
+            query = query.filter(Contact.last_active_at >= cutoff)
+
         if broadcast.include_tags:
             include_ids = (
                 db.session.query(ContactTag.contact_id)

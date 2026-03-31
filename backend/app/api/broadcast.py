@@ -20,16 +20,23 @@ from ..utils.permissions import require_role
 logger = logging.getLogger(__name__)
 
 
-def _get_broadcast_recipients(include_tags, exclude_tags, target_channels):
+def _get_broadcast_recipients(include_tags, exclude_tags, target_channels, active_within_days=None):
     """
-    根據標籤篩選計算廣播受眾。
+    根據標籤 + 活躍度篩選計算廣播受眾。
 
     include_tags: OR 邏輯（有任一標籤就選中）
     exclude_tags: OR 邏輯（有任一排除標籤就排除）
     target_channels: 只計算有這些渠道 channel_identifier 的客戶
+    active_within_days: 只選 N 天內有互動的客戶（None 或 0 表示不限）
     """
     # 基礎：未合併的客戶
     query = Contact.query.filter(Contact.is_merged == False)
+
+    # 活躍度篩選
+    if active_within_days and active_within_days > 0:
+        from datetime import timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(days=active_within_days)
+        query = query.filter(Contact.last_active_at >= cutoff)
 
     # 正選：至少有一個 include tag
     if include_tags:
@@ -118,12 +125,23 @@ def create_broadcast():
 
     status = 'scheduled' if scheduled_at else 'draft'
 
+    # 活躍天數篩選
+    active_within_days = data.get('active_within_days')
+    if active_within_days is not None:
+        try:
+            active_within_days = int(active_within_days)
+            if active_within_days < 0:
+                active_within_days = None
+        except (ValueError, TypeError):
+            active_within_days = None
+
     broadcast = Broadcast(
         title=title,
         content=content,
         image_url=data.get('image_url'),
         include_tags=include_tags,
         exclude_tags=data.get('exclude_tags', []),
+        active_within_days=active_within_days,
         target_channels=data.get('target_channels', ['messenger', 'instagram', 'line']),
         status=status,
         scheduled_at=scheduled_at,
@@ -161,6 +179,7 @@ def preview_broadcast(broadcast_id):
         broadcast.include_tags,
         broadcast.exclude_tags,
         broadcast.target_channels,
+        broadcast.active_within_days,
     )
     count = recipients.count()
 
@@ -170,6 +189,7 @@ def preview_broadcast(broadcast_id):
         'include_tags': broadcast.include_tags,
         'exclude_tags': broadcast.exclude_tags,
         'target_channels': broadcast.target_channels,
+        'active_within_days': broadcast.active_within_days,
     })
 
 
@@ -188,6 +208,7 @@ def send_broadcast(broadcast_id):
         broadcast.include_tags,
         broadcast.exclude_tags,
         broadcast.target_channels,
+        broadcast.active_within_days,
     )
     count = recipients.count()
 

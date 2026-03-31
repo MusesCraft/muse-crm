@@ -107,6 +107,17 @@ def create_broadcast():
     if not isinstance(include_tags, list) or len(include_tags) == 0:
         return jsonify({'error': 'include_tags 至少需要一個標籤'}), 400
 
+    # 排程時間
+    scheduled_at = None
+    scheduled_str = data.get('scheduled_at')
+    if scheduled_str:
+        try:
+            scheduled_at = datetime.fromisoformat(scheduled_str.replace('Z', '+00:00'))
+        except (ValueError, TypeError):
+            return jsonify({'error': 'scheduled_at 格式不正確'}), 400
+
+    status = 'scheduled' if scheduled_at else 'draft'
+
     broadcast = Broadcast(
         title=title,
         content=content,
@@ -114,7 +125,8 @@ def create_broadcast():
         include_tags=include_tags,
         exclude_tags=data.get('exclude_tags', []),
         target_channels=data.get('target_channels', ['messenger', 'instagram', 'line']),
-        status='draft',
+        status=status,
+        scheduled_at=scheduled_at,
         created_by=g.current_user.id,
     )
 

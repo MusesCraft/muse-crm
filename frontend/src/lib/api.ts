@@ -829,6 +829,7 @@ export const broadcastApi = {
     include_tags: string[];
     exclude_tags?: string[];
     target_channels?: string[];
+    scheduled_at?: string;
   }) {
     return await request<{ message: string; broadcast: Broadcast }>('/broadcasts', {
       method: 'POST',

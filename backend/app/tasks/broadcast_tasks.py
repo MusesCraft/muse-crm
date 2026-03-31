@@ -15,6 +15,38 @@ from ..channels.registry import channel_registry
 logger = logging.getLogger(__name__)
 
 
+@celery.task(name='crm.tasks.check_scheduled_broadcasts')
+def check_scheduled_broadcasts():
+    """
+    檢查並觸發已到時間的排程廣播。
+    由 Celery Beat 每分鐘執行一次。
+    """
+    now = datetime.now(timezone.utc)
+    scheduled = Broadcast.query.filter(
+        Broadcast.status == 'scheduled',
+        Broadcast.scheduled_at <= now,
+    ).all()
+
+    for broadcast in scheduled:
+        broadcast.status = 'sending'
+        # 計算受眾
+        query = Contact.query.filter(Contact.is_merged == False)
+        if broadcast.include_tags:
+            include_ids = (
+                db.session.query(ContactTag.contact_id)
+                .join(Tag, ContactTag.tag_id == Tag.id)
+                .filter(Tag.name.in_(broadcast.include_tags))
+                .distinct()
+                .subquery()
+            )
+            query = query.filter(Contact.id.in_(include_ids))
+        broadcast.total_recipients = query.count()
+        db.session.commit()
+
+        execute_broadcast.delay(str(broadcast.id))
+        logger.info(f"⏰ 排程廣播觸發: {broadcast.id}")
+
+
 @celery.task(bind=True, name='crm.tasks.execute_broadcast', max_retries=1)
 def execute_broadcast(self, broadcast_id: str):
     """

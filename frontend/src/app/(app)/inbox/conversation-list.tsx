@@ -1,11 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Avatar } from '@/components/avatar';
 import { ChannelIcon } from '@/components/channel-icon';
 import { UrgencyBadgeCompact as UrgencyBadge } from '@/components/badges';
 import { StatusBadge } from '@/components/status-badge';
-import { LoadingSpinner, EmptyState } from '@/components/loading';
+import { EmptyState } from '@/components/loading';
+import { ConversationListSkeleton } from '@/components/skeletons';
 import { formatTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { Conversation } from '@/lib/api';
@@ -31,6 +33,7 @@ interface ConversationListProps {
   onChannelChange: (v: string) => void;
   search: string;
   onSearchChange: (v: string) => void;
+  onRetry?: () => void;
 }
 
 export function ConversationList({
@@ -48,6 +51,7 @@ export function ConversationList({
   onChannelChange,
   search,
   onSearchChange,
+  onRetry,
 }: ConversationListProps) {
   return (
     <>
@@ -99,9 +103,19 @@ export function ConversationList({
       {/* List */}
       <div className="flex-1 overflow-y-auto">
         {loading && conversations.length === 0 ? (
-          <LoadingSpinner />
+          <ConversationListSkeleton />
         ) : error ? (
-          <div className="p-4 text-center text-sm text-red-400">{error}</div>
+          <div className="text-center py-8">
+            <p className="text-red-500 text-sm mb-3">{error}</p>
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="text-sm px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+              >
+                重試
+              </button>
+            )}
+          </div>
         ) : conversations.length === 0 ? (
           <EmptyState icon={Inbox} title="沒有對話" description="目前沒有符合條件的對話" />
         ) : (
@@ -114,16 +128,40 @@ export function ConversationList({
                 selectedId === conv.id && 'bg-zinc-100 dark:bg-zinc-800/50 border-l-2 border-l-indigo-500'
               )}
             >
-              <Avatar
-                name={conv.contact?.name || '未知'}
-                url={conv.contact?.avatar_url}
-                size="md"
-              />
+              {conv.contact_id ? (
+                <Link
+                  href={`/contacts/${conv.contact_id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-shrink-0"
+                >
+                  <Avatar
+                    name={conv.contact?.name || '未知'}
+                    url={conv.contact?.avatar_url}
+                    size="md"
+                  />
+                </Link>
+              ) : (
+                <Avatar
+                  name={conv.contact?.name || '未知'}
+                  url={conv.contact?.avatar_url}
+                  size="md"
+                />
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
-                    {conv.contact?.name || '未知客戶'}
-                  </span>
+                  {conv.contact_id ? (
+                    <Link
+                      href={`/contacts/${conv.contact_id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors"
+                    >
+                      {conv.contact?.name || '未知客戶'}
+                    </Link>
+                  ) : (
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                      {conv.contact?.name || '未知客戶'}
+                    </span>
+                  )}
                   <span className="text-xs text-zinc-400 dark:text-zinc-500 flex-shrink-0">
                     {conv.last_message?.timestamp ? formatTime(conv.last_message.timestamp) : ''}
                   </span>

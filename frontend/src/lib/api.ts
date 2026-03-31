@@ -478,6 +478,28 @@ export const contactsApi = {
       method: 'DELETE',
     });
   },
+
+  async createContact(data: {
+    display_name: string;
+    phone?: string;
+    email?: string;
+    notes?: string;
+    source_channel?: 'walk_in' | 'phone' | 'referral' | 'exhibition' | 'other';
+    intent?: 'browsing' | 'interested' | 'ready_to_buy' | 'purchased';
+    budget_range?: 'under_50k' | '50k_200k' | '200k_500k' | 'over_500k';
+    preferred_products?: string[];
+    visit_date?: string;
+    referral_source?: string;
+    contact_status?: 'new' | 'following_up' | 'quoted' | 'won' | 'lost';
+  }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = await request<any>('/contacts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    const contactData = raw.contact || raw;
+    return transformContact(contactData);
+  },
 };
 
 // ── Tags API ───────────────────────────────────────────
@@ -538,6 +560,12 @@ export const actionsApi = {
 
 // ── Quick Replies API ──────────────────────────────────
 
+export interface QuickReplyAttachment {
+  type: 'image';
+  url: string;
+  label?: string;
+}
+
 export interface QuickReplyItem {
   id: string;
   title: string;
@@ -545,6 +573,7 @@ export interface QuickReplyItem {
   priority: string;
   trigger_keywords: string[];
   content: string;
+  attachments?: QuickReplyAttachment[];
   is_system?: boolean;
   created_by?: string | null;
   created_at?: string | null;
@@ -553,7 +582,6 @@ export interface QuickReplyItem {
   trigger?: string;
   user_identity?: string | null;
   channel?: string;
-  attachments?: { type: string; label: string; value: string }[];
 }
 
 export const quickRepliesApi = {
@@ -578,14 +606,14 @@ export const quickRepliesApi = {
     return await request<QuickReplyItem>(`/quick-replies/${id}`);
   },
 
-  async create(data: { category: string; title: string; content: string; trigger_keywords?: string[]; priority?: string }) {
+  async create(data: { category: string; title: string; content: string; trigger_keywords?: string[]; priority?: string; attachments?: QuickReplyAttachment[] }) {
     return await request<QuickReplyItem>('/quick-replies', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
-  async update(id: string, data: Partial<{ category: string; title: string; content: string; trigger_keywords: string[]; priority: string }>) {
+  async update(id: string, data: Partial<{ category: string; title: string; content: string; trigger_keywords: string[]; priority: string; attachments: QuickReplyAttachment[] }>) {
     return await request<QuickReplyItem>(`/quick-replies/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),

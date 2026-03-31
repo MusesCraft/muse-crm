@@ -4,10 +4,10 @@ MUSE CRM — Contact & ChannelIdentifier Models
 客戶和渠道身份模型。
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
-from sqlalchemy import String, Text, DateTime, Boolean, Index
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import String, Text, Date, DateTime, Boolean, Index
+from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 import uuid
@@ -54,6 +54,14 @@ class Contact(db.Model):
     # 聯絡資訊
     phone: Mapped[Optional[str]] = mapped_column(String(50))
     email: Mapped[Optional[str]] = mapped_column(String(255))
+
+    # 銷售相關（手動登記客戶）
+    intent: Mapped[Optional[str]] = mapped_column(String(50))               # browsing/interested/ready_to_buy/purchased
+    budget_range: Mapped[Optional[str]] = mapped_column(String(50))         # under_50k/50k_200k/200k_500k/over_500k
+    preferred_products: Mapped[Optional[list]] = mapped_column(ARRAY(Text)) # 偏好產品
+    visit_date: Mapped[Optional[date]] = mapped_column(Date)                # 來訪日期
+    referral_source: Mapped[Optional[str]] = mapped_column(String(255))     # 轉介來源
+    contact_status: Mapped[Optional[str]] = mapped_column(String(20), default='new')  # new/following_up/quoted/won/lost
 
     # 負責人（CRM-019）
     assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -156,6 +164,12 @@ class Contact(db.Model):
             'notes': self.notes,
             'phone': self.phone,
             'email': self.email,
+            'intent': self.intent,
+            'budget_range': self.budget_range,
+            'preferred_products': self.preferred_products,
+            'visit_date': self.visit_date.isoformat() if self.visit_date else None,
+            'referral_source': self.referral_source,
+            'contact_status': self.contact_status,
             'assigned_to': str(self.assigned_to) if self.assigned_to else None,
             'external_crm_id': self.external_crm_id,
             'is_merged': self.is_merged,

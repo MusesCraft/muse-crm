@@ -152,7 +152,7 @@ export function CustomerSidebar({
   }, [collapsed]);
 
   // Fetch contact detail
-  const { data: contact, loading, refetch } = useAsync<ContactDetail>(
+  const { data: contact, loading, error: contactError, refetch } = useAsync<ContactDetail>(
     () => contactsApi.getContact(contactId),
     [contactId]
   );
@@ -231,6 +231,22 @@ export function CustomerSidebar({
 
   // ── Expanded View ──────────────────────────────────
 
+  if (contactError) {
+    return (
+      <div className="w-80 bg-zinc-50 border-l border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 flex items-center justify-center transition-all duration-200">
+        <div className="text-center py-8">
+          <p className="text-red-500 text-sm mb-3">{contactError}</p>
+          <button
+            onClick={() => refetch()}
+            className="text-sm px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+          >
+            重試
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (loading || !contact) {
     return (
       <div className="w-80 bg-zinc-50 border-l border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 flex items-center justify-center transition-all duration-200">
@@ -246,13 +262,15 @@ export function CustomerSidebar({
     <div className="w-80 bg-zinc-50 border-l border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 flex flex-col overflow-hidden transition-all duration-200">
       {/* ── Header ── */}
       <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-3">
-        <Avatar name={contact.name} url={contact.avatar_url} size="md" />
-        <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{contact.name}</h3>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <ChannelBadge channel={channel} />
+        <Link href={`/contacts/${contactId}`} className="flex items-center gap-3 flex-1 min-w-0 group">
+          <Avatar name={contact.name} url={contact.avatar_url} size="md" />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-white truncate group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors">{contact.name}</h3>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <ChannelBadge channel={channel} />
+            </div>
           </div>
-        </div>
+        </Link>
         <button
           onClick={() => setCollapsed(true)}
           className="p-2 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 transition-colors flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
@@ -353,6 +371,7 @@ export function CustomerSidebar({
             <button
               onClick={handleAnalyze}
               disabled={analyzing}
+              aria-label="深度分析"
               className={cn(
                 'w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors',
                 analyzing
@@ -368,7 +387,7 @@ export function CustomerSidebar({
               ) : (
                 <>
                   <Search className="w-4 h-4" />
-                  🔍 深入分析
+                  深入分析
                 </>
               )}
             </button>

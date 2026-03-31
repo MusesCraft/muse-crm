@@ -4,6 +4,7 @@ MUSE CRM — Contacts API
 客戶管理相關 API 端點。
 """
 
+from datetime import date, datetime, timezone
 from flask import jsonify, request, g
 from sqlalchemy import desc, or_, func
 from sqlalchemy.orm import subqueryload, joinedload
@@ -29,6 +30,92 @@ def _check_contact_access(contact):
         if not scoped:
             return jsonify({'error': '權限不足'}), 403
     return None
+
+
+@api_bp.route('/contacts', methods=['POST'])
+@login_required
+@require_role('admin', 'manager', 'user')
+def create_contact():
+    """
+    手動登記客戶（非線上來源）
+
+    Body:
+        - display_name: 客戶名稱（必填）
+        - phone, email, notes: 聯絡資訊（選填）
+        - source_channel: walk_in/phone/referral/exhibition/other（選填）
+        - intent: 購買意向（選填）
+        - budget_range: 預算區間（選填）
+        - preferred_products: 偏好產品 TEXT[]（選填）
+        - visit_date: 來訪日期 YYYY-MM-DD（選填）
+        - referral_source: 轉介來源（選填）
+        - contact_status: 跟進狀態（選填，預設 new）
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '缺少請求資料'}), 400
+
+    display_name = (data.get('display_name') or '').strip()
+    if not display_name:
+        return jsonify({'error': 'display_name 為必填欄位'}), 400
+
+    # 驗證 source_channel
+    valid_channels = ('walk_in', 'phone', 'referral', 'exhibition', 'other')
+    source_channel = data.get('source_channel')
+    if source_channel and source_channel not in valid_channels:
+        return jsonify({'error': f'source_channel 必須為 {", ".join(valid_channels)} 之一'}), 400
+
+    # 驗證 intent
+    valid_intents = ('browsing', 'interested', 'ready_to_buy', 'purchased')
+    intent = data.get('intent')
+    if intent and intent not in valid_intents:
+        return jsonify({'error': f'intent 必須為 {", ".join(valid_intents)} 之一'}), 400
+
+    # 驗證 budget_range
+    valid_budgets = ('under_50k', '50k_200k', '200k_500k', 'over_500k')
+    budget_range = data.get('budget_range')
+    if budget_range and budget_range not in valid_budgets:
+        return jsonify({'error': f'budget_range 必須為 {", ".join(valid_budgets)} 之一'}), 400
+
+    # 驗證 contact_status
+    valid_statuses = ('new', 'following_up', 'quoted', 'won', 'lost')
+    contact_status = data.get('contact_status', 'new')
+    if contact_status not in valid_statuses:
+        return jsonify({'error': f'contact_status 必須為 {", ".join(valid_statuses)} 之一'}), 400
+
+    # 解析 visit_date
+    visit_date = None
+    if data.get('visit_date'):
+        try:
+            visit_date = date.fromisoformat(data['visit_date'])
+        except ValueError:
+            return jsonify({'error': 'visit_date 格式必須為 YYYY-MM-DD'}), 400
+
+    now = datetime.now(timezone.utc)
+
+    contact = Contact(
+        display_name=display_name,
+        phone=data.get('phone'),
+        email=data.get('email'),
+        notes=data.get('notes'),
+        source_channel=source_channel,
+        source_type='manual',
+        intent=intent,
+        budget_range=budget_range,
+        preferred_products=data.get('preferred_products'),
+        visit_date=visit_date,
+        referral_source=data.get('referral_source'),
+        contact_status=contact_status,
+        first_seen_at=now,
+        last_active_at=now,
+    )
+
+    db.session.add(contact)
+    db.session.commit()
+
+    return jsonify({
+        'message': '客戶已建立',
+        'contact': contact.to_dict()
+    }), 201
 
 
 @api_bp.route('/contacts', methods=['GET'])
@@ -133,7 +220,18 @@ def list_contacts():
 @require_role('admin', 'manager', 'user')
 def get_contact_detail(contact_id):
     """取得客戶 360 檢視"""
-    contact = Contact.query.get_or_404(contact_id)
+    from ..models import Conversation, Analysis, Action, UserNote
+    contact = (
+        Contact.query
+        .options(
+            subqueryload(Contact.tags).joinedload(ContactTag.tag),
+            subqueryload(Contact.conversations),
+            subqueryload(Contact.analyses),
+            subqueryload(Contact.actions),
+            subqueryload(Contact.notes_by_users),
+        )
+        .get_or_404(contact_id)
+    )
 
     denied = _check_contact_access(contact)
     if denied:
@@ -328,6 +426,24 @@ def update_contact(contact_id):
         contact.email = data['email']
     if 'external_crm_id' in data:
         contact.external_crm_id = data['external_crm_id']
+    if 'intent' in data:
+        contact.intent = data['intent']
+    if 'budget_range' in data:
+        contact.budget_range = data['budget_range']
+    if 'preferred_products' in data:
+        contact.preferred_products = data['preferred_products']
+    if 'visit_date' in data:
+        if data['visit_date']:
+            try:
+                contact.visit_date = date.fromisoformat(data['visit_date'])
+            except ValueError:
+                return jsonify({'error': 'visit_date 格式必須為 YYYY-MM-DD'}), 400
+        else:
+            contact.visit_date = None
+    if 'referral_source' in data:
+        contact.referral_source = data['referral_source']
+    if 'contact_status' in data:
+        contact.contact_status = data['contact_status']
     if 'assigned_to' in data:
         # 指派任務：需要 admin 或 manager 角色
         if user and user.role == 'user':

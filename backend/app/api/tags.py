@@ -11,6 +11,7 @@ from . import api_bp
 from ..models import Tag, ContactTag, Contact
 from .. import db
 from ..utils.auth import login_required
+from ..utils.permissions import require_role
 
 
 @api_bp.route('/tags', methods=['GET'])
@@ -74,6 +75,7 @@ def list_tag_categories():
 
 @api_bp.route('/tags', methods=['POST'])
 @login_required
+@require_role('admin', 'manager')
 def create_tag():
     """建立新標籤"""
     data = request.get_json()
@@ -104,6 +106,7 @@ def create_tag():
 
 @api_bp.route('/tags/<tag_id>', methods=['PATCH'])
 @login_required
+@require_role('admin', 'manager')
 def update_tag(tag_id):
     """更新標籤資訊"""
     tag = Tag.query.get_or_404(tag_id)
@@ -141,6 +144,7 @@ def update_tag(tag_id):
 
 @api_bp.route('/tags/<tag_id>', methods=['DELETE'])
 @login_required
+@require_role('admin', 'manager')
 def delete_tag(tag_id):
     """刪除標籤"""
     tag = Tag.query.get_or_404(tag_id)

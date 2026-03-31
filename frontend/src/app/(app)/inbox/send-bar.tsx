@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { inboxSendApi, uploadApi, quickRepliesApi, type Message, type QuickReplyItem } from '@/lib/api';
+import { inboxSendApi, uploadApi, quickRepliesApi, type Message, type QuickReplyItem, type QuickReplyAttachment } from '@/lib/api';
 import { mockQuickReplies } from '@/lib/mock-data';
 import {
   Paperclip,
@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 
 // ── Quick Replies Panel ────────────────────────────────
 
-function QuickRepliesPanel({ onSelect, onClose }: { onSelect: (text: string) => void; onClose: () => void }) {
+function QuickRepliesPanel({ onSelect, onClose }: { onSelect: (text: string, attachments?: QuickReplyAttachment[]) => void; onClose: () => void }) {
   const [search, setSearch] = useState('');
   const [apiReplies, setApiReplies] = useState<QuickReplyItem[]>([]);
   const [apiLoaded, setApiLoaded] = useState(false);
@@ -66,8 +66,8 @@ function QuickRepliesPanel({ onSelect, onClose }: { onSelect: (text: string) => 
       )
     : mockQuickReplies;
 
-  const displayItems: { id: string | number; category: string; title: string; content: string }[] = useApi
-    ? apiReplies.map((r) => ({ id: r.id, category: r.category, title: r.title, content: r.content }))
+  const displayItems: { id: string | number; category: string; title: string; content: string; attachments?: QuickReplyAttachment[] }[] = useApi
+    ? apiReplies.map((r) => ({ id: r.id, category: r.category, title: r.title, content: r.content, attachments: r.attachments }))
     : filteredMock;
 
   return (
@@ -86,6 +86,7 @@ function QuickRepliesPanel({ onSelect, onClose }: { onSelect: (text: string) => 
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="搜尋語錄..."
+          aria-label="搜尋語錄"
           className="w-full text-xs bg-zinc-50 dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-1.5 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
         />
       </div>
@@ -103,13 +104,24 @@ function QuickRepliesPanel({ onSelect, onClose }: { onSelect: (text: string) => 
                 <button
                   key={item.id}
                   onClick={() => {
-                    onSelect(item.content);
+                    onSelect(item.content, item.attachments);
                     onClose();
                   }}
                   className="w-full text-left px-2 py-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-700/60 transition-colors"
                 >
                   <p className="text-xs font-medium text-zinc-700 dark:text-zinc-200">{item.title}</p>
                   <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">{item.content}</p>
+                  {item.attachments && item.attachments.length > 0 && (
+                    <div className="flex gap-1 mt-1">
+                      {item.attachments.filter(a => a.type === 'image').slice(0, 3).map((att, i) => (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img key={i} src={att.url} alt={att.label || '附件'} className="w-8 h-8 object-cover rounded border border-zinc-200 dark:border-zinc-600" />
+                      ))}
+                      {item.attachments.filter(a => a.type === 'image').length > 3 && (
+                        <span className="text-[10px] text-zinc-400 self-end">+{item.attachments.filter(a => a.type === 'image').length - 3}</span>
+                      )}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
@@ -142,6 +154,7 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
   const [imagePreview, setImagePreview] = useState<{ file: File; url: string } | null>(null);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [sending, setSending] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<QuickReplyAttachment[]>([]);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -152,6 +165,7 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
     setInputText('');
     setImagePreview(null);
     setShowQuickReplies(false);
+    setPendingAttachments([]);
   }, [conversationId]);
 
   // Auto-resize textarea
@@ -247,8 +261,23 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
         onError(`訊息已記錄但未送達客戶：${result.api_error}`);
       }
 
+      // 發送快捷回覆的附件圖片
+      if (pendingAttachments.length > 0) {
+        for (const att of pendingAttachments) {
+          try {
+            const imgResult = await inboxSendApi.sendMessage(conversationId, '', 'image', att.url);
+            if (imgResult.data) {
+              onMessageSent(imgResult.data as Message);
+            }
+          } catch {
+            // 圖片附件發送失敗不阻塞
+          }
+        }
+      }
+
       setInputText('');
       setImagePreview(null);
+      setPendingAttachments([]);
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
@@ -259,7 +288,7 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
       sendingRef.current = false;
       setSending(false);
     }
-  }, [inputText, imagePreview, conversationId, onMessageSent, onError]);
+  }, [inputText, imagePreview, pendingAttachments, conversationId, onMessageSent, onError]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -289,10 +318,10 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
 
   // ── Quick Reply ──
 
-  const handleQuickReplySelect = (text: string) => {
+  const handleQuickReplySelect = (text: string, attachments?: QuickReplyAttachment[]) => {
     setInputText(text);
+    setPendingAttachments(attachments?.filter(a => a.type === 'image') || []);
     setShowQuickReplies(false);
-    // 用 setTimeout 確保面板關閉後再 focus，避免 scroll 跳動
     setTimeout(() => textareaRef.current?.focus(), 50);
   };
 
@@ -321,6 +350,27 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
               className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
             >
               <X className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Quick Reply Attachments */}
+      {pendingAttachments.length > 0 && (
+        <div className="px-4 pt-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase">語錄附件</span>
+            <div className="flex gap-1">
+              {pendingAttachments.map((att, i) => (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img key={i} src={att.url} alt={att.label || '附件'} className="w-10 h-10 object-cover rounded border border-zinc-200 dark:border-zinc-700" />
+              ))}
+            </div>
+            <button
+              onClick={() => setPendingAttachments([])}
+              className="ml-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+            >
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -357,6 +407,7 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          aria-label="上傳圖片"
           onChange={handleImageSelect}
           className="hidden"
         />
@@ -368,6 +419,7 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="輸入訊息..."
+          aria-label="輸入訊息"
           rows={1}
           className="flex-1 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none max-h-[120px]"
         />

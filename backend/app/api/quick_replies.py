@@ -173,6 +173,7 @@ def create_quick_reply():
         content=content,
         trigger_keywords=data.get('trigger_keywords', []),
         priority=data.get('priority', 'template'),
+        attachments=data.get('attachments', []),
         is_system=False,
         created_by=g.current_user.id if hasattr(g, 'current_user') and g.current_user else None,
     )
@@ -204,6 +205,8 @@ def update_quick_reply(response_id: str):
         item.trigger_keywords = data['trigger_keywords']
     if 'priority' in data:
         item.priority = data['priority']
+    if 'attachments' in data:
+        item.attachments = data['attachments']
 
     db.session.commit()
 

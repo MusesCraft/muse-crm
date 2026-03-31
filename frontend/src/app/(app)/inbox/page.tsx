@@ -15,8 +15,19 @@ export default function InboxPage() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<string>('');
   const [channel, setChannel] = useState<string>('');
+  const [searchInput, setSearchInput] = useState<string>('');
   const [search, setSearch] = useState<string>('');
   const [mobileView, setMobileView] = useState<'list' | 'detail'>('list');
+  const searchDebounceTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchInput(value);
+    if (searchDebounceTimer.current) clearTimeout(searchDebounceTimer.current);
+    searchDebounceTimer.current = setTimeout(() => {
+      setSearch(value);
+      setPage(1);
+    }, 300);
+  }, []);
 
   const { data, loading, error, refetch } = useAsync<PaginatedResponse<Conversation>>(
     () =>
@@ -97,8 +108,9 @@ export default function InboxPage() {
           onStatusChange={(v) => { setStatus(v); setPage(1); }}
           channel={channel}
           onChannelChange={(v) => { setChannel(v); setPage(1); }}
-          search={search}
-          onSearchChange={(v) => { setSearch(v); setPage(1); }}
+          search={searchInput}
+          onSearchChange={handleSearchChange}
+          onRetry={refetch}
         />
       </div>
 

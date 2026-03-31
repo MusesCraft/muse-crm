@@ -59,9 +59,10 @@ export function MessageBubble({ message, onOcr }: MessageBubbleProps) {
                 {onOcr && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onOcr(message.media_url!); }}
+                    aria-label="辨識名片"
                     className="mt-1 text-[11px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
                   >
-                    📇 辨識名片
+                    <span role="img" aria-hidden="true">📇</span> 辨識名片
                   </button>
                 )}
               </>

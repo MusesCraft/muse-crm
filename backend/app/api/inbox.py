@@ -109,24 +109,42 @@ def list_conversations():
         )
     
     pagination = query.paginate(page=page, per_page=per_page)
-    
+
+    # 批次載入所有 last_message（避免 N+1）
+    conv_ids = [conv.id for conv in pagination.items]
+    last_messages_map = {}
+    if conv_ids:
+        from sqlalchemy import func as sa_func
+        subq = (
+            db.session.query(
+                Message.conversation_id,
+                sa_func.max(Message.sent_at).label('max_sent')
+            )
+            .filter(Message.conversation_id.in_(conv_ids))
+            .group_by(Message.conversation_id)
+            .subquery()
+        )
+        last_msgs = (
+            db.session.query(Message)
+            .join(subq, db.and_(
+                Message.conversation_id == subq.c.conversation_id,
+                Message.sent_at == subq.c.max_sent,
+            ))
+            .all()
+        )
+        for m in last_msgs:
+            last_messages_map[m.conversation_id] = m
+
     conversations = []
     for conv in pagination.items:
-        # 取得最後一則訊息
-        last_message = (
-            Message.query
-            .filter_by(conversation_id=conv.id)
-            .order_by(desc(Message.sent_at))
-            .first()
-        )
-        
         conv_dict = conv.to_dict()
         contact_dict = conv.contact.to_dict()
         priority = _infer_contact_priority(conv.contact)
         contact_dict['priority'] = priority
         conv_dict['contact'] = contact_dict
         conv_dict['urgency'] = priority
-        conv_dict['last_message'] = last_message.to_dict() if last_message else None
+        last_msg = last_messages_map.get(conv.id)
+        conv_dict['last_message'] = last_msg.to_dict() if last_msg else None
         conversations.append(conv_dict)
     
     return jsonify({

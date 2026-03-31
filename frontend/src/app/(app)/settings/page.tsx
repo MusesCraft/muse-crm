@@ -70,7 +70,7 @@ function IntegrationCard() {
             <div className="flex-1">
               <Label htmlFor={inputId} className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">{config.label}</Label>
               {config.isStatus ? (
-                <span id={inputId} className="text-sm text-emerald-600 dark:text-emerald-400 font-medium block">&#x2705; {config.value}</span>
+                <span id={inputId} className="text-sm text-emerald-600 dark:text-emerald-400 font-medium block"><span role="img" aria-label="已連接">&#x2705;</span> {config.value}</span>
               ) : (
                 <div className="flex items-center gap-2">
                   <input
@@ -360,6 +360,7 @@ function QuickRepliesManagementCard() {
   const [formCategory, setFormCategory] = useState('');
   const [formTitle, setFormTitle] = useState('');
   const [formContent, setFormContent] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
 
   const categoryLabels: Record<string, string> = {
     basin: '一體盆', dm: 'DM資料', hot_bend: '熱彎', identity: '身分確認',
@@ -459,16 +460,37 @@ function QuickRepliesManagementCard() {
 
   const displayCategories = categories.length > 0 ? categories : ['general'];
 
+  const filteredCategories = filterCategory === 'all'
+    ? displayCategories
+    : displayCategories.filter((c) => c === filterCategory);
+
+  const filteredCount = filterCategory === 'all'
+    ? apiReplies.length
+    : apiReplies.filter((r) => r.category === filterCategory).length;
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-zinc-400 dark:text-zinc-500">
-          管理預存語錄，供收件匣快速回覆使用。
-          <span className="text-emerald-500 ml-1">（{apiReplies.length} 條語錄）</span>
-        </p>
+      {/* Header: 篩選 + 新增 */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Label htmlFor="qr-filter" className="sr-only">篩選分類</Label>
+          <select
+            id="qr-filter"
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+          >
+            <option value="all">全部分類（{apiReplies.length}）</option>
+            {displayCategories.map((c) => {
+              const count = apiReplies.filter((r) => r.category === c).length;
+              return <option key={c} value={c}>{categoryLabels[c] || c}（{count}）</option>;
+            })}
+          </select>
+          <span className="text-xs text-zinc-400">{filteredCount} 條語錄</span>
+        </div>
         <button
-          onClick={() => { setShowAddForm(true); setEditingId(null); setFormTitle(''); setFormContent(''); setFormCategory(displayCategories[0] || 'general'); }}
-          className="flex items-center gap-1 text-xs font-medium text-indigo-500 hover:text-indigo-600 dark:text-indigo-400"
+          onClick={() => { setShowAddForm(true); setEditingId(null); setFormTitle(''); setFormContent(''); setFormCategory(filterCategory !== 'all' ? filterCategory : displayCategories[0] || 'general'); }}
+          className="flex items-center gap-1 text-xs font-medium text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 flex-shrink-0"
         >
           <Plus className="w-3.5 h-3.5" /> 新增語錄
         </button>
@@ -476,9 +498,10 @@ function QuickRepliesManagementCard() {
 
       {error && <p className="text-xs text-red-500">{error}</p>}
 
+      {/* 新增/編輯表單 */}
       {(showAddForm || editingId) && (
-        <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-zinc-700 space-y-3">
-          <div className="flex items-center gap-3">
+        <div className="p-3 md:p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-zinc-700 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
             <div>
               <Label htmlFor="qr-category" className="sr-only">分類</Label>
               <select id="qr-category" value={formCategory} onChange={(e) => setFormCategory(e.target.value)}
@@ -507,28 +530,35 @@ function QuickRepliesManagementCard() {
         </div>
       )}
 
-      <div className="space-y-2">
-        {displayCategories.map((cat) => {
+      {/* 語錄列表 — 限高 + 捲動 */}
+      <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-1">
+        {filteredCategories.map((cat) => {
           const items = apiReplies.filter((r) => r.category === cat);
           if (items.length === 0) return null;
           return (
             <div key={cat}>
-              <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">{categoryLabels[cat] || cat}</p>
+              <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5 sticky top-0 bg-white dark:bg-zinc-900 py-1 z-10">
+                {categoryLabels[cat] || cat}
+                <span className="ml-1.5 text-zinc-300 dark:text-zinc-600">({items.length})</span>
+              </p>
               {items.map((item) => (
-                <div key={item.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
+                <div key={item.id} className="flex items-start gap-2 md:gap-3 p-2 md:p-2.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-zinc-700 dark:text-zinc-200">{item.title}</p>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">{item.content}</p>
+                    <p className="text-xs font-medium text-zinc-700 dark:text-zinc-200 truncate">{item.title}</p>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-2">{item.content}</p>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                    <button onClick={() => handleEdit(item)} className="p-1 text-zinc-400 hover:text-indigo-500"><Pencil className="w-3 h-3" /></button>
-                    <button onClick={() => handleDelete(item.id)} disabled={saving} className="p-1 text-zinc-400 hover:text-red-500 disabled:opacity-50"><Trash2 className="w-3 h-3" /></button>
+                    <button onClick={() => handleEdit(item)} className="p-1.5 text-zinc-400 hover:text-indigo-500"><Pencil className="w-3 h-3" /></button>
+                    <button onClick={() => handleDelete(item.id)} disabled={saving} className="p-1.5 text-zinc-400 hover:text-red-500 disabled:opacity-50"><Trash2 className="w-3 h-3" /></button>
                   </div>
                 </div>
               ))}
             </div>
           );
         })}
+        {filteredCount === 0 && (
+          <p className="text-xs text-zinc-400 text-center py-6">此分類沒有語錄</p>
+        )}
       </div>
     </div>
   );
@@ -737,22 +767,22 @@ export default function SettingsPage() {
         </div>
 
         {/* Tabs + Content */}
-        <Tabs defaultValue="integration" orientation="vertical" className="flex flex-row gap-6">
-          {/* Tab Navigation */}
-          <TabsList variant="line" className="w-48 flex-shrink-0 flex-col items-stretch h-auto bg-transparent p-0">
+        <Tabs defaultValue="integration" orientation="vertical" className="flex flex-col md:flex-row gap-4 md:gap-6">
+          {/* Tab Navigation — 手機水平滾動，桌面垂直列表 */}
+          <TabsList variant="line" className="flex md:flex-col md:w-48 flex-shrink-0 items-stretch h-auto bg-transparent p-0 overflow-x-auto md:overflow-x-visible gap-1 md:gap-0">
             {tabs.map((tab) => (
               <TabsTrigger
                 key={tab.id}
                 value={tab.id}
                 className={cn(
-                  'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors justify-start',
+                  'flex items-center gap-2 px-3 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-colors whitespace-nowrap md:w-full md:justify-start',
                   'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800',
                   'data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-600 dark:data-[state=active]:bg-indigo-500/10 dark:data-[state=active]:text-indigo-400',
                   'after:hidden'
                 )}
               >
                 <tab.icon className="w-4 h-4" />
-                {tab.label}
+                <span className="hidden md:inline">{tab.label}</span>
               </TabsTrigger>
             ))}
           </TabsList>
@@ -761,8 +791,8 @@ export default function SettingsPage() {
           {tabs.map((tab) => {
             const Content = tabContentMap[tab.id];
             return (
-              <TabsContent key={tab.id} value={tab.id} className="flex-1 mt-0">
-                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+              <TabsContent key={tab.id} value={tab.id} className="flex-1 min-w-0 mt-0">
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 md:p-6">
                   <h2 className="text-sm font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
                     {tab.label}
                   </h2>

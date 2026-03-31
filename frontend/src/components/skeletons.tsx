@@ -49,8 +49,8 @@ export function ContactDetailSkeleton() {
         </div>
       </div>
       <div className="space-y-3">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded" style={{ width: `${70 + Math.random() * 30}%` }} />
+        {[85, 72, 96, 78].map((w, i) => (
+          <div key={i} className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded" style={{ width: `${w}%` }} />
         ))}
       </div>
     </div>

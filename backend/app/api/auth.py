@@ -13,7 +13,7 @@ from flask import jsonify, request, g, current_app
 from . import api_bp
 from ..models.user import User
 from .. import db, limiter
-from ..utils.auth import generate_token, generate_refresh_token, decode_jwt_token, login_required, admin_required, blacklist_token
+from ..utils.auth import generate_token, generate_refresh_token, decode_jwt_token, login_required, admin_required, blacklist_token, is_token_blacklisted
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +174,11 @@ def auth_refresh():
     if payload.get('type') != 'refresh':
         return jsonify({'error': '無效的 token 類型'}), 401
 
+    # 檢查 refresh token 是否已被撤銷（登出時加入黑名單）
+    jti = payload.get('jti')
+    if jti and is_token_blacklisted(jti):
+        return jsonify({'error': 'Refresh token 已撤銷'}), 401
+
     user = User.query.get(payload.get('sub'))
     if not user or not user.is_active:
         return jsonify({'error': '用戶不存在或已停用'}), 401
@@ -235,7 +240,8 @@ def auth_change_password():
 @api_bp.route('/auth/logout', methods=['POST'])
 @login_required
 def logout():
-    """登出並撤銷 token"""
+    """登出並撤銷 access token 和 refresh token"""
+    # 撤銷 access token
     token = request.headers.get('Authorization', '').replace('Bearer ', '')
     try:
         payload = pyjwt.decode(token, current_app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
@@ -246,4 +252,19 @@ def logout():
             blacklist_token(jti, ttl)
     except Exception:
         pass
+
+    # 撤銷 refresh token（由前端送回）
+    data = request.get_json(silent=True) or {}
+    refresh = data.get('refresh_token')
+    if refresh:
+        try:
+            r_payload = pyjwt.decode(refresh, current_app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+            r_jti = r_payload.get('jti')
+            r_exp = r_payload.get('exp', 0)
+            if r_jti:
+                ttl = max(r_exp - int(time.time()), 0)
+                blacklist_token(r_jti, ttl)
+        except Exception:
+            pass
+
     return jsonify({'message': '已登出'}), 200

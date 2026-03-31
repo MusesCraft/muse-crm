@@ -9,7 +9,15 @@ import { ChannelBadge } from '@/components/channel-icon';
 import { PriorityBadge } from '@/components/badges';
 import { LoadingSpinner, EmptyState } from '@/components/loading';
 import { formatDateTime } from '@/lib/format';
-import { Search, ChevronLeft, ChevronRight, Users, ExternalLink, ArrowUpDown } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Users, ExternalLink, ArrowUpDown, Plus, Loader2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 type SortKey = 'last_seen' | 'priority' | 'conversation_count' | 'name';
 const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -21,7 +29,39 @@ export default function ContactsPage() {
   const [channel, setChannel] = useState('');
   const [sourceType, setSourceType] = useState('');
   const [sort, setSort] = useState<SortKey>('last_seen');
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
   const debounceTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const handleCreateContact = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setCreateError('');
+    setCreating(true);
+    try {
+      const fd = new FormData(e.currentTarget);
+      const products = (fd.get('preferred_products') as string || '').split(',').map(s => s.trim()).filter(Boolean);
+      await contactsApi.createContact({
+        display_name: fd.get('display_name') as string,
+        phone: (fd.get('phone') as string) || undefined,
+        email: (fd.get('email') as string) || undefined,
+        notes: (fd.get('notes') as string) || undefined,
+        source_channel: (fd.get('source_channel') as 'walk_in' | 'phone' | 'referral' | 'exhibition' | 'other') || undefined,
+        intent: (fd.get('intent') as 'browsing' | 'interested' | 'ready_to_buy' | 'purchased') || undefined,
+        budget_range: (fd.get('budget_range') as 'under_50k' | '50k_200k' | '200k_500k' | 'over_500k') || undefined,
+        preferred_products: products.length > 0 ? products : undefined,
+        visit_date: (fd.get('visit_date') as string) || undefined,
+        referral_source: (fd.get('referral_source') as string) || undefined,
+        contact_status: (fd.get('contact_status') as 'new' | 'following_up' | 'quoted' | 'won' | 'lost') || undefined,
+      });
+      setShowCreate(false);
+      refetch();
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : '建立失敗');
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const handleSearchChange = (value: string) => {
     setSearchInput(value);
@@ -65,9 +105,18 @@ export default function ContactsPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-white">客戶管理</h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">查看和管理所有客戶資訊</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-zinc-900 dark:text-white">客戶管理</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">查看和管理所有客戶資訊</p>
+        </div>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-500 text-white text-sm font-medium rounded-lg hover:bg-indigo-600 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          新增客戶
+        </button>
       </div>
 
       {/* Filters */}
@@ -255,6 +304,109 @@ export default function ContactsPage() {
           </div>
         )}
       </div>
+      {/* 新增客戶 Dialog */}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>新增客戶</DialogTitle>
+            <DialogDescription>手動登記非線上客戶資訊</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateContact} className="grid gap-3">
+            {/* 必填 */}
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">客戶名稱 *</label>
+              <input name="display_name" required className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500" />
+            </div>
+            {/* 聯絡資訊 */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">電話</label>
+                <input name="phone" className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Email</label>
+                <input name="email" type="email" className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500" />
+              </div>
+            </div>
+            {/* 來源 */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">來源渠道</label>
+                <select name="source_channel" className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                  <option value="">請選擇</option>
+                  <option value="walk_in">到店來訪</option>
+                  <option value="phone">電話諮詢</option>
+                  <option value="referral">轉介紹</option>
+                  <option value="exhibition">展覽</option>
+                  <option value="other">其他</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">跟進狀態</label>
+                <select name="contact_status" defaultValue="new" className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                  <option value="new">新客戶</option>
+                  <option value="following_up">跟進中</option>
+                  <option value="quoted">已報價</option>
+                  <option value="won">成交</option>
+                  <option value="lost">流失</option>
+                </select>
+              </div>
+            </div>
+            {/* 購買意向 / 預算 */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">購買意向</label>
+                <select name="intent" className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                  <option value="">請選擇</option>
+                  <option value="browsing">瀏覽中</option>
+                  <option value="interested">有興趣</option>
+                  <option value="ready_to_buy">準備購買</option>
+                  <option value="purchased">已購買</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">預算區間</label>
+                <select name="budget_range" className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500">
+                  <option value="">請選擇</option>
+                  <option value="under_50k">5 萬以下</option>
+                  <option value="50k_200k">5-20 萬</option>
+                  <option value="200k_500k">20-50 萬</option>
+                  <option value="over_500k">50 萬以上</option>
+                </select>
+              </div>
+            </div>
+            {/* 偏好產品 / 來訪日期 */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">偏好產品</label>
+                <input name="preferred_products" placeholder="逗號分隔，如：岩板,檯面" className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">來訪日期</label>
+                <input name="visit_date" type="date" className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500" />
+              </div>
+            </div>
+            {/* 轉介來源 */}
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">轉介來源</label>
+              <input name="referral_source" placeholder="如：王設計師介紹" className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500" />
+            </div>
+            {/* 備註 */}
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">備註</label>
+              <textarea name="notes" rows={2} className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-indigo-500 resize-none" />
+            </div>
+            {createError && <p className="text-xs text-red-500">{createError}</p>}
+            <DialogFooter>
+              <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors">取消</button>
+              <button type="submit" disabled={creating} className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-500 text-white text-sm font-medium rounded-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors">
+                {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+                建立
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

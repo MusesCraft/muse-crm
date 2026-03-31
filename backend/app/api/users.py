@@ -108,8 +108,10 @@ def create_user():
     # 若提供密碼則設定，否則留空（可稍後設定）
     password = data.get('password')
     if password:
-        if len(password) < 6:
-            return jsonify({'error': '密碼至少 6 個字元'}), 400
+        from .auth import _validate_password_strength
+        pw_err = _validate_password_strength(password)
+        if pw_err:
+            return jsonify({'error': pw_err}), 400
         user.set_password(password)
 
     db.session.add(user)

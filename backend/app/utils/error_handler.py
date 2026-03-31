@@ -160,7 +160,7 @@ def get_error_stats(days: int = 30) -> Dict[str, Any]:
             text("""
                 SELECT error_type, COUNT(*) as count
                 FROM error_logs 
-                WHERE timestamp >= NOW() - INTERVAL :days DAY
+                WHERE timestamp >= NOW() - make_interval(days => :days)
                 GROUP BY error_type
                 ORDER BY count DESC
             """),
@@ -172,7 +172,7 @@ def get_error_stats(days: int = 30) -> Dict[str, Any]:
             text("""
                 SELECT DATE(timestamp) as date, COUNT(*) as count
                 FROM error_logs
-                WHERE timestamp >= NOW() - INTERVAL :days DAY
+                WHERE timestamp >= NOW() - make_interval(days => :days)
                 GROUP BY DATE(timestamp)
                 ORDER BY date DESC
             """),

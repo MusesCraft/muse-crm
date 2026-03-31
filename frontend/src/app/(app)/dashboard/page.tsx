@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { dashboardApi, contactsApi, type Contact } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
-import { LoadingSpinner } from '@/components/loading';
+import { DashboardSkeleton } from '@/components/skeletons';
 import { Avatar } from '@/components/avatar';
 import {
   Users,
@@ -208,7 +208,7 @@ export default function DashboardPage() {
     []
   );
 
-  if (loadingStats) return <LoadingSpinner className="min-h-screen" />;
+  if (loadingStats) return <div className="p-6 max-w-7xl mx-auto"><DashboardSkeleton /></div>;
 
   if (statsError) return (
     <div className="min-h-screen flex items-center justify-center">

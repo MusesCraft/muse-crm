@@ -20,6 +20,15 @@ CREATE TABLE contacts (
     source_channel  VARCHAR(50),                           -- 'messenger' | 'instagram' | 'line' | 'webchat'
     source_type     VARCHAR(50),                           -- 'ad_referral' | 'organic'
     notes           TEXT,
+    phone           VARCHAR(50),
+    email           VARCHAR(255),
+    intent          VARCHAR(50),                             -- 購買意向: browsing/interested/ready_to_buy/purchased
+    budget_range    VARCHAR(50),                             -- 預算區間: under_50k/50k_200k/200k_500k/over_500k
+    preferred_products TEXT[],                               -- 偏好產品
+    visit_date      DATE,                                    -- 來訪日期
+    referral_source VARCHAR(255),                            -- 轉介來源
+    contact_status  VARCHAR(20) DEFAULT 'new',               -- 跟進狀態: new/following_up/quoted/won/lost
+    assigned_to     UUID,                                   -- FK 在檔案末尾用 ALTER TABLE 建立（因 users 表在後面）
     external_crm_id VARCHAR(255),                          -- 預留：外部 CRM 同步 ID
     is_merged       BOOLEAN NOT NULL DEFAULT FALSE,
     merged_into_id  UUID REFERENCES contacts(id),
@@ -210,6 +219,7 @@ CREATE TABLE users (
                     CHECK (role IN ('admin', 'manager', 'user')),
     avatar_url      TEXT,
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+    team_id         VARCHAR(100),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -262,3 +272,9 @@ CREATE TRIGGER trg_actions_updated BEFORE UPDATE ON actions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER trg_user_notes_updated BEFORE UPDATE ON user_notes
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ============================================================
+-- 延遲建立的 FK（解決表建立順序相依）
+-- ============================================================
+ALTER TABLE contacts ADD CONSTRAINT fk_contacts_assigned_to
+    FOREIGN KEY (assigned_to) REFERENCES users(id);

@@ -12,6 +12,7 @@ class QuickReply(db.Model):
     content = db.Column(db.Text, nullable=False)
     trigger_keywords = db.Column(db.JSON, default=list)
     priority = db.Column(db.String(20), default='template')
+    attachments = db.Column(db.JSON, default=list)  # [{type: 'image', url: '...', label: '...'}]
     is_system = db.Column(db.Boolean, default=False)  # True = seeded from JSON
     created_by = db.Column(db.String(36), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -25,6 +26,7 @@ class QuickReply(db.Model):
             'content': self.content,
             'trigger_keywords': self.trigger_keywords or [],
             'priority': self.priority,
+            'attachments': self.attachments or [],
             'is_system': self.is_system,
             'created_by': self.created_by,
             'created_at': self.created_at.isoformat() if self.created_at else None,

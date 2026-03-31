@@ -89,6 +89,7 @@ function TagSection({
             onChange={(e) => setNewTag(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
             placeholder="輸入標籤名稱..."
+            aria-label="輸入標籤名稱"
             className="flex-1 px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
             autoFocus
           />
@@ -346,6 +347,7 @@ function NotesSection({
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
           placeholder="新增備註..."
+          aria-label="新增備註"
           className="flex-1 px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
         />
         <Button size="sm" onClick={handleSubmit} disabled={submitting || !content.trim()}>

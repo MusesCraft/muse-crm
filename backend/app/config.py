@@ -58,7 +58,7 @@ class BaseConfig:
     elif os.environ.get('RAILWAY_ENVIRONMENT'):
         CORS_ORIGINS = '*'  # Railway 內部部署，由 Railway 網路層保護
     else:
-        CORS_ORIGINS = 'http://localhost:3000,http://127.0.0.1:3000'
+        CORS_ORIGINS = '*'  # 本地開發允許所有來源
 
     # Celery
     CELERY_BROKER_URL = REDIS_URL

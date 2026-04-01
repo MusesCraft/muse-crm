@@ -314,10 +314,47 @@ def dashboard_stats():
         Message.sent_at < today_start
     ).count()
 
-    # 來源分析
-    ad_contacts = contact_q.filter(Contact.source_type == 'ad_referral').count()
-    organic_contacts = total_contacts - ad_contacts
-    referral_contacts = 0  # 目前無 referral 來源
+    # 渠道分布
+    channel_results = (
+        db.session.query(
+            Contact.source_channel,
+            func.count(Contact.id)
+        )
+        .filter(Contact.is_merged.is_(False))
+        .group_by(Contact.source_channel)
+        .order_by(func.count(Contact.id).desc())
+        .all()
+    )
+    channel_distribution_data = [
+        {'channel': ch or '未知', 'count': cnt}
+        for ch, cnt in channel_results
+    ]
+
+    # 客戶跟進狀態分布
+    status_results = (
+        db.session.query(
+            Contact.contact_status,
+            func.count(Contact.id)
+        )
+        .filter(Contact.is_merged.is_(False))
+        .group_by(Contact.contact_status)
+        .order_by(func.count(Contact.id).desc())
+        .all()
+    )
+    contact_status_data = {s or 'unknown': cnt for s, cnt in status_results}
+
+    # 購買意向分布
+    intent_results = (
+        db.session.query(
+            Contact.intent,
+            func.count(Contact.id)
+        )
+        .filter(Contact.is_merged.is_(False))
+        .group_by(Contact.intent)
+        .order_by(func.count(Contact.id).desc())
+        .all()
+    )
+    intent_data = {i or 'unknown': cnt for i, cnt in intent_results}
 
     return jsonify({
         'total_contacts': total_contacts,
@@ -339,11 +376,9 @@ def dashboard_stats():
             'count': today_messages,
             'yesterdayCount': yesterday_messages,
         },
-        'source_analysis': {
-            'organic': organic_contacts,
-            'ad': ad_contacts,
-            'referral': referral_contacts,
-        },
+        'channel_distribution': channel_distribution_data,
+        'contact_status': contact_status_data,
+        'intent_distribution': intent_data,
     })
 
 

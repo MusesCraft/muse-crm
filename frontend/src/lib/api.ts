@@ -111,6 +111,7 @@ export interface Contact {
   name: string;
   display_name: string | null;
   channel: string;
+  source_channel?: string | null;
   avatar_url: string | null;
   source_type: string;
   first_seen: string;
@@ -118,6 +119,11 @@ export interface Contact {
   conversation_count: number;
   tags?: Tag[];
   priority?: 'high' | 'medium' | 'low';
+  phone?: string | null;
+  email?: string | null;
+  contact_status?: string;
+  intent?: string;
+  budget_range?: string;
 }
 
 export interface Tag {
@@ -214,7 +220,9 @@ export interface DashboardStats {
   urgency_distribution?: { high: number; medium: number; low: number };
   status_distribution?: { active: number; silent: number; unanswered: number };
   today_messages?: { count: number; yesterdayCount: number };
-  source_analysis?: { organic: number; ad: number; referral: number };
+  channel_distribution?: { channel: string; count: number }[];
+  contact_status?: Record<string, number>;
+  intent_distribution?: Record<string, number>;
 }
 
 export interface ChannelDistribution {

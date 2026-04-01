@@ -53,6 +53,26 @@ def import_csv_contacts():
     sheet_id = match.group(1)
     csv_url = f'https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=0'
 
+    # Ensure new columns exist (auto-migration for new fields)
+    try:
+        from sqlalchemy import text
+        ddl_stmts = [
+            "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS intent VARCHAR(50)",
+            "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS budget_range VARCHAR(50)",
+            "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS preferred_products TEXT[]",
+            "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS visit_date DATE",
+            "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS referral_source VARCHAR(255)",
+            "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS contact_status VARCHAR(20) DEFAULT 'new'",
+            "ALTER TABLE quick_replies ADD COLUMN IF NOT EXISTS attachments JSON DEFAULT '[]'",
+        ]
+        for stmt in ddl_stmts:
+            db.session.execute(text(stmt))
+        db.session.commit()
+        logger.info("✅ Schema migration complete")
+    except Exception as mig_err:
+        logger.warning(f"Schema migration skipped: {mig_err}")
+        db.session.rollback()
+
     # Download CSV
     try:
         resp = http_requests.get(csv_url, timeout=30)

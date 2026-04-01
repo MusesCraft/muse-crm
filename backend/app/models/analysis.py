@@ -4,7 +4,7 @@ MUSE CRM — Analysis & AnalysisQueue Models
 LLM 分析結果和分析佇列模型。
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy import String, Text, Integer, Boolean, DateTime, Index, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
@@ -194,18 +194,18 @@ class AnalysisQueue(db.Model):
     def mark_as_processing(self) -> None:
         """標記為處理中"""
         self.status = 'processing'
-        self.processed_at = func.now()
-    
+        self.processed_at = datetime.now(timezone.utc)
+
     def mark_as_completed(self) -> None:
         """標記為完成"""
         self.status = 'completed'
-        self.processed_at = func.now()
-    
+        self.processed_at = datetime.now(timezone.utc)
+
     def mark_as_failed(self, error_message: str) -> None:
         """標記為失敗"""
         self.status = 'failed'
         self.error_message = error_message
-        self.processed_at = func.now()
+        self.processed_at = datetime.now(timezone.utc)
         self.retry_count += 1
     
     def to_dict(self) -> dict:

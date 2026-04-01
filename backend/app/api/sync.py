@@ -42,7 +42,10 @@ def sync_meta_history():
 
     data = request.get_json(silent=True) or {}
     channel = data.get('channel', 'all')
-    limit = min(int(data.get('limit', 100)), 500)
+    try:
+        limit = min(int(data.get('limit', 100)), 500)
+    except (ValueError, TypeError):
+        return jsonify({'error': 'limit 必須為整數'}), 400
 
     if channel not in ('messenger', 'instagram', 'all'):
         return jsonify({'error': f'不支援的渠道：{channel}'}), 400

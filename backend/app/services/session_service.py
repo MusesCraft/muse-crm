@@ -103,17 +103,26 @@ class SessionService:
             ).order_by(Conversation.started_at.desc()).first()
             if active_conversation:
                 return active_conversation
-            # 極端情況：重新建立
-            conversation = Conversation(
-                contact_id=contact.id,
-                channel=channel,
-                status='active',
-                started_at=datetime.now(timezone.utc),
-                timeout_minutes=timeout_minutes,
-                ad_referral=ad_referral
-            )
-            db.session.add(conversation)
-            db.session.flush()
+            # 極端情況：重新建立（若再次衝突則拋出例外）
+            try:
+                conversation = Conversation(
+                    contact_id=contact.id,
+                    channel=channel,
+                    status='active',
+                    started_at=datetime.now(timezone.utc),
+                    timeout_minutes=timeout_minutes,
+                    ad_referral=ad_referral
+                )
+                db.session.add(conversation)
+                db.session.flush()
+            except IntegrityError:
+                db.session.rollback()
+                logger.warning(f"二次建立衝突，再次查詢：contact={contact.id}")
+                return Conversation.query.filter_by(
+                    contact_id=contact.id,
+                    channel=channel,
+                    status='active'
+                ).order_by(Conversation.started_at.desc()).first()
 
         logger.info(f"新對話 Session 已建立：{conversation.id}")
         return conversation

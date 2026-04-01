@@ -222,10 +222,15 @@ class MetaAdapter(ChannelAdapter):
             referral = message_obj['referral']
 
         if referral:
+            ad_id = referral.get('ad_id')
+            campaign_name = referral.get('campaign_name')
+            # 至少需要 ad_id 或 campaign_name 才算有效廣告來源
+            if not ad_id and not campaign_name:
+                return None
             return {
                 'ref': referral.get('ref'),
-                'ad_id': referral.get('ad_id'),
-                'campaign_name': referral.get('campaign_name'),
+                'ad_id': ad_id,
+                'campaign_name': campaign_name,
                 'creative_id': referral.get('creative_id'),
                 'source': referral.get('source', 'ADS'),
                 'type': referral.get('type', 'OPEN_THREAD'),

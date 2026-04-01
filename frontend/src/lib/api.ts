@@ -53,11 +53,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     // 嘗試用 refresh token 續期（防止多個請求同時 refresh）
     if (!isRefreshing) {
       isRefreshing = true;
-      refreshPromise = tryRefresh();
+      refreshPromise = tryRefresh().finally(() => {
+        isRefreshing = false;
+        refreshPromise = null;
+      });
     }
     const refreshed = await refreshPromise;
-    isRefreshing = false;
-    refreshPromise = null;
 
     if (refreshed) {
       // 用新 token 重試原請求
@@ -194,6 +195,9 @@ export interface Note {
 }
 
 export interface ContactDetail extends Contact {
+  phone?: string | null;
+  email?: string | null;
+  notes_text?: string | null;
   tags: Tag[];
   conversations: Conversation[];
   analyses: Analysis[];
@@ -356,6 +360,9 @@ function transformContactDetail(raw: any): ContactDetail {
   const base = transformContact(raw);
   return {
     ...base,
+    phone: raw.phone || null,
+    email: raw.email || null,
+    notes_text: raw.notes || null,
     tags: raw.tags?.map(transformTag) || [],
     conversations: raw.conversations?.map(transformConversation) || [],
     analyses: raw.analyses?.map(transformAnalysis) || [],

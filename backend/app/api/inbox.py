@@ -34,9 +34,7 @@ def _check_conversation_access(conversation):
             return jsonify({'error': '權限不足'}), 403
     return None
 
-# 根據 tags 推斷 contact priority
-_HIGH_PRIORITY_TAGS = {'VIP', '投訴者'}
-_MEDIUM_PRIORITY_TAGS = {'潛在客戶'}
+from ..services.contact_service import infer_contact_priority
 
 
 def _get_contact_external_id(contact, channel=None):
@@ -46,20 +44,6 @@ def _get_contact_external_id(contact, channel=None):
         query = query.filter_by(channel=channel)
     ci = query.first()
     return ci.external_id if ci else None
-
-
-def _infer_contact_priority(contact: Contact) -> str:
-    """根據 contact tags 推斷 priority（high/medium/low）"""
-    tag_names = set()
-    for ct in contact.tags:
-        if ct.tag:
-            tag_names.add(ct.tag.name)
-
-    if tag_names & _HIGH_PRIORITY_TAGS:
-        return 'high'
-    if tag_names & _MEDIUM_PRIORITY_TAGS:
-        return 'medium'
-    return 'low'
 
 
 @api_bp.route('/inbox/conversations', methods=['GET'])
@@ -139,7 +123,7 @@ def list_conversations():
     for conv in pagination.items:
         conv_dict = conv.to_dict()
         contact_dict = conv.contact.to_dict()
-        priority = _infer_contact_priority(conv.contact)
+        priority = infer_contact_priority(conv.contact)
         contact_dict['priority'] = priority
         conv_dict['contact'] = contact_dict
         conv_dict['urgency'] = priority
@@ -303,8 +287,8 @@ def send_message(conversation_id):
     )
     db.session.add(msg)
 
-    # 更新 conversation 統計
-    conversation.message_count = (conversation.message_count or 0) + 1
+    # 更新 conversation 統計（使用 SQL 表達式做原子遞增，避免並發競態）
+    conversation.message_count = Conversation.message_count + 1
     conversation.last_message_at = now
 
     db.session.commit()

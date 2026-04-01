@@ -9,11 +9,6 @@ import {
   type Conversation,
   type Analysis,
 } from '@/lib/api';
-import {
-  mockContactEntities,
-  mockConversations,
-  type ContactEntityInfo,
-} from '@/lib/mock-data';
 import { useAsync } from '@/lib/hooks';
 import { Avatar } from '@/components/avatar';
 import { ChannelBadge } from '@/components/channel-icon';
@@ -157,23 +152,12 @@ export function CustomerSidebar({
     [contactId]
   );
 
-  // Get entity info from mock
-  const entityInfo: ContactEntityInfo = mockContactEntities[contactId] || {};
-
-  // Get other conversations for this contact (from mock data for now)
-  const otherConversations = mockConversations.filter(
-    (c) => c.contact_id === contactId && c.id !== conversationId
+  // 從 API 資料取得其他對話和分析結果
+  const otherConversations = (contact?.conversations || []).filter(
+    (c) => c.id !== conversationId
   );
 
-  // Get existing analysis from the current conversation
-  const currentConvAnalyses = mockConversations
-    .find((c) => c.id === conversationId)
-    ?.analyses || [];
-
-  // Check if there's already an analysis
-  const existingAnalysis = currentConvAnalyses.length > 0
-    ? currentConvAnalyses[0]
-    : contact?.analyses?.[0] || null;
+  const existingAnalysis = contact?.analyses?.[0] || null;
 
   // Handle deep analysis
   const handleAnalyze = async () => {
@@ -286,28 +270,16 @@ export function CustomerSidebar({
         <div className="p-4 border-b border-zinc-200/50 dark:border-zinc-800/50">
           <h4 className="text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-3">基本資訊</h4>
           <div className="space-y-2.5">
-            {entityInfo.phone && (
+            {contact.phone && (
               <div className="flex items-center gap-2.5 text-sm">
                 <Phone className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 flex-shrink-0" />
-                <span className="text-zinc-600 dark:text-zinc-300">{entityInfo.phone}</span>
+                <span className="text-zinc-600 dark:text-zinc-300">{contact.phone}</span>
               </div>
             )}
-            {entityInfo.address && (
-              <div className="flex items-center gap-2.5 text-sm">
-                <MapPin className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 flex-shrink-0" />
-                <span className="text-zinc-600 dark:text-zinc-300">{entityInfo.address}</span>
-              </div>
-            )}
-            {entityInfo.email && (
+            {contact.email && (
               <div className="flex items-center gap-2.5 text-sm">
                 <Mail className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 flex-shrink-0" />
-                <span className="text-zinc-600 dark:text-zinc-300">{entityInfo.email}</span>
-              </div>
-            )}
-            {entityInfo.company && (
-              <div className="flex items-center gap-2.5 text-sm">
-                <Building2 className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 flex-shrink-0" />
-                <span className="text-zinc-600 dark:text-zinc-300">{entityInfo.company}</span>
+                <span className="text-zinc-600 dark:text-zinc-300">{contact.email}</span>
               </div>
             )}
             {contact.display_name && contact.display_name !== contact.name && (
@@ -387,7 +359,7 @@ export function CustomerSidebar({
               ) : (
                 <>
                   <Search className="w-4 h-4" />
-                  深入分析
+                  深度分析
                 </>
               )}
             </button>

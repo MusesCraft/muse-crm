@@ -16,7 +16,7 @@ from ..utils import escape_like
 from ..utils.auth import login_required
 from ..utils.permissions import get_current_user, require_role
 from ..utils.scope import apply_contact_scope
-from ..services.contact_service import ContactService
+from ..services.contact_service import ContactService, infer_contact_priority
 from ..services.merge_service import MergeService
 
 
@@ -196,10 +196,13 @@ def list_contacts():
             for ct in contact.tags
         ]
         
+        # 加入優先級（根據 tags 推斷）
+        contact_dict['priority'] = infer_contact_priority(contact)
+
         # 加入統計資訊（已 eager loaded，直接用 len）
         contact_dict['conversation_count'] = len(contact.conversations)
         contact_dict['message_count'] = len(contact.messages)
-        
+
         contacts.append(contact_dict)
     
     return jsonify({
@@ -241,7 +244,10 @@ def get_contact_detail(contact_id):
         return jsonify({'error': '此客戶已被合併'}), 400
     
     contact_dict = contact.to_dict()
-    
+
+    # 優先級（根據 tags 推斷）
+    contact_dict['priority'] = infer_contact_priority(contact)
+
     # 標籤
     contact_dict['tags'] = [
         {
@@ -505,6 +511,14 @@ def merge_contacts():
     target = Contact.query.get(target_id)
     if not target:
         return jsonify({'error': f'目標客戶 {target_id} 不存在'}), 404
+
+    # 檢查用戶是否有權存取這兩個客戶
+    denied = _check_contact_access(source)
+    if denied:
+        return denied
+    denied = _check_contact_access(target)
+    if denied:
+        return denied
 
     if source.is_merged:
         return jsonify({'error': '來源客戶已被合併'}), 400

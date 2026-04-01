@@ -1,26 +1,39 @@
 """MUSE CRM — QuickReply Model"""
-from datetime import datetime, timezone
-from .. import db
+from datetime import datetime
+from typing import Optional, List
+from sqlalchemy import String, Text, Boolean, DateTime, Index
+from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql import func
 import uuid
+
+from .. import db
+
 
 class QuickReply(db.Model):
     __tablename__ = 'quick_replies'
 
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    category = db.Column(db.String(50), nullable=False, index=True)
-    title = db.Column(db.String(200), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    trigger_keywords = db.Column(db.JSON, default=list)
-    priority = db.Column(db.String(20), default='template')
-    attachments = db.Column(db.JSON, default=list)  # [{type: 'image', url: '...', label: '...'}]
-    is_system = db.Column(db.Boolean, default=False)  # True = seeded from JSON
-    created_by = db.Column(db.String(36), nullable=True)
-    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    category: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    trigger_keywords: Mapped[Optional[list]] = mapped_column(JSONB, default=list)
+    priority: Mapped[Optional[str]] = mapped_column(String(20), default='template')
+    attachments: Mapped[Optional[list]] = mapped_column(JSONB, default=list)
+    is_system: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=func.now(), onupdate=func.now()
+    )
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return {
-            'id': self.id,
+            'id': str(self.id),
             'category': self.category,
             'title': self.title,
             'content': self.content,

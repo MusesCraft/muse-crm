@@ -4,7 +4,7 @@ MUSE CRM — NotificationPreference Model
 使用者通知偏好設定模型。
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from sqlalchemy import String, Text, DateTime, Boolean, Index
 from sqlalchemy.dialects.postgresql import UUID
@@ -89,7 +89,9 @@ class NotificationPreference(db.Model):
             return False
 
         try:
-            now = datetime.now(timezone.utc).strftime('%H:%M')
+            # 使用 Asia/Taipei（UTC+8）時區，與使用者設定的勿擾時段一致
+            tz_taipei = timezone(timedelta(hours=8))
+            now = datetime.now(tz_taipei).strftime('%H:%M')
             start = self.quiet_hours_start
             end = self.quiet_hours_end
 

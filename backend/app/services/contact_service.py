@@ -14,6 +14,25 @@ from .. import db
 logger = logging.getLogger(__name__)
 
 
+# 根據 tags 推斷 contact priority
+_HIGH_PRIORITY_TAGS = {'VIP', '投訴者'}
+_MEDIUM_PRIORITY_TAGS = {'潛在客戶'}
+
+
+def infer_contact_priority(contact: Contact) -> str:
+    """根據 contact tags 推斷 priority（high/medium/low）"""
+    tag_names = set()
+    for ct in contact.tags:
+        if ct.tag:
+            tag_names.add(ct.tag.name)
+
+    if tag_names & _HIGH_PRIORITY_TAGS:
+        return 'high'
+    if tag_names & _MEDIUM_PRIORITY_TAGS:
+        return 'medium'
+    return 'low'
+
+
 class ContactService:
     """客戶服務類別"""
     

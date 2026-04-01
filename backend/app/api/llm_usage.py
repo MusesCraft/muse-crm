@@ -204,7 +204,7 @@ def llm_budget_status():
     current_tokens = int(result.tokens)
 
     cost_percentage = (current_cost / cost_limit * 100) if cost_limit > 0 else 0
-    token_percentage = (current_tokens / token_limit * 100) if token_limit else None
+    token_percentage = (current_tokens / token_limit * 100) if token_limit and token_limit > 0 else None
 
     return jsonify({
         'enabled': enabled,

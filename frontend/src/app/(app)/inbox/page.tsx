@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { inboxApi, type Conversation, type PaginatedResponse } from '@/lib/api';
-import { mockConversations } from '@/lib/mock-data';
 import { useAsync } from '@/lib/hooks';
 import { ConversationList } from './conversation-list';
 import { ConversationDetail } from './conversation-detail';
@@ -26,6 +25,7 @@ export default function InboxPage() {
     searchDebounceTimer.current = setTimeout(() => {
       setSearch(value);
       setPage(1);
+      setSelectedId(null);
     }, 300);
   }, []);
 
@@ -87,7 +87,7 @@ export default function InboxPage() {
 
   // Find selected conversation to get contact info
   const selectedConv = selectedId
-    ? (data?.data || []).find((c) => c.id === selectedId) || mockConversations.find((c) => c.id === selectedId)
+    ? (data?.data || []).find((c) => c.id === selectedId)
     : null;
 
   return (
@@ -105,9 +105,9 @@ export default function InboxPage() {
           page={page}
           onPageChange={setPage}
           status={status}
-          onStatusChange={(v) => { setStatus(v); setPage(1); }}
+          onStatusChange={(v) => { setStatus(v); setPage(1); setSelectedId(null); }}
           channel={channel}
-          onChannelChange={(v) => { setChannel(v); setPage(1); }}
+          onChannelChange={(v) => { setChannel(v); setPage(1); setSelectedId(null); }}
           search={searchInput}
           onSearchChange={handleSearchChange}
           onRetry={refetch}

@@ -43,8 +43,14 @@ export function MessageBubble({ message, onOcr }: MessageBubbleProps) {
         {message.message_type === 'image' && message.media_url && (
           <div className="mb-2">
             {imgError ? (
-              <div className="w-48 h-36 bg-zinc-200 dark:bg-zinc-700 rounded-lg flex items-center justify-center">
-                <span className="text-xs text-zinc-400">圖片已過期</span>
+              <div className="w-48 h-36 bg-zinc-200 dark:bg-zinc-700 rounded-lg flex flex-col items-center justify-center gap-1.5">
+                <span className="text-xs text-zinc-400">圖片已過期或無法載入</span>
+                <button
+                  onClick={() => setImgError(false)}
+                  className="text-[11px] text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300"
+                >
+                  重新載入
+                </button>
               </div>
             ) : (
               <>

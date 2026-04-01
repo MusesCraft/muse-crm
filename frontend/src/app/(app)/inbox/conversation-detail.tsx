@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { inboxApi, ocrApi, type Conversation, type Message, type Analysis } from '@/lib/api';
-import { getConversationAnalysis } from '@/lib/mock-data';
 import { useAsync } from '@/lib/hooks';
 import { Avatar } from '@/components/avatar';
 import { ChannelBadge } from '@/components/channel-icon';
@@ -78,23 +77,25 @@ function AnalysisCard({ analysis }: { analysis: Analysis }) {
 // ── AI Suggestion Card ─────────────────────────────────
 
 function AiSuggestionCard({
-  conversationId,
+  analyses,
   onUse,
 }: {
-  conversationId: string | number;
+  analyses?: Analysis[];
   onUse: (text: string) => void;
 }) {
   const [dismissed, setDismissed] = useState(false);
-  const { hasAnalysis, suggestedReply } = getConversationAnalysis(conversationId);
 
   if (dismissed) return null;
 
-  if (!hasAnalysis) {
+  // 從真實分析結果中取得建議回覆
+  const suggestedReply = analyses?.[0]?.result?.suggested_reply as string | undefined;
+
+  if (!analyses || analyses.length === 0) {
     return (
       <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50">
         <p className="text-xs text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
           <Lightbulb className="w-3.5 h-3.5" />
-          點擊右側「深度分析」查看 AI 建議
+          點擊「深度分析」查看 AI 建議
         </p>
       </div>
     );
@@ -177,9 +178,10 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
     [conversationId]
   );
 
-  // Reset local messages when conversation changes
+  // Reset local messages and scroll tracking when conversation changes
   useEffect(() => {
     setLocalMessages([]);
+    prevMsgCountRef.current = 0;
   }, [conversationId]);
 
   // Auto polling every 5 seconds (pause when tab hidden or just sent a message)
@@ -211,9 +213,15 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
   const prevMsgCountRef = useRef(0);
   useEffect(() => {
     const count = (conv?.messages?.length || 0) + localMessages.length;
-    if (count !== prevMsgCountRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (count > 0 && count !== prevMsgCountRef.current) {
+      const isInitialLoad = prevMsgCountRef.current === 0;
       prevMsgCountRef.current = count;
+      // 使用雙 RAF 確保長訊息列表 DOM 完整渲染後再滾動
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: isInitialLoad ? 'instant' : 'smooth' });
+        });
+      });
     }
   }, [conv?.messages, localMessages]);
 
@@ -346,15 +354,15 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-4 text-xs text-zinc-400 dark:text-zinc-500">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <div className="hidden sm:flex items-center gap-4 text-xs text-zinc-400 dark:text-zinc-500">
             <span className="flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {formatDateTime(conv.started_at)}
             </span>
             <span className="flex items-center gap-1">
               <MessageSquare className="w-3 h-3" />
-              {conv.message_count} 則訊息
+              {conv.message_count} 則
             </span>
           </div>
 
@@ -418,7 +426,7 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
       )}
 
       {/* AI Suggestion */}
-      <AiSuggestionCard conversationId={conversationId} onUse={handleAiSuggestionUse} />
+      <AiSuggestionCard analyses={conv.analyses} onUse={handleAiSuggestionUse} />
 
       {/* Message Input Area */}
       <SendBar

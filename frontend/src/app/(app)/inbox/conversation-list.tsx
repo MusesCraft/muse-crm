@@ -172,7 +172,14 @@ export function ConversationList({
                   <UrgencyBadge urgency={conv.urgency} />
                 </div>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 truncate">
-                  {conv.last_message ? truncate(conv.last_message.content, 40) : '尚無訊息'}
+                  {conv.last_message
+                    ? (conv.last_message.content
+                        ? truncate(conv.last_message.content, 40)
+                        : conv.last_message.message_type === 'image' ? '[圖片]'
+                        : conv.last_message.message_type === 'sticker' ? '[貼圖]'
+                        : conv.last_message.message_type === 'attachment' ? '[附件]'
+                        : '...')
+                    : '尚無訊息'}
                 </p>
               </div>
             </button>

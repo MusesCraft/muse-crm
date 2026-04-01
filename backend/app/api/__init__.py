@@ -26,6 +26,7 @@ from . import upload
 from . import health_check
 from . import ocr
 from . import broadcast
+from . import import_contacts
 
 # 註冊錯誤處理器
 from ..utils.error_handler import register_error_handlers

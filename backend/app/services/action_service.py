@@ -159,22 +159,12 @@ class ActionService:
         Returns:
             新建的 Action ID 或 None（已存在時）
         """
-        # 去重：同一個 contact + 相似類型，如果已有 pending 的就不重複建立
+        # 去重：同一個 contact + 相同 action_type，如果已有 pending 的就不重複建立
         existing = Action.query.filter(
             Action.contact_id == contact_id,
             Action.status.in_(["pending", "assigned"]),
-            Action.description.ilike(f"%{action_type}%"),
+            Action.action_type == action_type,
         ).first()
-
-        # 更精確的去重：檢查是否有描述相似的 pending action
-        if not existing and description:
-            # 取描述前 20 個字做模糊匹配
-            desc_prefix = description[:20] if len(description) > 20 else description
-            existing = Action.query.filter(
-                Action.contact_id == contact_id,
-                Action.status.in_(["pending", "assigned"]),
-                Action.description.ilike(f"%{desc_prefix}%"),
-            ).first()
 
         if existing:
             logger.debug(

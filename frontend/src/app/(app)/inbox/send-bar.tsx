@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { inboxSendApi, uploadApi, quickRepliesApi, type Message, type QuickReplyItem, type QuickReplyAttachment } from '@/lib/api';
-import { mockQuickReplies } from '@/lib/mock-data';
 import {
   Paperclip,
   Loader2,
@@ -51,24 +50,10 @@ function QuickRepliesPanel({ onSelect, onClose }: { onSelect: (text: string, att
     return () => clearTimeout(timer);
   }, [search, apiLoaded, apiReplies.length]);
 
-  // Use API replies if available, else fallback to mock
-  const useApi = apiReplies.length > 0;
+  const categories = Array.from(new Set(apiReplies.map((r) => r.category)));
 
-  const categories = useApi
-    ? Array.from(new Set(apiReplies.map((r) => r.category)))
-    : Array.from(new Set(mockQuickReplies.map((r) => r.category)));
-
-  const filteredMock = search
-    ? mockQuickReplies.filter(
-        (r) =>
-          r.title.toLowerCase().includes(search.toLowerCase()) ||
-          r.content.toLowerCase().includes(search.toLowerCase())
-      )
-    : mockQuickReplies;
-
-  const displayItems: { id: string | number; category: string; title: string; content: string; attachments?: QuickReplyAttachment[] }[] = useApi
-    ? apiReplies.map((r) => ({ id: r.id, category: r.category, title: r.title, content: r.content, attachments: r.attachments }))
-    : filteredMock;
+  const displayItems: { id: string | number; category: string; title: string; content: string; attachments?: QuickReplyAttachment[] }[] =
+    apiReplies.map((r) => ({ id: r.id, category: r.category, title: r.title, content: r.content, attachments: r.attachments }));
 
   return (
     <div className="absolute bottom-full left-0 mb-2 w-80 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg z-50 max-h-80 flex flex-col">
@@ -243,7 +228,7 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
       } else {
         // fallback: 如果後端沒回傳完整 message，自己建一個
         const newMsg: Message = {
-          id: Date.now(),
+          id: `local-${Date.now()}`,
           conversation_id: conversationId,
           sender_type: 'business',
           message_type: messageType,

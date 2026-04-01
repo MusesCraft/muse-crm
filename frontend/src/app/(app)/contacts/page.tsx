@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { contactsApi, type Contact, type PaginatedResponse } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
@@ -71,6 +71,13 @@ export default function ContactsPage() {
       setPage(1);
     }, 300);
   };
+
+  // 清理 debounce timer，避免 unmount 後 setState
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, []);
 
   const { data, loading, error, refetch } = useAsync<PaginatedResponse<Contact>>(
     () =>

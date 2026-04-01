@@ -11,7 +11,8 @@ from . import api_bp
 from ..models import Tag, ContactTag, Contact
 from .. import db
 from ..utils.auth import login_required
-from ..utils.permissions import require_role
+from ..utils.permissions import get_current_user, require_role
+from ..utils.scope import apply_contact_scope
 
 
 @api_bp.route('/tags', methods=['GET'])
@@ -174,9 +175,9 @@ def list_contacts_by_tag(tag_id):
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 20, type=int), 100)
     
-    # 透過 ContactTag 關聯查詢客戶
+    # 透過 ContactTag 關聯查詢客戶（一次 JOIN 取得 tag_source，避免 N+1）
     query = (
-        db.session.query(Contact)
+        db.session.query(Contact, ContactTag)
         .join(ContactTag, Contact.id == ContactTag.contact_id)
         .filter(
             ContactTag.tag_id == tag.id,
@@ -184,22 +185,19 @@ def list_contacts_by_tag(tag_id):
         )
         .order_by(Contact.last_active_at.desc())
     )
-    
+
+    # 套用資料可見範圍
+    user = get_current_user()
+    if user:
+        query = apply_contact_scope(query, user)
+
     pagination = query.paginate(page=page, per_page=per_page)
-    
+
     contacts = []
-    for contact in pagination.items:
+    for contact, contact_tag in pagination.items:
         contact_dict = contact.to_dict()
-        
-        # 加入此標籤的來源資訊
-        contact_tag = ContactTag.query.filter_by(
-            contact_id=contact.id,
-            tag_id=tag.id
-        ).first()
-        
         contact_dict['tag_source'] = contact_tag.source if contact_tag else None
         contact_dict['tagged_at'] = contact_tag.created_at.isoformat() if contact_tag else None
-        
         contacts.append(contact_dict)
     
     return jsonify({

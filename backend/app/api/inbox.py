@@ -12,7 +12,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import joinedload, subqueryload
 
 from . import api_bp
-from ..models import Conversation, Message, Contact, ChannelIdentifier, ContactTag, Tag
+from ..models import Conversation, Message, Contact, ChannelIdentifier
 from .. import db
 from ..tasks.analysis_tasks import analyze_conversation
 from ..utils import escape_like
@@ -55,24 +55,29 @@ def list_conversations():
     Query parameters:
         - page: 頁碼（預設 1）
         - per_page: 每頁筆數（預設 20）
-        - status: 篩選狀態 active/closed
+        - status: 篩選狀態 unassigned/active/waiting_customer/escalated/supervisor_taken/resolved/closed
         - channel: 篩選渠道 messenger/instagram
         - search: 搜尋客戶名稱或訊息內容
+        - view: 視圖（PR-2/PRD §F1.1）
+            mine：分配給我的對話（current_handler_id == self）
+            unassigned：待認領（status='unassigned' 或 current_handler_id IS NULL）
+            team：團隊視圖（manager/admin only，預設行為）
+        - handler_id: 篩選負責人（manager/admin only）
+        - escalated: 'true' 時只顯示 status='escalated'
     """
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 20, type=int), 100)
     status = request.args.get('status')
     channel = request.args.get('channel')
     search = request.args.get('search', '').strip()
+    view = request.args.get('view')
+    handler_id = request.args.get('handler_id')
+    escalated_only = request.args.get('escalated') == 'true'
     
     query = (
         db.session.query(Conversation)
         .join(Contact, Conversation.contact_id == Contact.id)
-        .options(
-            joinedload(Conversation.contact)
-            .subqueryload(Contact.tags)
-            .joinedload(ContactTag.tag)
-        )
+        .options(joinedload(Conversation.contact))
         .order_by(desc(Conversation.last_message_at))
     )
 
@@ -81,11 +86,27 @@ def list_conversations():
     if user:
         query = apply_conversation_scope(query, user)
 
+    # PR-2 視圖篩選
+    if view == 'mine' and user:
+        query = query.filter(Conversation.current_handler_id == user.id)
+    elif view == 'unassigned':
+        query = query.filter(
+            db.or_(
+                Conversation.status == 'unassigned',
+                Conversation.current_handler_id.is_(None),
+            )
+        )
+    # 'team' 視圖：保持預設（受 scope 限制，supervisor/admin 看全部）
+
     # 篩選條件
     if status:
         query = query.filter(Conversation.status == status)
     if channel:
         query = query.filter(Conversation.channel == channel)
+    if handler_id and user and user.role in ('admin', 'manager'):
+        query = query.filter(Conversation.current_handler_id == handler_id)
+    if escalated_only:
+        query = query.filter(Conversation.status == 'escalated')
     if search:
         safe_search = escape_like(search)
         query = query.filter(
@@ -236,6 +257,11 @@ def send_message(conversation_id):
     content = (data.get('content') or '').strip()
     message_type = data.get('message_type', 'text')
     media_url = data.get('media_url')
+    # PR-2 新增：內部備註與 @ 提及
+    is_internal = bool(data.get('is_internal', False))
+    mentions = data.get('mentions') or []
+    if not isinstance(mentions, list):
+        return jsonify({'error': 'mentions 必須為陣列'}), 400
 
     if message_type == 'text' and not content:
         return jsonify({'error': '請提供訊息內容'}), 400
@@ -246,33 +272,37 @@ def send_message(conversation_id):
     contact = conversation.contact
     psid = _get_contact_external_id(contact, channel=conversation.channel)
 
-    # 依渠道選擇發送方式
+    # 依渠道選擇發送方式（內部備註不對外發送）
     sent_via_api = False
     api_error = None
     channel = conversation.channel
 
-    try:
-        if psid and channel in ('messenger', 'instagram'):
-            from ..utils.meta_api import meta_api
-            if message_type == 'text':
-                sent_via_api = meta_api.send_message(psid, content)
-            elif message_type == 'image':
-                sent_via_api = meta_api.send_image(psid, media_url)
-                if content and sent_via_api:
-                    meta_api.send_message(psid, content)
-        elif psid and channel == 'line':
-            from ..channels.registry import channel_registry
-            line_adapter = channel_registry.get_adapter('line')
-            if line_adapter:
+    if is_internal:
+        # PR-2：內部備註只儲存，不發送平台
+        pass
+    else:
+        try:
+            if psid and channel in ('messenger', 'instagram'):
+                from ..utils.meta_api import meta_api
                 if message_type == 'text':
-                    sent_via_api = line_adapter.send_message(psid, content)
+                    sent_via_api = meta_api.send_message(psid, content)
                 elif message_type == 'image':
-                    sent_via_api = line_adapter.send_image(psid, media_url)
+                    sent_via_api = meta_api.send_image(psid, media_url)
                     if content and sent_via_api:
-                        line_adapter.send_message(psid, content)
-    except Exception as e:
-        logger.warning(f"[{channel}] API 發送失敗: {e}")
-        api_error = str(e)
+                        meta_api.send_message(psid, content)
+            elif psid and channel == 'line':
+                from ..channels.registry import channel_registry
+                line_adapter = channel_registry.get_adapter('line')
+                if line_adapter:
+                    if message_type == 'text':
+                        sent_via_api = line_adapter.send_message(psid, content)
+                    elif message_type == 'image':
+                        sent_via_api = line_adapter.send_image(psid, media_url)
+                        if content and sent_via_api:
+                            line_adapter.send_message(psid, content)
+        except Exception as e:
+            logger.warning(f"[{channel}] API 發送失敗: {e}")
+            api_error = str(e)
 
     # 不管 API 是否成功，都建立 Message 記錄
     now = datetime.now(timezone.utc)
@@ -283,6 +313,8 @@ def send_message(conversation_id):
         message_type=message_type,
         content=content or None,
         media_url=media_url if message_type == 'image' else None,
+        is_internal=is_internal,
+        mentions=mentions,
         sent_at=now,
     )
     db.session.add(msg)

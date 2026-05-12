@@ -36,27 +36,47 @@ class Conversation(db.Model):
     
     # 基本資訊
     channel: Mapped[str] = mapped_column(String(50), nullable=False)
+    # PR-2 擴充 status enum：unassigned/active/waiting_customer/escalated/supervisor_taken/resolved/closed
     status: Mapped[str] = mapped_column(
-        String(20), 
-        nullable=False, 
+        String(20),
+        nullable=False,
         default='active'
     )
-    
+
     # 時間管理
     started_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), 
-        nullable=False, 
+        DateTime(timezone=True),
+        nullable=False,
         default=func.now()
     )
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     timeout_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=240)  # 預設 4 小時（與 schema.sql 一致）
-    
+
     # Ad Referral
     ad_referral: Mapped[Optional[dict]] = mapped_column(JSONB)  # { ad_id, campaign_name, creative_id }
-    
+
     # Meta 統計
     message_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_message_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+    # PR-2 新增：對話分配與接管欄位（FILE_STRUCTURE_PLAN §2.1）
+    # current_handler_id：當前實際處理者（客服或接管中的主管）
+    current_handler_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        db.ForeignKey('users.id', ondelete='SET NULL'),
+        nullable=True
+    )
+    # supervisor_id：接管中的主管（與 current_handler_id 可能相同，也可能為旁聽者）
+    supervisor_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        db.ForeignKey('users.id', ondelete='SET NULL'),
+        nullable=True
+    )
+    # watchers：旁聽中的使用者 ID 清單（JSONB array of UUID 字串）
+    watchers: Mapped[Optional[list]] = mapped_column(JSONB, default=list)
+    # 求援/升級資訊
+    escalated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    escalation_reason: Mapped[Optional[str]] = mapped_column(String(500))
     
     # 審計欄位
     created_at: Mapped[datetime] = mapped_column(
@@ -93,26 +113,47 @@ class Conversation(db.Model):
     
     # 約束和索引
     __table_args__ = (
-        CheckConstraint("status IN ('active', 'closed')", name='ck_conversation_status'),
+        # PR-2 擴充：對話狀態機（PRD §F2.1）
+        CheckConstraint(
+            "status IN ('unassigned', 'active', 'waiting_customer', 'escalated', "
+            "'supervisor_taken', 'resolved', 'closed')",
+            name='ck_conversation_status'
+        ),
         Index('idx_conversations_contact', 'contact_id'),
         Index('idx_conversations_status', 'status', 'last_message_at'),
         Index('idx_conversations_channel', 'channel'),
-        # 唯一約束：同一個 contact + channel + status=active 只能有一個
+        Index('idx_conversations_handler', 'current_handler_id'),
+        Index('idx_conversations_supervisor', 'supervisor_id'),
+        # 唯一約束：同一個 contact + channel 在「非終態」狀態只能有一個
         Index(
             'uq_conversations_active_per_contact_channel',
             'contact_id', 'channel',
             unique=True,
-            postgresql_where=db.text("status = 'active'")
+            postgresql_where=db.text(
+                "status IN ('unassigned', 'active', 'waiting_customer', 'escalated', 'supervisor_taken')"
+            )
         ),
     )
     
     def __repr__(self) -> str:
         return f"<Conversation {self.id}: {self.status} on {self.channel}>"
     
+    # PR-2 新增：對話狀態判定 helpers
+    _OPEN_STATUSES = {'unassigned', 'active', 'waiting_customer', 'escalated', 'supervisor_taken'}
+    _CLOSED_STATUSES = {'resolved', 'closed'}
+
     @property
     def is_active(self) -> bool:
-        """檢查對話是否仍在活躍狀態"""
-        return self.status == 'active'
+        """檢查對話是否仍在活躍狀態（含 PR-2 新增的開放狀態）"""
+        return self.status in self._OPEN_STATUSES
+
+    @property
+    def is_escalated(self) -> bool:
+        return self.status == 'escalated'
+
+    @property
+    def is_supervisor_taken(self) -> bool:
+        return self.status == 'supervisor_taken'
     
     @property
     def has_ad_referral(self) -> bool:
@@ -140,7 +181,7 @@ class Conversation(db.Model):
         """關閉對話"""
         self.status = 'closed'
         self.closed_at = datetime.now(timezone.utc)
-    
+
     def to_dict(self) -> dict:
         """轉換為字典格式"""
         return {
@@ -155,6 +196,12 @@ class Conversation(db.Model):
             'has_ad_referral': self.has_ad_referral,
             'message_count': self.message_count,
             'last_message_at': self.last_message_at.isoformat() if self.last_message_at else None,
+            # PR-2 新增欄位
+            'current_handler_id': str(self.current_handler_id) if self.current_handler_id else None,
+            'supervisor_id': str(self.supervisor_id) if self.supervisor_id else None,
+            'watchers': self.watchers or [],
+            'escalated_at': self.escalated_at.isoformat() if self.escalated_at else None,
+            'escalation_reason': self.escalation_reason,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

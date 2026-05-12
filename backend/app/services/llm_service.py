@@ -28,6 +28,8 @@ from .prompts import (
     build_action_prompt,
     build_full_analysis_prompt,
     build_quick_triage_prompt,
+    build_reply_suggestion_prompt,
+    build_risk_detection_prompt,
     format_conversation_for_prompt,
 )
 
@@ -636,6 +638,119 @@ class LLMService:
             temperature=0.2,
             max_tokens=MAX_TOKENS_RESPONSE,
         )
+
+    # ----------------------------------------------------------
+    # PR-6：回覆草稿 / 風險偵測
+    # ----------------------------------------------------------
+
+    def generate_reply_suggestions(
+        self,
+        conversation_text: str,
+        kb_snippets: str = '',
+        tone: str = 'professional',
+        n: int = 3,
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        產生回覆草稿（PR-6，PRD §F4.3）。
+
+        呼叫 LLM 一次取得 n 則草稿；回傳已 normalize 的 list（含 text/confidence/kb_refs）。
+        若 LLM 回傳格式不符或不可用，回傳空 list（呼叫端應 fallback 到 stub）。
+
+        TODO: 接通真實 OpenRouter SSE，做 token-level streaming。目前一次取回全部草稿，
+            前端 SSE 端點仍可分批送出每筆 suggestion event 來模擬遞進顯示。
+        """
+        messages = build_reply_suggestion_prompt(
+            conversation_text=conversation_text,
+            kb_snippets=kb_snippets,
+            tone=tone,
+        )
+        try:
+            result, usage = self.chat_completion(
+                messages=messages,
+                temperature=0.5,
+                max_tokens=MAX_TOKENS_RESPONSE,
+                response_format={'type': 'json_object'},
+            )
+        except LLMServiceError as e:
+            logger.warning(f"generate_reply_suggestions 呼叫失敗，回傳空 list：{e}")
+            return [], {}
+
+        # OpenRouter 通常會把純 JSON 放在 result['content'] 或 message.content
+        raw = result.get('content') if isinstance(result, dict) else None
+        if not raw and isinstance(result, dict):
+            raw = result.get('text') or ''
+
+        parsed: List[Dict[str, Any]] = []
+        try:
+            data = json.loads(raw) if isinstance(raw, str) else raw
+            # prompt 要求 JSON 陣列，但 response_format=json_object 時通常會包一層 {suggestions: [...]}
+            if isinstance(data, dict):
+                if 'suggestions' in data and isinstance(data['suggestions'], list):
+                    parsed = data['suggestions']
+                else:
+                    # 取出 dict 內的第一個 list value
+                    for v in data.values():
+                        if isinstance(v, list):
+                            parsed = v
+                            break
+            elif isinstance(data, list):
+                parsed = data
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.warning(f"generate_reply_suggestions JSON 解析失敗：{e}")
+            parsed = []
+
+        # Normalize：保留前 n 筆
+        normalized: List[Dict[str, Any]] = []
+        for item in parsed[:n]:
+            if not isinstance(item, dict):
+                continue
+            text = str(item.get('text') or '').strip()
+            if not text:
+                continue
+            confidence = item.get('confidence')
+            if not isinstance(confidence, (int, float)):
+                confidence = 0.6
+            kb_refs = item.get('kb_refs') or []
+            if not isinstance(kb_refs, list):
+                kb_refs = []
+            normalized.append({
+                'text': text,
+                'confidence': float(confidence),
+                'kb_refs': [str(x) for x in kb_refs],
+            })
+        return normalized, usage
+
+    def detect_risks(self, conversation_text: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """
+        風險偵測（PR-6，PRD §F4.5）。
+
+        回傳 ({"risk_flags": [...], "severity": "...", "rationale": "..."}, usage)。
+        失敗時回傳 ({"risk_flags": []}, {})。
+        """
+        messages = build_risk_detection_prompt(conversation_text=conversation_text)
+        try:
+            result, usage = self.chat_completion(
+                messages=messages,
+                temperature=0.1,
+                max_tokens=512,
+                response_format={'type': 'json_object'},
+            )
+        except LLMServiceError as e:
+            logger.warning(f"detect_risks 呼叫失敗：{e}")
+            return {'risk_flags': []}, {}
+
+        raw = result.get('content') if isinstance(result, dict) else None
+        try:
+            data = json.loads(raw) if isinstance(raw, str) else (raw or {})
+        except (json.JSONDecodeError, TypeError):
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        return {
+            'risk_flags': list(data.get('risk_flags') or []),
+            'severity': data.get('severity'),
+            'rationale': data.get('rationale'),
+        }, usage
 
 
 # ============================================================

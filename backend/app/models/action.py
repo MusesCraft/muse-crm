@@ -33,9 +33,13 @@ class Action(db.Model):
         db.ForeignKey('contacts.id', ondelete='CASCADE'), 
         nullable=False
     )
-    conversation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), 
-        db.ForeignKey('conversations.id', ondelete='SET NULL')
+    # PR-2：conversation_id 改為 NOT NULL（PRD §F7.1：所有 Action 必須關聯對話）
+    # 注意：migration crm_028 內含資料修補：將 conversation_id IS NULL 的 Action
+    # 嘗試補上同 contact 的最後一個 conversation；補不到者刪除。
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        db.ForeignKey('conversations.id', ondelete='CASCADE'),
+        nullable=False
     )
     
     # 動作內容

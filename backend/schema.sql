@@ -163,40 +163,8 @@ CREATE INDEX idx_actions_status ON actions(status, priority, due_date);
 CREATE INDEX idx_actions_assigned ON actions(assigned_to) WHERE assigned_to IS NOT NULL;
 
 -- ============================================================
--- 7. tags（標籤定義）
+-- 7. （已下線）tags / contact_tags — Tag 系統於 2026-05-12 重構移除
 -- ============================================================
-CREATE TABLE tags (
-    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name        VARCHAR(100) NOT NULL UNIQUE,
-    category    VARCHAR(50),                               -- 'identity' | 'interest' | 'status' | 'region'
-    is_system   BOOLEAN NOT NULL DEFAULT FALSE,            -- 系統預設標籤
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- 預設標籤
-INSERT INTO tags (name, category, is_system) VALUES
-    ('潛在客戶', 'status', TRUE),
-    ('VIP', 'status', TRUE),
-    ('投訴者', 'status', TRUE),
-    ('復購客戶', 'status', TRUE),
-    ('設計師', 'identity', TRUE),
-    ('屋主', 'identity', TRUE),
-    ('建材行', 'identity', TRUE),
-    ('工班', 'identity', TRUE);
-
--- ============================================================
--- 8. contact_tags（客戶-標籤 多對多）
--- ============================================================
-CREATE TABLE contact_tags (
-    contact_id  UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
-    tag_id      UUID NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
-    source      VARCHAR(20) NOT NULL DEFAULT 'llm'
-                CHECK (source IN ('llm', 'manual')),
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (contact_id, tag_id)
-);
-
-CREATE INDEX idx_contact_tags_tag ON contact_tags(tag_id);
 
 -- ============================================================
 -- 9. users（使用者，預留權限系統）

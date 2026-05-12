@@ -15,7 +15,6 @@ from . import inbox
 from . import contacts
 from . import actions
 from . import dashboard
-from . import tags
 from . import auth
 from . import quick_replies
 from . import llm_usage
@@ -25,8 +24,15 @@ from . import sync
 from . import upload
 from . import health_check
 from . import ocr
-from . import broadcast
 from . import import_contacts
+from . import products
+from . import roles
+from . import quotes
+from . import inventory_proxy
+from . import conversation_ops
+from . import conversation_events
+from . import knowledge_base  # 知識庫 API（PR-5）
+from . import ai_copilot  # AI Copilot API（PR-6）
 
 # 註冊錯誤處理器
 from ..utils.error_handler import register_error_handlers

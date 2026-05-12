@@ -6,10 +6,10 @@ Dashboard 統計數據相關 API 端點。
 
 from datetime import datetime, timedelta, timezone
 from flask import current_app, jsonify, request
-from sqlalchemy import func, and_, distinct
+from sqlalchemy import func, and_, distinct, desc
 
 from . import api_bp
-from ..models import Contact, Conversation, Message, Action, Tag, ContactTag, Analysis
+from ..models import Contact, Conversation, Message, Action, Analysis
 from .. import db
 from ..utils.auth import login_required
 from ..utils.permissions import get_current_user
@@ -168,33 +168,152 @@ def channel_distribution():
     return jsonify(channel_data)
 
 
-@api_bp.route('/dashboard/tags', methods=['GET'])
+# ── PR-7：主管 KPI 端點（PRD §F10） ───────────────────────
+
+@api_bp.route('/dashboard/first-response-time', methods=['GET'])
 @login_required
-def tag_distribution():
-    """標籤分布統計（Top 10）"""
-    results = (
-        db.session.query(
-            Tag.name,
-            Tag.category,
-            func.count(ContactTag.contact_id).label('count')
+def first_response_time():
+    """
+    首次回覆時間 P50 / P90（單位：分鐘）。
+    對每個對話：找出第一則 customer 訊息 → 之後第一則 business 訊息的時間差。
+    """
+    from sqlalchemy import text as sa_text
+    rows = db.session.execute(sa_text("""
+        WITH first_customer AS (
+            SELECT conversation_id, MIN(sent_at) AS t
+            FROM messages
+            WHERE sender_type = 'customer' AND COALESCE(is_internal, false) = false
+            GROUP BY conversation_id
+        ),
+        first_business AS (
+            SELECT m.conversation_id, MIN(m.sent_at) AS t
+            FROM messages m
+            JOIN first_customer fc ON fc.conversation_id = m.conversation_id
+            WHERE m.sender_type = 'business'
+              AND COALESCE(m.is_internal, false) = false
+              AND m.sent_at > fc.t
+            GROUP BY m.conversation_id
+        ),
+        diffs AS (
+            SELECT EXTRACT(EPOCH FROM (fb.t - fc.t)) / 60.0 AS minutes
+            FROM first_customer fc
+            JOIN first_business fb ON fb.conversation_id = fc.conversation_id
         )
-        .join(ContactTag, Tag.id == ContactTag.tag_id)
-        .group_by(Tag.id, Tag.name, Tag.category)
-        .order_by(func.count(ContactTag.contact_id).desc())
-        .limit(10)
-        .all()
+        SELECT
+            percentile_cont(0.5) WITHIN GROUP (ORDER BY minutes) AS p50,
+            percentile_cont(0.9) WITHIN GROUP (ORDER BY minutes) AS p90,
+            COUNT(*) AS sample_count
+        FROM diffs
+    """)).fetchone()
+
+    return jsonify({
+        'p50_minutes': float(rows.p50) if rows and rows.p50 is not None else None,
+        'p90_minutes': float(rows.p90) if rows and rows.p90 is not None else None,
+        'sample_count': int(rows.sample_count) if rows else 0,
+    })
+
+
+@api_bp.route('/dashboard/resolution-rate', methods=['GET'])
+@login_required
+def resolution_rate():
+    """
+    解決率（resolved / total）（PRD §F10）。
+    Query: days（預設 30）
+    """
+    days = max(1, min(request.args.get('days', 30, type=int), 365))
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+
+    total = Conversation.query.filter(Conversation.created_at >= start_date).count()
+    resolved = Conversation.query.filter(
+        Conversation.created_at >= start_date,
+        Conversation.status.in_(('resolved', 'closed')),
+    ).count()
+    rate = (resolved / total) if total > 0 else 0
+    return jsonify({
+        'period_days': days,
+        'total': total,
+        'resolved': resolved,
+        'resolution_rate': round(rate, 4),
+    })
+
+
+@api_bp.route('/dashboard/conversation-status', methods=['GET'])
+@login_required
+def conversation_status_distribution():
+    """
+    當前對話依 status 分組計數（PR-7 KPI 視圖）。
+    回傳: { unassigned, active, waiting_customer, escalated, supervisor_taken, resolved, closed }
+    """
+    user = get_current_user()
+    q = (
+        db.session.query(Conversation.status, func.count(Conversation.id))
+        .join(Contact, Conversation.contact_id == Contact.id)
     )
-    
-    tag_data = [
-        {
-            'name': result.name,
-            'category': result.category,
-            'count': result.count
-        }
-        for result in results
-    ]
-    
-    return jsonify(tag_data)
+    if user:
+        q = apply_contact_scope(q, user)
+    rows = q.group_by(Conversation.status).all()
+
+    result = {s: 0 for s in (
+        'unassigned', 'active', 'waiting_customer',
+        'escalated', 'supervisor_taken', 'resolved', 'closed',
+    )}
+    for status, cnt in rows:
+        if status in result:
+            result[status] = int(cnt)
+        else:
+            # 未在 enum 內，加到 closed 桶以免遺漏
+            result['closed'] = result.get('closed', 0) + int(cnt)
+    return jsonify(result)
+
+
+@api_bp.route('/dashboard/today-conversations', methods=['GET'])
+@login_required
+def today_conversations():
+    """今日新對話數（以 Asia/Taipei 計算日界）"""
+    user = get_current_user()
+    tz_name = current_app.config.get('DISPLAY_TIMEZONE', 'Asia/Taipei')
+    try:
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo(tz_name)
+    except Exception:
+        tz = timezone(timedelta(hours=8))
+    now_local = datetime.now(tz)
+    today_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+    yesterday_start = today_start - timedelta(days=1)
+
+    q = Conversation.query.join(Contact, Conversation.contact_id == Contact.id)
+    if user:
+        q = apply_contact_scope(q, user)
+    today_count = q.filter(Conversation.created_at >= today_start).count()
+    yesterday_count = q.filter(
+        Conversation.created_at >= yesterday_start,
+        Conversation.created_at < today_start,
+    ).count()
+    return jsonify({
+        'today': today_count,
+        'yesterday': yesterday_count,
+    })
+
+
+@api_bp.route('/dashboard/escalation-rate', methods=['GET'])
+@login_required
+def escalation_rate():
+    """求援率 = escalated 對話數 / 全部開放對話數（PRD §F10）"""
+    days = max(1, min(request.args.get('days', 30, type=int), 365))
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+
+    total = Conversation.query.filter(Conversation.created_at >= start_date).count()
+    escalated = Conversation.query.filter(
+        Conversation.created_at >= start_date,
+        Conversation.escalated_at.isnot(None),
+    ).count()
+    rate = (escalated / total) if total > 0 else 0
+    return jsonify({
+        'period_days': days,
+        'total': total,
+        'escalated': escalated,
+        'escalation_rate': round(rate, 4),
+    })
 
 
 @api_bp.route('/dashboard/actions/completion', methods=['GET'])
@@ -267,24 +386,10 @@ def dashboard_stats():
         Action.status.in_(['pending', 'assigned', 'in_progress'])
     ).count()
 
-    # 緊急度分布：根據 contact tags 推斷
-    from ..models import ContactTag, Tag
-    high_priority_tags = {'VIP', '投訴者'}
-    medium_priority_tags = {'潛在客戶'}
-
-    # 取得有高優先標籤的 contact 數
-    high_contacts = (
-        db.session.query(func.count(distinct(ContactTag.contact_id)))
-        .join(Tag, ContactTag.tag_id == Tag.id)
-        .filter(Tag.name.in_(high_priority_tags))
-        .scalar()
-    ) or 0
-    medium_contacts = (
-        db.session.query(func.count(distinct(ContactTag.contact_id)))
-        .join(Tag, ContactTag.tag_id == Tag.id)
-        .filter(Tag.name.in_(medium_priority_tags))
-        .scalar()
-    ) or 0
+    # 緊急度分布：以 contact_status 粗略對應（Tag 系統下線後的暫時替代方案）
+    # TODO PR-2/PR-7：改用 Conversation 的 escalated/escalation 統計
+    high_contacts = contact_q.filter(Contact.contact_status == 'quoted').count()
+    medium_contacts = contact_q.filter(Contact.contact_status == 'following_up').count()
     low_contacts = max(0, total_contacts - high_contacts - medium_contacts)
 
     # 對話狀態分布
@@ -356,12 +461,78 @@ def dashboard_stats():
     )
     intent_data = {i or 'unknown': cnt for i, cnt in intent_results}
 
+    # 轉換漏斗
+    from sqlalchemy import literal_column
+    funnel_total = total_contacts
+    funnel_engaged = contact_q.filter(
+        Contact.contact_status.in_(['following_up', 'quoted', 'won'])
+    ).count()
+    funnel_quoted = contact_q.filter(
+        Contact.contact_status.in_(['quoted', 'won'])
+    ).count()
+    funnel_won = contact_q.filter(Contact.contact_status == 'won').count()
+
+    # 平均回覆時間（小時）
+    avg_response_hours = None
+    try:
+        from sqlalchemy import text as sa_text
+        result = db.session.execute(sa_text("""
+            SELECT AVG(EXTRACT(EPOCH FROM (m2.sent_at - m1.sent_at))/3600)::numeric(10,1) AS avg_hours
+            FROM messages m1
+            JOIN messages m2 ON m1.conversation_id = m2.conversation_id
+            WHERE m1.sender_type = 'customer' AND m2.sender_type = 'business'
+            AND m2.sent_at > m1.sent_at
+            AND m2.sent_at - m1.sent_at < INTERVAL '7 days'
+        """)).scalar()
+        if result is not None:
+            avg_response_hours = float(result)
+    except Exception:
+        pass
+
+    # 熱門對話 Top 5
+    top_convs_q = (
+        db.session.query(Conversation, Contact)
+        .join(Contact, Conversation.contact_id == Contact.id)
+        .order_by(desc(Conversation.message_count))
+        .limit(5)
+        .all()
+    )
+    top_conversations = [
+        {
+            'id': str(conv.id),
+            'contact_name': contact.display_name or '未知',
+            'channel': conv.channel,
+            'message_count': conv.message_count or 0,
+            'status': conv.status,
+            'last_message_at': conv.last_message_at.isoformat() if conv.last_message_at else None,
+        }
+        for conv, contact in top_convs_q
+    ]
+
+    # 30 天訊息活動趨勢
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    activity_results = (
+        db.session.query(
+            func.date(Message.sent_at).label('date'),
+            func.count(Message.id).label('count'),
+        )
+        .filter(Message.sent_at >= thirty_days_ago)
+        .group_by(func.date(Message.sent_at))
+        .order_by(func.date(Message.sent_at))
+        .all()
+    )
+    message_activity = [
+        {'date': r.date.isoformat() if hasattr(r.date, 'isoformat') else str(r.date), 'count': r.count}
+        for r in activity_results
+    ]
+
     return jsonify({
         'total_contacts': total_contacts,
         'total_conversations': total_conversations,
         'active_conversations': active_conversations,
         'total_messages': total_messages,
         'pending_actions': pending_actions,
+        'avg_response_hours': avg_response_hours,
         'urgency_distribution': {
             'high': high_contacts,
             'medium': medium_contacts,
@@ -379,6 +550,14 @@ def dashboard_stats():
         'channel_distribution': channel_distribution_data,
         'contact_status': contact_status_data,
         'intent_distribution': intent_data,
+        'conversion_funnel': {
+            'total': funnel_total,
+            'engaged': funnel_engaged,
+            'quoted': funnel_quoted,
+            'won': funnel_won,
+        },
+        'top_conversations': top_conversations,
+        'message_activity': message_activity,
     })
 
 

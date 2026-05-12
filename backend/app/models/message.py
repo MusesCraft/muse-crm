@@ -63,6 +63,12 @@ class Message(db.Model):
     quick_intent: Mapped[Optional[str]] = mapped_column(String(50))
     quick_identity: Mapped[Optional[str]] = mapped_column(String(50))
     quick_analyzed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+    # PR-2 新增：內部備註與 @mention（PRD §F6）
+    # is_internal=True 表示這是團隊內部訊息，不發給客戶
+    is_internal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # mentions：被 @ 提及的 user_id 清單（JSONB array of UUID 字串）
+    mentions: Mapped[Optional[list]] = mapped_column(JSONB, default=list)
     
     # 審計欄位
     created_at: Mapped[datetime] = mapped_column(
@@ -137,5 +143,7 @@ class Message(db.Model):
             'quick_intent': self.quick_intent,
             'quick_identity': self.quick_identity,
             'quick_analyzed_at': self.quick_analyzed_at.isoformat() if self.quick_analyzed_at else None,
+            'is_internal': self.is_internal,
+            'mentions': self.mentions or [],
             'created_at': self.created_at.isoformat() if self.created_at else None
         }

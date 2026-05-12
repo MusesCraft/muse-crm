@@ -56,13 +56,18 @@ class BaseConfig:
     if _cors_env:
         CORS_ORIGINS = _cors_env
     elif os.environ.get('RAILWAY_ENVIRONMENT'):
-        CORS_ORIGINS = '*'  # Railway 內部部署，由 Railway 網路層保護
+        # Railway 部署：限制為前端域名
+        CORS_ORIGINS = 'https://miraculous-flow-production-e93d.up.railway.app'
     else:
         CORS_ORIGINS = '*'  # 本地開發允許所有來源
 
     # Celery
     CELERY_BROKER_URL = REDIS_URL
     CELERY_RESULT_BACKEND = REDIS_URL
+
+    # 進銷存系統（muse-inventory）
+    INVENTORY_API_URL = os.environ.get('INVENTORY_API_URL', 'http://localhost:3003/api')
+    INVENTORY_API_TOKEN = os.environ.get('INVENTORY_API_TOKEN', '')
 
     # 分析設定
     ANALYSIS_TIMEOUT_MINUTES = int(os.environ.get('ANALYSIS_TIMEOUT_MINUTES', '5'))

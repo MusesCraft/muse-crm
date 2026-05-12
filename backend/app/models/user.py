@@ -56,6 +56,7 @@ class User(db.Model):
         back_populates="author",
         cascade="all, delete-orphan"
     )
+    assigned_roles = db.relationship('Role', secondary='user_roles', backref='users', lazy='selectin')
 
     # 約束和索引
     __table_args__ = (
@@ -111,7 +112,8 @@ class User(db.Model):
             'avatar_url': self.avatar_url,
             'is_active': self.is_active,
             'team_id': self.team_id,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'roles': [{'id': r.id, 'name': r.name, 'color': r.color} for r in self.assigned_roles],
         }
 
 

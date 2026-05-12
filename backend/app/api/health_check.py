@@ -61,14 +61,3 @@ def fix_counts():
         return jsonify({'error': str(e)}), 500
 
 
-@api_bp.route('/admin/retag', methods=['POST'])
-@login_required
-@require_role('admin')
-def retag():
-    """重新對所有 conversations 跑關鍵字打標"""
-    try:
-        result = DataHealthService.run_keyword_tagging()
-        return jsonify({'data': result}), 200
-    except Exception as e:
-        logger.error(f"retag 失敗: {e}", exc_info=True)
-        return jsonify({'error': str(e)}), 500

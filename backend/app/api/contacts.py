@@ -10,7 +10,7 @@ from sqlalchemy import desc, or_, func
 from sqlalchemy.orm import subqueryload, joinedload
 
 from . import api_bp
-from ..models import Contact, ChannelIdentifier, ContactTag, Tag, UserNote
+from ..models import Contact, ChannelIdentifier, UserNote
 from .. import db
 from ..utils import escape_like
 from ..utils.auth import login_required
@@ -92,6 +92,19 @@ def create_contact():
 
     now = datetime.now(timezone.utc)
 
+    # PR-2 新增欄位驗證
+    customer_identity = data.get('customer_identity')
+    if customer_identity:
+        valid_identities = ('designer', 'homeowner', 'dealer', 'contractor', 'unknown')
+        if customer_identity not in valid_identities:
+            return jsonify({'error': f'customer_identity 必須為 {", ".join(valid_identities)} 之一'}), 400
+
+    sales_stage = data.get('sales_stage')
+    if sales_stage:
+        valid_stages = ('initial', 'evaluating', 'quoted', 'won', 'lost')
+        if sales_stage not in valid_stages:
+            return jsonify({'error': f'sales_stage 必須為 {", ".join(valid_stages)} 之一'}), 400
+
     contact = Contact(
         display_name=display_name,
         phone=data.get('phone'),
@@ -105,6 +118,8 @@ def create_contact():
         visit_date=visit_date,
         referral_source=data.get('referral_source'),
         contact_status=contact_status,
+        customer_identity=customer_identity,
+        sales_stage=sales_stage,
         first_seen_at=now,
         last_active_at=now,
     )
@@ -129,17 +144,23 @@ def list_contacts():
         - page: 頁碼（預設 1）
         - per_page: 每頁筆數（預設 20）
         - search: 搜尋客戶名稱
-        - tag: 篩選標籤
         - channel: 篩選來源渠道
         - source_type: 篩選來源類型 ad_referral/organic
+        - contact_status: 篩選跟進狀態 new/following_up/quoted/won/lost
+        - intent: 篩選購買意向 browsing/interested/ready_to_buy/purchased
+        - customer_identity: 篩選客戶身份 designer/homeowner/dealer/contractor/unknown（PR-2）
+        - sales_stage: 篩選銷售階段 initial/evaluating/quoted/won/lost（PR-2）
     """
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 20, type=int), 100)
     search = request.args.get('search', '').strip()
-    tag_name = request.args.get('tag')
     channel = request.args.get('channel')
     source_type = request.args.get('source_type')
-    
+    contact_status = request.args.get('contact_status')
+    intent = request.args.get('intent')
+    customer_identity = request.args.get('customer_identity')
+    sales_stage = request.args.get('sales_stage')
+
     query = Contact.query.filter(Contact.is_merged.is_(False))
 
     # 套用資料可見範圍
@@ -150,18 +171,14 @@ def list_contacts():
     # 篩選條件
     if search:
         safe_search = escape_like(search)
+        like_pat = f'%{safe_search}%'
         query = query.filter(
             or_(
-                Contact.display_name.ilike(f'%{safe_search}%', escape='\\'),
-                Contact.notes.ilike(f'%{safe_search}%', escape='\\')
+                Contact.display_name.ilike(like_pat, escape='\\'),
+                Contact.notes.ilike(like_pat, escape='\\'),
+                Contact.phone.ilike(like_pat, escape='\\'),
+                Contact.email.ilike(like_pat, escape='\\'),
             )
-        )
-    
-    if tag_name:
-        query = (
-            query.join(ContactTag, Contact.id == ContactTag.contact_id)
-            .join(Tag, ContactTag.tag_id == Tag.id)
-            .filter(Tag.name == tag_name)
         )
     
     if channel:
@@ -169,37 +186,32 @@ def list_contacts():
     
     if source_type:
         query = query.filter(Contact.source_type == source_type)
-    
+
+    if contact_status:
+        query = query.filter(Contact.contact_status == contact_status)
+
+    if intent:
+        query = query.filter(Contact.intent == intent)
+
+    if customer_identity:
+        query = query.filter(Contact.customer_identity == customer_identity)
+
+    if sales_stage:
+        query = query.filter(Contact.sales_stage == sales_stage)
+
     # 排序：最近活躍優先
     query = query.order_by(desc(Contact.last_active_at))
 
-    # Eager loading 避免 N+1（tags + tag 定義一起載入）
-    query = query.options(
-        subqueryload(Contact.tags).joinedload(ContactTag.tag),
-        subqueryload(Contact.conversations),
-        subqueryload(Contact.messages),
-    )
-    
     pagination = query.paginate(page=page, per_page=per_page)
-    
+
     contacts = []
     for contact in pagination.items:
         contact_dict = contact.to_dict()
-        
-        # 加入標籤資訊（已 eager loaded）
-        contact_dict['tags'] = [
-            {
-                'name': ct.tag.name,
-                'category': ct.tag.category,
-                'source': ct.source
-            }
-            for ct in contact.tags
-        ]
-        
-        # 加入優先級（根據 tags 推斷）
+
+        # 加入優先級（根據 contact_status 推斷）
         contact_dict['priority'] = infer_contact_priority(contact)
 
-        # 加入統計資訊（已 eager loaded，直接用 len）
+        # 加入統計資訊
         contact_dict['conversation_count'] = len(contact.conversations)
         contact_dict['message_count'] = len(contact.messages)
 
@@ -227,7 +239,6 @@ def get_contact_detail(contact_id):
     contact = (
         Contact.query
         .options(
-            subqueryload(Contact.tags).joinedload(ContactTag.tag),
             subqueryload(Contact.conversations),
             subqueryload(Contact.analyses),
             subqueryload(Contact.actions),
@@ -245,21 +256,9 @@ def get_contact_detail(contact_id):
     
     contact_dict = contact.to_dict()
 
-    # 優先級（根據 tags 推斷）
+    # 優先級（根據 contact_status 推斷）
     contact_dict['priority'] = infer_contact_priority(contact)
 
-    # 標籤
-    contact_dict['tags'] = [
-        {
-            'id': str(ct.tag.id),
-            'name': ct.tag.name,
-            'category': ct.tag.category,
-            'source': ct.source,
-            'created_at': ct.created_at.isoformat()
-        }
-        for ct in contact.tags
-    ]
-    
     # 對話歷史
     contact_dict['conversations'] = [
         {
@@ -321,80 +320,6 @@ def add_contact_note(contact_id):
     }), 201
 
 
-@api_bp.route('/contacts/<contact_id>/tags', methods=['POST'])
-@login_required
-def add_contact_tag(contact_id):
-    """為客戶新增標籤"""
-    contact = Contact.query.get_or_404(contact_id)
-
-    denied = _check_contact_access(contact)
-    if denied:
-        return denied
-
-    data = request.get_json()
-    
-    tag_name = data.get('tag_name', '').strip()
-    if not tag_name:
-        return jsonify({'error': '標籤名稱不能為空'}), 400
-    
-    # 取得或建立標籤
-    tag = Tag.query.filter_by(name=tag_name).first()
-    if not tag:
-        tag = Tag(name=tag_name, category=data.get('category'))
-        db.session.add(tag)
-        db.session.flush()
-    
-    # 檢查是否已存在
-    existing = ContactTag.query.filter_by(
-        contact_id=contact.id,
-        tag_id=tag.id
-    ).first()
-    
-    if existing:
-        return jsonify({'error': '標籤已存在'}), 400
-    
-    # 新增關聯
-    contact_tag = ContactTag(
-        contact_id=contact.id,
-        tag_id=tag.id,
-        source='manual'
-    )
-    
-    db.session.add(contact_tag)
-    db.session.commit()
-    
-    return jsonify({
-        'message': '標籤已新增',
-        'tag': {
-            'id': str(tag.id),
-            'name': tag.name,
-            'category': tag.category,
-            'source': 'manual'
-        }
-    }), 201
-
-
-@api_bp.route('/contacts/<contact_id>/tags/<tag_id>', methods=['DELETE'])
-@login_required
-def remove_contact_tag(contact_id, tag_id):
-    """移除客戶標籤"""
-    contact = Contact.query.get_or_404(contact_id)
-
-    denied = _check_contact_access(contact)
-    if denied:
-        return denied
-
-    contact_tag = ContactTag.query.filter_by(
-        contact_id=contact_id,
-        tag_id=tag_id
-    ).first_or_404()
-
-    db.session.delete(contact_tag)
-    db.session.commit()
-    
-    return jsonify({'message': '標籤已移除'})
-
-
 @api_bp.route('/contacts/<contact_id>', methods=['PATCH'])
 @login_required
 @require_role('admin', 'manager', 'user')
@@ -450,6 +375,16 @@ def update_contact(contact_id):
         contact.referral_source = data['referral_source']
     if 'contact_status' in data:
         contact.contact_status = data['contact_status']
+    if 'customer_identity' in data:
+        valid_identities = ('designer', 'homeowner', 'dealer', 'contractor', 'unknown')
+        if data['customer_identity'] and data['customer_identity'] not in valid_identities:
+            return jsonify({'error': f'customer_identity 必須為 {", ".join(valid_identities)} 之一'}), 400
+        contact.customer_identity = data['customer_identity']
+    if 'sales_stage' in data:
+        valid_stages = ('initial', 'evaluating', 'quoted', 'won', 'lost')
+        if data['sales_stage'] and data['sales_stage'] not in valid_stages:
+            return jsonify({'error': f'sales_stage 必須為 {", ".join(valid_stages)} 之一'}), 400
+        contact.sales_stage = data['sales_stage']
     if 'assigned_to' in data:
         # 指派任務：需要 admin 或 manager 角色
         if user and user.role == 'user':
@@ -581,17 +516,25 @@ def search_contacts():
             or_(
                 Contact.display_name.ilike(like_pattern, escape='\\'),
                 Contact.notes.ilike(like_pattern, escape='\\'),
+                Contact.phone.ilike(like_pattern, escape='\\'),
+                Contact.email.ilike(like_pattern, escape='\\'),
                 Contact.id.in_(ci_subquery)
             )
         )
         .order_by(desc(Contact.last_active_at))
     )
 
+    # 套用資料可見範圍
+    user = get_current_user()
+    if user:
+        query = apply_contact_scope(query, user)
+
     pagination = query.paginate(page=page, per_page=per_page)
 
     contacts = []
     for contact in pagination.items:
         contact_dict = contact.to_dict()
+        contact_dict['priority'] = infer_contact_priority(contact)
         contact_dict['channel_identifiers'] = [
             ci.to_dict() for ci in contact.channel_identifiers
         ]

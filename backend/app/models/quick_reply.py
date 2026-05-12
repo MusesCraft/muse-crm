@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Optional, List
 from sqlalchemy import String, Text, Boolean, DateTime, Index
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 import uuid
@@ -13,8 +13,8 @@ from .. import db
 class QuickReply(db.Model):
     __tablename__ = 'quick_replies'
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     category: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)

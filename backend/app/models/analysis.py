@@ -52,6 +52,10 @@ class Analysis(db.Model):
     intent: Mapped[Optional[str]] = mapped_column(String(50))
     urgency: Mapped[Optional[str]] = mapped_column(String(10))          # high/medium/low
     customer_stage: Mapped[Optional[str]] = mapped_column(String(50))
+
+    # PR-2 新增：風險預警旗標（PRD §F4.5）
+    # 例：['churn', 'complaint', 'high_amount', 'long_no_response']
+    risk_flags: Mapped[Optional[List[str]]] = mapped_column(ARRAY(String))
     
     # Meta 資訊
     trigger_type: Mapped[str] = mapped_column(String(20), nullable=False, default='auto')  # auto/manual
@@ -117,6 +121,7 @@ class Analysis(db.Model):
             'intent': self.intent,
             'urgency': self.urgency,
             'customer_stage': self.customer_stage,
+            'risk_flags': self.risk_flags or [],
             'trigger_type': self.trigger_type,
             'is_human_corrected': self.is_human_corrected,
             'correction_diff': self.correction_diff,

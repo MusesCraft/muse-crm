@@ -12,7 +12,6 @@ from sqlalchemy import text
 from .. import db
 from ..models import Contact, Conversation, Message
 from ..models.contact import ChannelIdentifier
-from ..services.auto_tagger import AutoTagger
 from ..utils.meta_api import MetaGraphAPI
 
 logger = logging.getLogger(__name__)
@@ -97,23 +96,7 @@ class DataHealthService:
                 'error': str(e),
             })
 
-        # 4. 關鍵字打標
-        try:
-            tag_result = DataHealthService.run_keyword_tagging()
-            if tag_result.get('total_tags_added', 0) > 0:
-                result['issues_fixed'] += tag_result['total_tags_added']
-            result['details'].append({
-                'check': 'keyword_tagging',
-                **tag_result,
-            })
-        except Exception as e:
-            logger.error(f"run_keyword_tagging 失敗: {e}", exc_info=True)
-            result['details'].append({
-                'check': 'keyword_tagging',
-                'error': str(e),
-            })
-
-        # 5. 驗證 channel_identifiers
+        # 4. 驗證 channel_identifiers
         try:
             ci_result = DataHealthService.validate_channel_identifiers()
             if ci_result.get('missing_external_id', 0) > 0:
@@ -220,40 +203,6 @@ class DataHealthService:
             logger.info(f"fix_message_counts 完成，更新 {fixed} 個 conversations")
 
         return fixed
-
-    @staticmethod
-    def run_keyword_tagging() -> dict:
-        """
-        對所有 conversation 跑關鍵字打標。
-
-        Returns:
-            打標統計
-        """
-        conversations = Conversation.query.all()
-        stats = {
-            'total_conversations': len(conversations),
-            'tagged_conversations': 0,
-            'total_tags_added': 0,
-        }
-
-        for conv in conversations:
-            messages = Message.query.filter_by(conversation_id=conv.id).all()
-            conversation_text = ' '.join(
-                m.content for m in messages if m.content
-            )
-            if not conversation_text.strip():
-                continue
-
-            keyword_tags = AutoTagger._match_keywords(conversation_text)
-            if keyword_tags:
-                added = AutoTagger._apply_tags(conv.contact_id, keyword_tags)
-                if added:
-                    stats['tagged_conversations'] += 1
-                    stats['total_tags_added'] += len(added)
-
-        db.session.commit()
-        logger.info(f"run_keyword_tagging 完成: {stats}")
-        return stats
 
     @staticmethod
     def validate_channel_identifiers() -> dict:

@@ -210,11 +210,18 @@ def import_csv_contacts():
             db.session.add(contact)
             created += 1
 
-            # Batch commit every 50
+            # Batch commit every 50（使用 savepoint 隔離批次錯誤）
             if created % 50 == 0:
-                db.session.commit()
+                try:
+                    db.session.commit()
+                except Exception as batch_err:
+                    db.session.rollback()
+                    failed += 1
+                    if len(errors) < 5:
+                        errors.append(f'批次寫入失敗: {str(batch_err)}')
 
         except Exception as e:
+            db.session.rollback()
             failed += 1
             if len(errors) < 5:
                 errors.append(f'{display_name}: {str(e)}')

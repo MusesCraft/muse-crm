@@ -64,6 +64,14 @@ def apply_conversation_scope(query: Query, user: User) -> Query:
     """
     套用 Conversation 查詢範圍（透過 join Contact）。
 
+    PR-3 擴充：
+    - admin/manager 維持原行為（看 team 全部或全部）
+    - user/agent：除了 assigned_to == self 之外，也包含
+        a) current_handler_id == self（被分配的對話）
+        b) supervisor_id == self（接管中的對話）
+        c) watchers 含 self（旁聽中的對話）
+        d) contact.assigned_to is None（待認領池）
+
     注意：呼叫前 query 需已 join Contact，或由此函數 join。
     """
     if user.role == 'admin':
@@ -76,9 +84,15 @@ def apply_conversation_scope(query: Query, user: User) -> Query:
             Contact.assigned_to.is_(None),
         ))
 
+    # user/agent
+    uid_str = str(user.id)
     return query.filter(or_(
         Contact.assigned_to == user.id,
         Contact.assigned_to.is_(None),
+        Conversation.current_handler_id == user.id,
+        Conversation.supervisor_id == user.id,
+        # watchers 是 JSONB array，使用 PG @> 包含查詢
+        Conversation.watchers.cast(db.Text).like(f'%"{uid_str}"%'),
     ))
 
 

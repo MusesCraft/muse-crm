@@ -14,21 +14,19 @@ from .. import db
 logger = logging.getLogger(__name__)
 
 
-# 根據 tags 推斷 contact priority
-_HIGH_PRIORITY_TAGS = {'VIP', '投訴者'}
-_MEDIUM_PRIORITY_TAGS = {'潛在客戶'}
-
-
 def infer_contact_priority(contact: Contact) -> str:
-    """根據 contact tags 推斷 priority（high/medium/low）"""
-    tag_names = set()
-    for ct in contact.tags:
-        if ct.tag:
-            tag_names.add(ct.tag.name)
+    """
+    根據 contact_status / intent 推斷 priority（high/medium/low）。
 
-    if tag_names & _HIGH_PRIORITY_TAGS:
+    Tag 系統下線後的暫時實作。後續 PR-2 / PR-7 應改為依
+    Conversation 的 escalated 狀態與 Analysis 的 risk_flags 推算。
+    """
+    status = (contact.contact_status or '').lower()
+    intent = (contact.intent or '').lower()
+
+    if status == 'quoted' or intent == 'ready_to_buy':
         return 'high'
-    if tag_names & _MEDIUM_PRIORITY_TAGS:
+    if status in ('following_up',) or intent in ('interested',):
         return 'medium'
     return 'low'
 
@@ -189,16 +187,8 @@ class ContactService:
             for action in source_contact.actions:
                 action.contact_id = target_contact.id
             
-            # 6. 合併標籤（避免重複）
-            source_tag_ids = {ct.tag_id for ct in source_contact.tags}
-            target_tag_ids = {ct.tag_id for ct in target_contact.tags}
-            
-            for contact_tag in source_contact.tags:
-                if contact_tag.tag_id not in target_tag_ids:
-                    contact_tag.contact_id = target_contact.id
-                else:
-                    db.session.delete(contact_tag)
-            
+            # 6. （Tag 系統已下線，無需合併標籤）
+
             # 7. 將來源客戶的所有備註轉移到目標客戶
             for note in source_contact.notes_by_users:
                 note.contact_id = target_contact.id

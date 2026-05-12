@@ -16,7 +16,6 @@ from .. import db
 from ..models import Contact, Message, Conversation
 from ..services.contact_service import ContactService
 from ..services.session_service import SessionService
-from ..services.auto_tagger import AutoTagger
 from ..utils.meta_api import meta_api
 
 logger = logging.getLogger(__name__)
@@ -285,13 +284,11 @@ class HistorySyncService:
             from .data_health_service import DataHealthService
 
             count_fixed = DataHealthService.fix_message_counts()
-            tag_result = DataHealthService.run_keyword_tagging()
 
             stats['health_check'] = {
                 'message_counts_fixed': count_fixed,
-                'keyword_tagging': tag_result,
             }
-            logger.info(f"同步後健康修復完成: counts={count_fixed}, tags={tag_result}")
+            logger.info(f"同步後健康修復完成: counts={count_fixed}")
         except Exception as e:
             logger.error(f"同步後健康修復失敗: {e}", exc_info=True)
             stats['health_check'] = {'error': str(e)}
@@ -431,23 +428,6 @@ class HistorySyncService:
         if result['messages'] > 0:
             conversation.message_count = (conversation.message_count or 0) + result['messages']
             conversation.last_message_at = datetime.now(timezone.utc)
-
-        # 同步完成後跑 keyword-based auto-tagging
-        try:
-            all_msgs = Message.query.filter_by(
-                conversation_id=conversation.id
-            ).all()
-            conversation_text = ' '.join(
-                m.content for m in all_msgs if m.content
-            )
-            if conversation_text.strip():
-                keyword_tags = AutoTagger._match_keywords(conversation_text)
-                if keyword_tags:
-                    added = AutoTagger._apply_tags(contact.id, keyword_tags)
-                    if added:
-                        logger.info(f"自動打標（sync）: contact={contact.id}, tags={added}")
-        except Exception as e:
-            logger.error(f"同步後自動打標失敗: {e}")
 
         db.session.commit()
         return result

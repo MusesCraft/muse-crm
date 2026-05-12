@@ -8,15 +8,11 @@ import logging
 from datetime import datetime, timezone
 
 from flask import request, jsonify
-from sqlalchemy.orm import selectinload
 
 from . import api_bp
-from .. import db
-from ..models import Conversation, Message
 from ..utils.auth import login_required
 from ..utils.permissions import require_role
 from ..services.history_sync_service import HistorySyncService
-from ..services.auto_tagger import AutoTagger
 
 logger = logging.getLogger(__name__)
 
@@ -87,81 +83,6 @@ def sync_meta_history():
         }
 
         return jsonify({'error': f'同步失敗：{str(e)}'}), 500
-
-
-@api_bp.route('/sync/analyze-all', methods=['POST'])
-@login_required
-@require_role('admin')
-def analyze_all_conversations():
-    """
-    對所有對話執行 keyword-based 自動打標。
-
-    遍歷所有 conversations，用 AutoTagger._match_keywords 跑規則打標。
-    （LLM 分析因 OPENROUTER_API_KEY 為 placeholder 暫不啟用）
-
-    Returns:
-        打標統計
-    """
-    conversations = Conversation.query.options(selectinload(Conversation.messages)).all()
-    stats = {
-        'total_conversations': len(conversations),
-        'tagged_conversations': 0,
-        'total_tags_added': 0,
-    }
-
-    for conv in conversations:
-        conversation_text = ' '.join(
-            m.content for m in conv.messages if m.content
-        )
-        if not conversation_text.strip():
-            continue
-
-        keyword_tags = AutoTagger._match_keywords(conversation_text)
-        if keyword_tags:
-            added = AutoTagger._apply_tags(conv.contact_id, keyword_tags)
-            if added:
-                stats['tagged_conversations'] += 1
-                stats['total_tags_added'] += len(added)
-
-    db.session.commit()
-    logger.info(f"全量自動打標完成：{stats}")
-    return jsonify({'data': stats}), 200
-
-
-@api_bp.route('/sync/tag-all', methods=['POST'])
-@login_required
-@require_role('admin')
-def tag_all_conversations():
-    """
-    遍歷所有 conversations 跑 keyword-based 自動打標。
-
-    Returns:
-        打標統計
-    """
-    conversations = Conversation.query.options(selectinload(Conversation.messages)).all()
-    stats = {
-        'total_conversations': len(conversations),
-        'tagged_conversations': 0,
-        'total_tags_added': 0,
-    }
-
-    for conv in conversations:
-        conversation_text = ' '.join(
-            m.content for m in conv.messages if m.content
-        )
-        if not conversation_text.strip():
-            continue
-
-        keyword_tags = AutoTagger._match_keywords(conversation_text)
-        if keyword_tags:
-            added = AutoTagger._apply_tags(conv.contact_id, keyword_tags)
-            if added:
-                stats['tagged_conversations'] += 1
-                stats['total_tags_added'] += len(added)
-
-    db.session.commit()
-    logger.info(f"tag-all 自動打標完成：{stats}")
-    return jsonify({'data': stats}), 200
 
 
 @api_bp.route('/sync/backfill-names', methods=['POST'])

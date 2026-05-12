@@ -26,6 +26,7 @@ from ..services.notification_service import NotificationService
 from ..realtime.emitter import emit_scoped
 from ..channels import ChannelEvent
 from ..channels.registry import channel_registry
+from ..utils.media_storage import download_and_store
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ def webhook_verify():
         logger.info("✅ Meta Webhook 驗證成功")
         return challenge, 200
     else:
-        logger.warning(f"❌ Meta Webhook 驗證失敗：mode={mode}, token={token}")
+        logger.warning(f"❌ Meta Webhook 驗證失敗：mode={mode}, token={token[:4]}***" if token else f"❌ Meta Webhook 驗證失敗：mode={mode}, token=None")
         return 'Forbidden', 403
 
 
@@ -202,6 +203,17 @@ def _handle_channel_event(event: 'ChannelEvent'):
             db.session.commit()
 
             logger.info(f"✅ [webhook] 訊息已儲存：conversation={conversation.id}, message={message.id}")
+
+            # ── 5.1 下載外部媒體並替換為永久 URL ──
+            if message.media_url and message.message_type in ('image', 'attachment'):
+                try:
+                    permanent_url = download_and_store(message.media_url)
+                    if permanent_url:
+                        message.media_url = permanent_url
+                        db.session.commit()
+                        logger.info(f"[webhook] 媒體已永久儲存：message={message.id}")
+                except Exception as dl_err:
+                    logger.warning(f"[webhook] 媒體下載失敗（保留原始 URL）：{dl_err}")
 
             # ── 5.5 發送新訊息通知 ──
             try:

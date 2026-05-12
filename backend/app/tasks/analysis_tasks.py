@@ -27,8 +27,6 @@ from ..services.llm_service import (
     LLMBudgetExceededError,
     get_llm_service,
 )
-from ..services.prompts import format_conversation_for_prompt
-from ..services.auto_tagger import AutoTagger
 from ..services.action_service import ActionService
 from ..utils.error_handler import handle_llm_error
 from ..realtime.emitter import emit_scoped
@@ -58,7 +56,10 @@ def _get_min_messages_for_analysis() -> int:
 @celery.task(
     bind=True,
     name='crm.tasks.quick_triage_message',
-    max_retries=0,  # 失敗不重試（輕量分析失敗不嚴重）
+    max_retries=2,
+    autoretry_for=(LLMTimeoutError, LLMRateLimitError),
+    retry_backoff=True,
+    retry_backoff_max=60,
 )
 def quick_triage_message(self, message_id: str):
     """
@@ -305,14 +306,6 @@ def analyze_conversation(self, conversation_id: str, trigger_type: str = "auto")
             trigger_type=trigger_type,
         )
 
-        # 自動打標
-        conversation_text = format_conversation_for_prompt(messages)
-        added_tags = AutoTagger.tag_from_analysis(
-            contact_id=conversation.contact_id,
-            analysis_result=analysis_result,
-            conversation_text=conversation_text,
-        )
-
         # 自動建立 Action
         created_action_ids = ActionService.create_from_analysis(
             contact_id=conversation.contact_id,
@@ -326,7 +319,6 @@ def analyze_conversation(self, conversation_id: str, trigger_type: str = "auto")
             f"對話分析完成：{conversation_id}, "
             f"model={usage_info.get('model_used')}, "
             f"tokens={usage_info.get('tokens_used')}, "
-            f"tags_added={len(added_tags)}, "
             f"actions_created={len(created_action_ids)}"
         )
 
@@ -351,7 +343,6 @@ def analyze_conversation(self, conversation_id: str, trigger_type: str = "auto")
             "success": True,
             "conversation_id": conversation_id,
             "analysis_id": str(analysis.id),
-            "tags_added": added_tags,
             "actions_created": created_action_ids,
             "tokens_used": usage_info.get("tokens_used", 0),
             "processing_time_ms": usage_info.get("processing_time_ms", 0),
@@ -785,14 +776,6 @@ def _execute_conversation_analysis(conversation_id) -> bool:
             analysis_result=analysis_result,
             usage_info=usage_info,
             trigger_type="auto",
-        )
-
-        # 自動打標
-        conversation_text = format_conversation_for_prompt(messages)
-        AutoTagger.tag_from_analysis(
-            contact_id=conversation.contact_id,
-            analysis_result=analysis_result,
-            conversation_text=conversation_text,
         )
 
         # 自動建立 Action

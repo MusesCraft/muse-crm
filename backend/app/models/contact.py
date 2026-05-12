@@ -56,12 +56,18 @@ class Contact(db.Model):
     email: Mapped[Optional[str]] = mapped_column(String(255))
 
     # 銷售相關（手動登記客戶）
-    intent: Mapped[Optional[str]] = mapped_column(String(50))               # browsing/interested/ready_to_buy/purchased
-    budget_range: Mapped[Optional[str]] = mapped_column(String(50))         # under_50k/50k_200k/200k_500k/over_500k
-    preferred_products: Mapped[Optional[list]] = mapped_column(ARRAY(Text)) # 偏好產品
+    intent: Mapped[Optional[str]] = mapped_column(String(50))               # browsing/interested/ready_to_buy/purchased（PR-2 後續移除）
+    budget_range: Mapped[Optional[str]] = mapped_column(String(50))         # under_50k/50k_200k/200k_500k/over_500k（PR-2 後續移除）
+    preferred_products: Mapped[Optional[list]] = mapped_column(ARRAY(Text)) # 偏好產品（PR-2 後續移除）
     visit_date: Mapped[Optional[date]] = mapped_column(Date)                # 來訪日期
     referral_source: Mapped[Optional[str]] = mapped_column(String(255))     # 轉介來源
     contact_status: Mapped[Optional[str]] = mapped_column(String(20), default='new')  # new/following_up/quoted/won/lost
+
+    # PR-2 新增（FILE_STRUCTURE_PLAN §2.1）
+    # 客戶身份：取代過去的 Tag 分類
+    customer_identity: Mapped[Optional[str]] = mapped_column(String(20))    # designer/homeowner/dealer/contractor/unknown
+    # 銷售階段：結構化跟單階段，比 contact_status 更語意化
+    sales_stage: Mapped[Optional[str]] = mapped_column(String(20))          # initial/evaluating/quoted/won/lost
 
     # 負責人（CRM-019）
     assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -112,11 +118,7 @@ class Contact(db.Model):
         back_populates="contact"
     )
     actions: Mapped[List["Action"]] = relationship(
-        "Action", 
-        back_populates="contact"
-    )
-    tags: Mapped[List["ContactTag"]] = relationship(
-        "ContactTag", 
+        "Action",
         back_populates="contact"
     )
     notes_by_users: Mapped[List["UserNote"]] = relationship(
@@ -170,6 +172,8 @@ class Contact(db.Model):
             'visit_date': self.visit_date.isoformat() if self.visit_date else None,
             'referral_source': self.referral_source,
             'contact_status': self.contact_status,
+            'customer_identity': self.customer_identity,
+            'sales_stage': self.sales_stage,
             'assigned_to': str(self.assigned_to) if self.assigned_to else None,
             'external_crm_id': self.external_crm_id,
             'is_merged': self.is_merged,

@@ -359,6 +359,63 @@ def build_action_prompt(
     ]
 
 
+# ============================================================
+# PR-5/6 新增 Prompts
+# ============================================================
+
+REPLY_SUGGESTION_SYSTEM = """你是建材產業客服副駕駛。根據對話脈絡與知識庫條目，產生 3 則簡潔、專業、可直接送出的回覆草稿（繁體中文）。
+你必須以 JSON 陣列回覆，每筆包含 text, confidence, kb_refs（用到的 KB id 清單）。不可加入額外說明文字。"""
+
+REPLY_SUGGESTION_USER = """對話脈絡：
+---
+{conversation_text}
+---
+
+知識庫條目（可選擇引用）：
+{kb_snippets}
+
+請產出 3 則建議回覆，每筆 50-100 字之間，語氣依品牌設定：{tone}。
+"""
+
+
+RISK_DETECTION_SYSTEM = """你是建材產業客服風險偵測器。判斷對話是否觸發任何風險：
+- churn（客戶可能流失）
+- complaint（投訴可能升級）
+- high_amount（高金額異動，風險高）
+- long_no_response（客戶長時間未回應）
+只輸出 JSON，不可加任何說明。"""
+
+RISK_DETECTION_USER = """對話脈絡：
+---
+{conversation_text}
+---
+
+請回傳：{{"risk_flags": ["..."], "severity": "high|medium|low", "rationale": "簡短說明"}}
+"""
+
+
+def build_reply_suggestion_prompt(conversation_text: str, kb_snippets: str = '', tone: str = 'professional') -> List[Dict[str, str]]:
+    """組合回覆草稿 prompt（PR-6）"""
+    return [
+        {"role": "system", "content": REPLY_SUGGESTION_SYSTEM},
+        {"role": "user", "content": REPLY_SUGGESTION_USER.format(
+            conversation_text=_sanitize_user_input(conversation_text),
+            kb_snippets=_sanitize_user_input(kb_snippets),
+            tone=tone,
+        )},
+    ]
+
+
+def build_risk_detection_prompt(conversation_text: str) -> List[Dict[str, str]]:
+    """組合風險偵測 prompt（PR-6）"""
+    return [
+        {"role": "system", "content": RISK_DETECTION_SYSTEM},
+        {"role": "user", "content": RISK_DETECTION_USER.format(
+            conversation_text=_sanitize_user_input(conversation_text),
+        )},
+    ]
+
+
 def build_full_analysis_prompt(
     conversation_text: str,
     channel: str = 'unknown',

@@ -81,3 +81,25 @@ def is_manager(user: User) -> bool:
 def is_user(user: User) -> bool:
     """檢查是否為一般使用者"""
     return user.role == 'user'
+
+
+# ── PR-3 新增：對話接管與升級權限 ───────────────────────────
+
+def can_take_over(user: User) -> bool:
+    """可以接管他人對話（PRD §9.1：manager / admin）"""
+    return user.role in ('manager', 'admin')
+
+
+def can_force_take_over(user: User) -> bool:
+    """可以強制接管（admin only）"""
+    return user.role == 'admin'
+
+
+def can_escalate(user: User) -> bool:
+    """可以求援（agent / user 角色才能求援）"""
+    return user.role in ('user', 'agent')
+
+
+def can_manage_kb(user: User) -> bool:
+    """可以管理知識庫（manager / admin）"""
+    return user.role in ('manager', 'admin')

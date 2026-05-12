@@ -54,10 +54,17 @@ def _seed_from_json():
     return count
 
 
+_seeded = False
+
+
 def _ensure_seeded():
-    """確保資料庫中有語錄（空表時自動種子匯入）。"""
+    """確保資料庫中有語錄（空表時自動種子匯入，結果快取避免每次查詢）。"""
+    global _seeded
+    if _seeded:
+        return
     if QuickReply.query.first() is None:
         _seed_from_json()
+    _seeded = True
 
 
 # ── API 端點 ──────────────────────────────────────────────

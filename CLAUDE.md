@@ -15,32 +15,40 @@ docker-compose.yml 僅供參考，實際開發和測試都在 Railway 上進行
 
 所有開發、測試、驗證都直接在 Railway 進行，不使用本地環境。
 
-| 服務 | Railway 專案 | URL |
-|------|-------------|-----|
-| Backend API | muse-crm-backend | https://inspiring-strength-production-a8ca.up.railway.app |
-| Frontend | muse-crm-frontend | https://miraculous-flow-production-e93d.up.railway.app |
+**Railway 專案**：`Muses-CRM-edit`（單一 monorepo 專案，含 4 個 services；2026-05-12 重建）
+
+| Service | 用途 | URL |
+|---------|------|-----|
+| `backend` | Flask API + Celery | https://backend-production-5171.up.railway.app |
+| `frontend` | Next.js 前端 | https://frontend-production-0866.up.railway.app |
+| `postgres` | PostgreSQL 15 + uuid-ossp | （internal: postgres.railway.internal:5432）|
+| `redis` | Redis 8（含 AOF 持久化） | （internal: redis.railway.internal:6379）|
+
+GitHub 連動：`MusesCraft/muse-crm` `main` 分支 push 自動觸發 backend/frontend 部署。
 
 ### 部署指令
 
 ```bash
-# 後端部署
-cd backend && railway up --detach
+# 多數情況不需手動：git push 後 Railway 會自動部署
+# 手動觸發（CLI 用 Project Token）：
+RAILWAY_TOKEN=<project-token> railway up --detach
 
 # 查看部署日誌
-railway logs
+railway logs --service backend
+railway logs --service frontend
 
 # 查看服務狀態
-railway service status --all
+railway status
 ```
 
 ### 健康檢查
 
 ```bash
 # 輕量檢查（無需認證）
-curl https://inspiring-strength-production-a8ca.up.railway.app/api/health
+curl https://backend-production-5171.up.railway.app/api/health
 
 # 完整檢查（含 DB/Redis/Meta 狀態）
-curl https://inspiring-strength-production-a8ca.up.railway.app/api/v1/health
+curl https://backend-production-5171.up.railway.app/api/v1/health
 ```
 
 ### 資料庫操作
@@ -48,10 +56,17 @@ curl https://inspiring-strength-production-a8ca.up.railway.app/api/v1/health
 ```bash
 # 連接 Railway PostgreSQL（需 psql，PATH 含 /opt/homebrew/opt/libpq/bin）
 export PATH="/opt/homebrew/opt/libpq/bin:/opt/homebrew/bin:$PATH"
-echo "SELECT * FROM users;" | railway connect Postgres-g1oi
 
-# Migration（透過 Railway 環境執行）
-railway run -- flask db upgrade
+# 方式一：透過 Railway CLI（需先 link）
+echo "SELECT * FROM users;" | railway connect postgres
+
+# 方式二：用 TCP proxy（postgres TCP proxy 已開啟）
+# DATABASE_URL 範例（密碼存於本地 .railway-pg-password，已 gitignore）
+psql "postgresql://postgres:<password>@yamabiko.proxy.rlwy.net:27856/railway" -c "SELECT * FROM users;"
+
+# Schema 目前由 backend 啟動時 db.create_all() 統一建立
+# Alembic migration 暫未啟用（schema.sql 已過時、不再使用）
+# 後續若要重啟 migration：先標記 alembic_version 為最新 head，再 flask db migrate
 ```
 
 ## 常用指令
@@ -85,8 +100,8 @@ Production 必須設定：`SECRET_KEY`, `JWT_SECRET`, `META_APP_SECRET`, `META_P
 ### 修改後端 API
 1. 先看 `app/api/` 對應檔案了解現有端點
 2. 業務邏輯放 `app/services/`，API 層只做參數驗證和回傳
-3. 如需新 model，在 `app/models/` 建立後跑 `flask db migrate`
-4. 修改完 commit → `cd backend && railway up --detach` 部署
+3. 如需新 model，在 `app/models/` 建立 — 啟動時 `db.create_all()` 自動建表
+4. 修改完 `git push origin main`，Railway 自動部署
 5. 用 `curl` 打 Railway API 端點驗證
 
 ### 修改前端頁面
@@ -94,23 +109,27 @@ Production 必須設定：`SECRET_KEY`, `JWT_SECRET`, `META_APP_SECRET`, `META_P
 2. API 呼叫統一透過 `lib/api.ts`，不要直接 fetch
 3. UI 元件優先用 shadcn/ui（`npx shadcn add <component>`）
 4. `npm run lint` + `npm run build` 確認無錯誤
-5. 前端部署需從 Railway Dashboard 或 link 到 muse-crm-frontend 專案後 `railway up`
+5. `git push` 後 Railway 自動部署 frontend service
 
 ### 驗證步驟
 1. 部署後先 `curl /api/health` 確認服務存活
 2. 用 `curl /api/v1/health` 確認 DB/Redis 正常
-3. 前端開啟 https://miraculous-flow-production-e93d.up.railway.app 實際操作
+3. 前端開啟 https://frontend-production-0866.up.railway.app 實際操作
 
 ## Railway CLI 備忘
 
 ```bash
-railway whoami                     # 確認登入狀態
-railway list                       # 列出所有專案
-railway link -p "muse-crm-backend" -s "inspiring-strength"  # Link 後端
-railway up --detach                # 部署（不等待完成）
-railway logs                       # 查看即時日誌
-railway variables list             # 查看環境變數
-railway connect Postgres-g1oi      # 連接 DB（需 psql）
+# Project Token 模式（推薦，免 keychain 互動）
+RAILWAY_TOKEN=<project-token> railway status
+RAILWAY_TOKEN=<project-token> railway service backend   # link
+RAILWAY_TOKEN=<project-token> railway logs --service backend
+RAILWAY_TOKEN=<project-token> railway variables --service backend --json
+
+# Account Token 模式（GraphQL API，可管理 service / domain / database）
+curl -X POST https://backboard.railway.com/graphql/v2 \
+  -H "Authorization: Bearer <account-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"query { projects { edges { node { id name } } } }"}'
 ```
 
 ## 語言

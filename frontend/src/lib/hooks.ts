@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, type DependencyList } from 'react';
+import { getWs } from './ws';
 
 interface UseAsyncState<T> {
   data: T | null;
@@ -11,7 +12,7 @@ interface UseAsyncState<T> {
 
 export function useAsync<T>(
   fetcher: () => Promise<T>,
-  deps: unknown[] = []
+  deps: DependencyList = []
 ): UseAsyncState<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,4 +47,30 @@ export function useAsync<T>(
   }, [trigger, ...deps]);
 
   return { data, loading, error, refetch };
+}
+
+/**
+ * 訂閱 WebSocket 事件。元件卸載時自動退訂。
+ *
+ * @example
+ *   useWebSocketEvent<{ conversation_id: string }>('conversation.assigned', (data) => {
+ *     refetchList();
+ *   });
+ */
+export function useWebSocketEvent<T = unknown>(
+  event: string,
+  callback: (data: T) => void,
+): void {
+  // 用 ref 鎖最新的 callback，避免每次重渲染都重新訂閱
+  const cbRef = useRef(callback);
+  useEffect(() => {
+    cbRef.current = callback;
+  }, [callback]);
+
+  useEffect(() => {
+    const ws = getWs();
+    const handler = (data: unknown) => cbRef.current(data as T);
+    ws.on(event, handler);
+    return () => ws.off(event, handler);
+  }, [event]);
 }

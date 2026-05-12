@@ -1,17 +1,20 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { inboxApi, ocrApi, type Conversation, type Message, type Analysis } from '@/lib/api';
-import { useAsync } from '@/lib/hooks';
+import { inboxApi, ocrApi, conversationOpsApi, type Conversation, type Message, type Analysis } from '@/lib/api';
+import { useAsync, useWebSocketEvent } from '@/lib/hooks';
+import { useAuth } from '@/lib/auth';
 import { Avatar } from '@/components/avatar';
 import { ChannelBadge } from '@/components/channel-icon';
 import { StatusBadge } from '@/components/status-badge';
 import { MessageListSkeleton } from '@/components/skeletons';
 import { MessageBubble } from './message-bubble';
 import { SendBar, type SendBarHandle } from './send-bar';
+import { TakeOverBanner } from '@/components/inbox/take-over-banner';
+import { InternalNoteBubble } from '@/components/inbox/internal-note-bubble';
 import { Button } from '@/components/ui/button';
 import {
-  XCircle,
+  CheckCircle2,
   Clock,
   MessageSquare,
   Brain,
@@ -21,6 +24,7 @@ import {
   Loader2,
   X,
   Lightbulb,
+  ChevronLeft,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -87,7 +91,6 @@ function AiSuggestionCard({
 
   if (dismissed) return null;
 
-  // 從真實分析結果中取得建議回覆
   const suggestedReply = analyses?.[0]?.result?.suggested_reply as string | undefined;
 
   if (!analyses || analyses.length === 0) {
@@ -159,7 +162,8 @@ function OcrToast({
 // ── Main Component ─────────────────────────────────────
 
 export function ConversationDetail({ conversationId, onClose, onBack }: ConversationDetailProps) {
-  const [closing, setClosing] = useState(false);
+  const { user } = useAuth();
+  const [resolving, setResolving] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
@@ -172,23 +176,20 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
   const ocrToastTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const msgCountRef = useRef(0);
   const lastSentRef = useRef(0);
+  const prevMsgCountRef = useRef(0);
 
   const { data: conv, loading, error, refetch } = useAsync<Conversation>(
     () => inboxApi.getConversation(conversationId),
     [conversationId]
   );
 
-  // Reset local messages and scroll tracking when conversation changes
   useEffect(() => {
     setLocalMessages([]);
     prevMsgCountRef.current = 0;
   }, [conversationId]);
 
-  // Auto polling every 5 seconds (pause when tab hidden or just sent a message)
-  // 使用 silent fetch 避免觸發 loading/error state → 防止不必要的 re-render 和 scroll 重置
   useEffect(() => {
     msgCountRef.current = conv?.messages?.length || 0;
-    // Server 資料更新後，清除已被 server 包含的 local 樂觀訊息
     if (localMessages.length > 0 && conv?.messages?.length) {
       setLocalMessages([]);
     }
@@ -203,20 +204,30 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
           refetch();
         }
       } catch {
-        // 靜默忽略所有 polling 錯誤（包含 401），不觸發 state 更新
+        // 靜默忽略
       }
     }, 5000);
     return () => clearInterval(id);
   }, [conversationId, refetch]);
 
-  // Scroll to bottom when messages change
-  const prevMsgCountRef = useRef(0);
+  // WebSocket：對話被接管/歸還/求援/已解決時刷新
+  const refreshOnEvent = useCallback((data: unknown) => {
+    const payload = data as { conversation_id?: string } | undefined;
+    if (payload?.conversation_id && String(payload.conversation_id) === String(conversationId)) {
+      refetch();
+    }
+  }, [conversationId, refetch]);
+  useWebSocketEvent('conversation.assigned', refreshOnEvent);
+  useWebSocketEvent('conversation.escalated', refreshOnEvent);
+  useWebSocketEvent('conversation.taken_over', refreshOnEvent);
+  useWebSocketEvent('conversation.returned', refreshOnEvent);
+  useWebSocketEvent('conversation.resolved', refreshOnEvent);
+
   useEffect(() => {
     const count = (conv?.messages?.length || 0) + localMessages.length;
     if (count > 0 && count !== prevMsgCountRef.current) {
       const isInitialLoad = prevMsgCountRef.current === 0;
       prevMsgCountRef.current = count;
-      // 使用雙 RAF 確保長訊息列表 DOM 完整渲染後再滾動
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: isInitialLoad ? 'instant' : 'smooth' });
@@ -225,8 +236,6 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
     }
   }, [conv?.messages, localMessages]);
 
-  // 去重：polling refetch 後 conv.messages 會包含已發送的訊息，
-  // 需排除 localMessages 中已出現在 server 資料的項目
   const allMessages = useMemo(() => {
     const serverMessages = conv?.messages || [];
     if (localMessages.length === 0) return serverMessages;
@@ -239,7 +248,7 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
 
   const handleMessageSent = useCallback((msg: Message) => {
     setLocalMessages((prev) => [...prev, msg]);
-    lastSentRef.current = Date.now(); // 防止 polling 立刻 refetch
+    lastSentRef.current = Date.now();
   }, []);
 
   const handleSendError = useCallback((err: string) => {
@@ -283,7 +292,6 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
     }
   }, [conv?.contact?.id, refetch]);
 
-  // 清理 OCR toast timer（組件卸載時）
   useEffect(() => {
     return () => {
       if (ocrToastTimerRef.current) clearTimeout(ocrToastTimerRef.current);
@@ -292,17 +300,17 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
 
   // ── Conversation Actions ──
 
-  const handleClose = async () => {
-    if (!conv || closing) return;
-    setClosing(true);
+  const handleResolve = async () => {
+    if (!conv || resolving) return;
+    setResolving(true);
     try {
-      await inboxApi.closeConversation(conv.id);
+      await conversationOpsApi.resolve(conv.id);
       refetch();
       onClose();
     } catch {
       // ignore
     } finally {
-      setClosing(false);
+      setResolving(false);
     }
   };
 
@@ -333,11 +341,24 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
   );
   if (!conv) return null;
 
+  const isOpen = !['resolved', 'closed'].includes(conv.status);
+  const showTakeOverBanner = conv.status === 'supervisor_taken' || conv.status === 'escalated';
+  const isMeTheSupervisor = !!(user && conv.supervisor_id && String(user.id) === String(conv.supervisor_id));
+
   return (
     <>
       {/* Header */}
-      <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 px-6 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 px-4 sm:px-6 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-2">
+          {onBack && (
+            <button
+              onClick={onBack}
+              aria-label="返回列表"
+              className="md:hidden p-2 -ml-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              <ChevronLeft className="w-4 h-4 text-zinc-500" />
+            </button>
+          )}
           <Avatar
             name={conv.contact?.name || '未知'}
             url={conv.contact?.avatar_url}
@@ -382,30 +403,48 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
             {analyzing ? '分析中...' : '深度分析'}
           </Button>
 
-          {conv.status === 'active' && (
+          {isOpen && (
             <Button
               variant="outline"
               size="sm"
-              onClick={handleClose}
-              disabled={closing}
-              className="text-zinc-500 hover:text-red-500 dark:text-zinc-400 dark:hover:text-red-400"
+              onClick={handleResolve}
+              disabled={resolving}
+              className="text-zinc-500 hover:text-emerald-500 dark:text-zinc-400 dark:hover:text-emerald-400"
             >
-              <XCircle className="w-3.5 h-3.5 mr-1" />
-              {closing ? '關閉中...' : '關閉對話'}
+              <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+              {resolving ? '處理中...' : '標記已解決'}
             </Button>
           )}
         </div>
       </div>
 
+      {/* Take Over Banner（主管接管中或求援狀態） */}
+      {showTakeOverBanner && (
+        <TakeOverBanner
+          conversationId={conv.id}
+          isSupervisor={isMeTheSupervisor}
+          onReturned={refetch}
+        />
+      )}
+
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-1">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-1">
         {allMessages.length > 0 ? (
           allMessages.map((msg) => (
-            <MessageBubble
-              key={msg.id}
-              message={msg}
-              onOcr={msg.message_type === 'image' && msg.media_url ? handleOcr : undefined}
-            />
+            msg.is_internal ? (
+              <InternalNoteBubble
+                key={msg.id}
+                content={msg.content}
+                timestamp={msg.timestamp ? formatDateTime(msg.timestamp) : undefined}
+                mentions={msg.mentions}
+              />
+            ) : (
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                onOcr={msg.message_type === 'image' && msg.media_url ? handleOcr : undefined}
+              />
+            )
           ))
         ) : (
           <p className="text-center text-sm text-zinc-500 py-8">尚無訊息</p>
@@ -417,7 +456,7 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
       {conv.analyses && conv.analyses.length > 0 && (
         <div className="border-t border-zinc-200 dark:border-zinc-800 p-4 space-y-2 max-h-60 overflow-y-auto flex-shrink-0">
           <h3 className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">
-            🧠 AI 分析摘要
+            AI 分析摘要
           </h3>
           {conv.analyses.map((a) => (
             <AnalysisCard key={a.id} analysis={a} />
@@ -434,6 +473,8 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
         conversationId={conversationId}
         onMessageSent={handleMessageSent}
         onError={handleSendError}
+        currentHandlerId={conv.current_handler_id}
+        onConversationChanged={refetch}
       />
 
       {/* OCR Toast */}

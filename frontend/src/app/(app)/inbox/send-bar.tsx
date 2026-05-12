@@ -1,13 +1,17 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { inboxSendApi, uploadApi, quickRepliesApi, type Message, type QuickReplyItem, type QuickReplyAttachment } from '@/lib/api';
+import { inboxSendApi, uploadApi, quickRepliesApi, usersApi, type Message, type QuickReplyItem, type QuickReplyAttachment, type UserOption } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { EscalationButton } from '@/components/inbox/escalation-button';
+import { AssignMenu } from '@/components/inbox/assign-menu';
 import {
   Paperclip,
   Loader2,
   Send,
   Zap,
   X,
+  StickyNote,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -18,7 +22,6 @@ function QuickRepliesPanel({ onSelect, onClose }: { onSelect: (text: string, att
   const [apiReplies, setApiReplies] = useState<QuickReplyItem[]>([]);
   const [apiLoaded, setApiLoaded] = useState(false);
 
-  // Try loading from API on mount
   useEffect(() => {
     quickRepliesApi.getAll()
       .then((res) => {
@@ -27,44 +30,33 @@ function QuickRepliesPanel({ onSelect, onClose }: { onSelect: (text: string, att
         }
         setApiLoaded(true);
       })
-      .catch(() => {
-        // API unavailable, fall back to mock data
-        setApiLoaded(true);
-      });
+      .catch(() => setApiLoaded(true));
   }, []);
 
-  // Search from API when search changes
   useEffect(() => {
     if (!search.trim() || !apiLoaded || apiReplies.length === 0) return;
     const timer = setTimeout(() => {
       quickRepliesApi.search(search)
         .then((res) => {
-          if (res.data && res.data.length > 0) {
-            setApiReplies(res.data);
-          }
+          if (res.data && res.data.length > 0) setApiReplies(res.data);
         })
-        .catch(() => {
-          // Search failed, keep existing replies
-        });
+        .catch(() => {});
     }, 300);
     return () => clearTimeout(timer);
   }, [search, apiLoaded, apiReplies.length]);
 
   const categories = Array.from(new Set(apiReplies.map((r) => r.category)));
-
   const displayItems: { id: string | number; category: string; title: string; content: string; attachments?: QuickReplyAttachment[] }[] =
     apiReplies.map((r) => ({ id: r.id, category: r.category, title: r.title, content: r.content, attachments: r.attachments }));
 
   return (
     <div className="absolute bottom-full left-0 mb-2 w-80 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg z-50 max-h-80 flex flex-col">
-      {/* Header */}
       <div className="flex items-center justify-between px-3 pt-3 pb-2">
         <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">⚡ 預存語錄</span>
         <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
-      {/* Search */}
       <div className="px-3 pb-2">
         <input
           type="text"
@@ -75,7 +67,6 @@ function QuickRepliesPanel({ onSelect, onClose }: { onSelect: (text: string, att
           className="w-full text-xs bg-zinc-50 dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-1.5 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
         />
       </div>
-      {/* List */}
       <div className="flex-1 overflow-y-auto px-1 pb-2">
         {categories.map((cat) => {
           const items = displayItems.filter((r) => r.category === cat);
@@ -126,6 +117,10 @@ export interface SendBarProps {
   conversationId: string | number;
   onMessageSent: (msg: Message) => void;
   onError: (error: string) => void;
+  /** 當前對話的 current_handler_id（給 AssignMenu 高亮用） */
+  currentHandlerId?: string | null;
+  /** 對話操作（求援/分配）後通知父層 refetch */
+  onConversationChanged?: () => void;
 }
 
 export interface SendBarHandle {
@@ -134,16 +129,27 @@ export interface SendBarHandle {
 
 // ── SendBar Component ──────────────────────────────────
 
-export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar({ conversationId, onMessageSent, onError }, ref) {
+export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar({
+  conversationId,
+  onMessageSent,
+  onError,
+  currentHandlerId,
+  onConversationChanged,
+}, ref) {
+  const { user } = useAuth();
   const [inputText, setInputText] = useState('');
   const [imagePreview, setImagePreview] = useState<{ file: File; url: string } | null>(null);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [sending, setSending] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<QuickReplyAttachment[]>([]);
+  const [isInternal, setIsInternal] = useState(false);
+  const [agents, setAgents] = useState<UserOption[]>([]);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sendingRef = useRef(false);
+
+  const canManage = user?.role === 'admin' || user?.role === 'manager';
 
   // Reset state when conversation changes
   useEffect(() => {
@@ -151,6 +157,7 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
     setImagePreview(null);
     setShowQuickReplies(false);
     setPendingAttachments([]);
+    setIsInternal(false);
   }, [conversationId]);
 
   // Auto-resize textarea
@@ -162,7 +169,13 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
     }
   }, [inputText]);
 
-  // 清理 imagePreview URL（組件卸載時）
+  // 取得可分配客服列表（manager+ 才需要）
+  useEffect(() => {
+    if (!canManage) return;
+    usersApi.getAgents().then(setAgents).catch(() => setAgents([]));
+  }, [canManage]);
+
+  // 清理 imagePreview URL
   const imagePreviewRef = useRef(imagePreview);
   imagePreviewRef.current = imagePreview;
   useEffect(() => {
@@ -180,13 +193,15 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
     if (!text && !hasImage) return;
     if (sendingRef.current) return;
 
-    // 發送前確認
-    const confirmMsg = hasImage && text
-      ? '確定要發送這則訊息和圖片？'
-      : hasImage
-        ? '確定要發送這張圖片？'
-        : '確定要發送這則訊息？';
-    if (!window.confirm(confirmMsg)) return;
+    // 內部備註模式不必確認，避免打斷團隊溝通；對外訊息保留確認
+    if (!isInternal) {
+      const confirmMsg = hasImage && text
+        ? '確定要發送這則訊息和圖片？'
+        : hasImage
+          ? '確定要發送這張圖片？'
+          : '確定要發送這則訊息？';
+      if (!window.confirm(confirmMsg)) return;
+    }
 
     sendingRef.current = true;
     setSending(true);
@@ -194,7 +209,6 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
     try {
       let mediaUrl: string | undefined;
 
-      // 如果有圖片，先上傳取得 URL
       if (hasImage) {
         try {
           const uploaded = await uploadApi.uploadImage(imagePreview.file);
@@ -213,20 +227,18 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
         }
       }
 
-      // 呼叫 send API
       const messageType = hasImage ? 'image' as const : 'text' as const;
       const result = await inboxSendApi.sendMessage(
         conversationId,
         text,
         messageType,
         mediaUrl,
+        { isInternal },
       );
 
-      // 成功：把回傳的 message 通知父組件
       if (result.data) {
         onMessageSent(result.data as Message);
       } else {
-        // fallback: 如果後端沒回傳完整 message，自己建一個
         const newMsg: Message = {
           id: `local-${Date.now()}`,
           conversation_id: conversationId,
@@ -237,23 +249,29 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
           timestamp: new Date().toISOString(),
           is_read: false,
           platform_message_id: null,
+          is_internal: isInternal,
+          mentions: [],
         };
         onMessageSent(newMsg);
       }
 
-      // 檢查平台 API 是否送達失敗
-      if (result.api_error) {
+      // 內部備註不對外發送，所以不會有 api_error；對外訊息才檢查平台 API 結果
+      if (result.api_error && !isInternal) {
         onError(`訊息已記錄但未送達客戶：${result.api_error}`);
       }
 
-      // 發送快捷回覆的附件圖片
+      // 快捷回覆附件圖片（內部備註模式下仍可附帶，但不會送到平台）
       if (pendingAttachments.length > 0) {
         for (const att of pendingAttachments) {
           try {
-            const imgResult = await inboxSendApi.sendMessage(conversationId, '', 'image', att.url);
-            if (imgResult.data) {
-              onMessageSent(imgResult.data as Message);
-            }
+            const imgResult = await inboxSendApi.sendMessage(
+              conversationId,
+              '',
+              'image',
+              att.url,
+              { isInternal },
+            );
+            if (imgResult.data) onMessageSent(imgResult.data as Message);
           } catch {
             // 圖片附件發送失敗不阻塞
           }
@@ -273,7 +291,7 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
       sendingRef.current = false;
       setSending(false);
     }
-  }, [inputText, imagePreview, pendingAttachments, conversationId, onMessageSent, onError]);
+  }, [inputText, imagePreview, pendingAttachments, conversationId, isInternal, onMessageSent, onError]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -290,7 +308,6 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
       const url = URL.createObjectURL(file);
       setImagePreview({ file, url });
     }
-    // Reset input so the same file can be selected again
     e.target.value = '';
   };
 
@@ -310,7 +327,6 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
     setTimeout(() => textareaRef.current?.focus(), 50);
   };
 
-  // 暴露方法給父組件（AI 建議填入等）
   useImperativeHandle(ref, () => ({
     setTextAndFocus(text: string) {
       setInputText(text);
@@ -319,7 +335,42 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
   }), []);
 
   return (
-    <div className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex-shrink-0">
+    <div
+      className={cn(
+        'border-t bg-white dark:bg-zinc-900 flex-shrink-0 transition-colors',
+        isInternal
+          ? 'border-yellow-400 dark:border-yellow-500/60 bg-yellow-50/40 dark:bg-yellow-500/5'
+          : 'border-zinc-200 dark:border-zinc-800'
+      )}
+    >
+      {/* Action Row（求援 / 分配 / 內部備註 toggle） */}
+      <div className="px-4 pt-2 flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() => setIsInternal((v) => !v)}
+          aria-pressed={isInternal}
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors',
+            isInternal
+              ? 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-500/20 dark:text-yellow-300 dark:border-yellow-500/40'
+              : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 dark:hover:bg-zinc-700'
+          )}
+        >
+          <StickyNote className="w-3.5 h-3.5" />
+          {isInternal ? '內部備註模式' : '切到內部備註'}
+        </button>
+
+        <EscalationButton conversationId={conversationId} onEscalated={onConversationChanged} />
+
+        {canManage && agents.length > 0 && (
+          <AssignMenu
+            conversationId={conversationId}
+            agents={agents}
+            currentHandlerId={currentHandlerId}
+            onAssigned={onConversationChanged}
+          />
+        )}
+      </div>
+
       {/* Image Preview */}
       {imagePreview && (
         <div className="px-4 pt-3">
@@ -403,10 +454,15 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="輸入訊息..."
+          placeholder={isInternal ? '留下內部備註，僅團隊可見' : '輸入訊息...'}
           aria-label="輸入訊息"
           rows={1}
-          className="flex-1 bg-zinc-50 dark:bg-zinc-800 rounded-xl px-4 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none max-h-[120px]"
+          className={cn(
+            'flex-1 rounded-xl px-4 py-2 text-sm placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-1 resize-none max-h-[120px]',
+            isInternal
+              ? 'bg-yellow-50 dark:bg-yellow-500/10 text-zinc-900 dark:text-zinc-100 border border-yellow-300 dark:border-yellow-500/40 focus:ring-yellow-500'
+              : 'bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 focus:ring-indigo-500'
+          )}
         />
 
         {/* Send Button */}
@@ -417,8 +473,10 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
             'p-2 rounded-lg transition-colors',
             sending
               ? 'bg-indigo-400 text-white cursor-wait'
-              : inputText.trim() || imagePreview
-                ? 'bg-indigo-500 text-white hover:bg-indigo-600'
+              : (inputText.trim() || imagePreview)
+                ? isInternal
+                  ? 'bg-yellow-500 text-white hover:bg-yellow-600'
+                  : 'bg-indigo-500 text-white hover:bg-indigo-600'
                 : 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600 cursor-not-allowed'
           )}
           title="發送"

@@ -74,7 +74,7 @@ export default function LoginPage() {
               required
               autoComplete="email"
               className="w-full rounded-xl border border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50 px-4 py-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition"
-              placeholder="admin@musecraft.com"
+              placeholder="輸入 Email"
             />
           </div>
 

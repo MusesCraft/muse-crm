@@ -1,15 +1,21 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { Suspense, useState, useMemo, useRef, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { contactsApi, type Contact, type PaginatedResponse } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
+import { useAuth } from '@/lib/auth';
+import { useColumnVisibility } from '@/lib/use-column-visibility';
 import { Avatar } from '@/components/avatar';
 import { ChannelBadge } from '@/components/channel-icon';
 import { PriorityBadge } from '@/components/badges';
+import { ContactPreview } from '@/components/contact-preview';
+import { ColumnVisibility } from '@/components/column-visibility';
 import { LoadingSpinner, EmptyState } from '@/components/loading';
 import { formatDateTime } from '@/lib/format';
-import { Search, ChevronLeft, ChevronRight, Users, ExternalLink, ArrowUpDown, Plus, Loader2 } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Users, ExternalLink, ArrowUpDown, Plus, Loader2, Upload } from 'lucide-react';
+import { ImportDialog } from './import-dialog';
 import {
   Dialog,
   DialogContent,
@@ -22,14 +28,38 @@ import {
 type SortKey = 'last_seen' | 'priority' | 'conversation_count' | 'name';
 const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
-export default function ContactsPage() {
+const columnDefs = [
+  { key: 'channel', label: '渠道' },
+  { key: 'status', label: '優先級' },
+  { key: 'intent', label: '意向' },
+  { key: 'identity', label: '客戶身份' },
+  { key: 'last_seen', label: '最後活躍' },
+  { key: 'conversations', label: '對話數' },
+];
+
+export default function ContactsPageWrapper() {
+  return (
+    <Suspense>
+      <ContactsPage />
+    </Suspense>
+  );
+}
+
+function ContactsPage() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const urlParams = useSearchParams();
+  const { visible, toggle, isVisible } = useColumnVisibility('muse_contacts_columns', columnDefs);
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const [channel, setChannel] = useState('');
+  const [channel, setChannel] = useState(urlParams.get('channel') || '');
   const [sourceType, setSourceType] = useState('');
+  const [contactStatus, setContactStatus] = useState(urlParams.get('status') || '');
+  const [intent, setIntent] = useState(urlParams.get('intent') || '');
   const [sort, setSort] = useState<SortKey>('last_seen');
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
   const debounceTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -87,8 +117,10 @@ export default function ContactsPage() {
         search: search || undefined,
         channel: channel || undefined,
         source_type: sourceType || undefined,
+        contact_status: contactStatus || undefined,
+        intent: intent || undefined,
       }),
-    [page, search, channel, sourceType]
+    [page, search, channel, sourceType, contactStatus, intent]
   );
 
   const sortedContacts = useMemo(() => {
@@ -117,13 +149,24 @@ export default function ContactsPage() {
           <h1 className="text-lg font-semibold text-zinc-900 dark:text-white">客戶管理</h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">查看和管理所有客戶資訊</p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-500 text-white text-sm font-medium rounded-lg hover:bg-indigo-600 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          新增客戶
-        </button>
+        <div className="flex items-center gap-2">
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => setShowImport(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 text-sm font-medium rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              匯入
+            </button>
+          )}
+          <button
+            onClick={() => setShowCreate(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-500 text-white text-sm font-medium rounded-lg hover:bg-indigo-600 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            新增客戶
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -161,9 +204,37 @@ export default function ContactsPage() {
           <option value="ad">廣告</option>
           <option value="referral">推薦</option>
         </select>
+        <select
+          value={contactStatus}
+          onChange={(e) => { setContactStatus(e.target.value); setPage(1); }}
+          aria-label="篩選狀態"
+          className="px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
+        >
+          <option value="">全部狀態</option>
+          <option value="new">新客戶</option>
+          <option value="following_up">跟進中</option>
+          <option value="quoted">已報價</option>
+          <option value="won">已成交</option>
+          <option value="lost">已流失</option>
+        </select>
+        <select
+          value={intent}
+          onChange={(e) => { setIntent(e.target.value); setPage(1); }}
+          aria-label="篩選意向"
+          className="px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
+        >
+          <option value="">全部意向</option>
+          <option value="browsing">瀏覽中</option>
+          <option value="interested">有興趣</option>
+          <option value="ready_to_buy">準備購買</option>
+          <option value="purchased">已購買</option>
+        </select>
 
-        {/* Sort */}
-        <div className="flex items-center gap-1.5 ml-auto text-xs text-zinc-400 dark:text-zinc-500">
+        {/* Column Visibility + Sort */}
+        <div className="flex items-center gap-1.5 ml-auto">
+          <ColumnVisibility columns={columnDefs} visible={visible} onToggle={toggle} />
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-500">
           <ArrowUpDown className="w-3.5 h-3.5" />
         </div>
         <select
@@ -202,21 +273,31 @@ export default function ContactsPage() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
                   客戶
                 </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
-                  渠道
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
-                  優先級
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
-                  標籤
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
-                  最後活躍
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
-                  對話數
-                </th>
+                {isVisible('channel') && (
+                  <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
+                    渠道
+                  </th>
+                )}
+                {isVisible('status') && (
+                  <th className="text-center px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
+                    優先級
+                  </th>
+                )}
+                {isVisible('identity') && (
+                  <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
+                    客戶身份
+                  </th>
+                )}
+                {isVisible('last_seen') && (
+                  <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
+                    最後活躍
+                  </th>
+                )}
+                {isVisible('conversations') && (
+                  <th className="text-center px-4 py-3 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/50">
+                    對話數
+                  </th>
+                )}
                 <th className="px-4 py-3 bg-zinc-50 dark:bg-zinc-800/50"></th>
               </tr>
             </thead>
@@ -224,55 +305,66 @@ export default function ContactsPage() {
               {sortedContacts.map((contact) => (
                 <tr
                   key={contact.id}
-                  className="border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors"
+                  onClick={() => router.push(`/contacts/${contact.id}`)}
+                  className="border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors cursor-pointer"
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <Avatar name={contact.name} url={contact.avatar_url} size="sm" />
                       <div>
-                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{contact.name}</p>
+                        <ContactPreview contactId={contact.id}>
+                          <button type="button" onClick={(e) => e.stopPropagation()} className="text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors text-left">
+                            {contact.name}
+                          </button>
+                        </ContactPreview>
                         {contact.display_name && contact.display_name !== contact.name && (
                           <p className="text-xs text-zinc-400 dark:text-zinc-500">{contact.display_name}</p>
                         )}
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    <ChannelBadge channel={contact.channel} />
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <PriorityBadge priority={contact.priority} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {contact.tags && contact.tags.length > 0 ? (
-                        contact.tags.slice(0, 3).map((tag) => (
-                          <span
-                            key={tag.id}
-                            className="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-xs text-zinc-600 dark:text-zinc-300"
-                          >
-                            {tag.tag_name}
+                  {isVisible('channel') && (
+                    <td className="px-4 py-3">
+                      <ChannelBadge channel={contact.channel} />
+                    </td>
+                  )}
+                  {isVisible('status') && (
+                    <td className="px-4 py-3 text-center">
+                      <PriorityBadge priority={contact.priority} />
+                    </td>
+                  )}
+                  {isVisible('identity') && (
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {contact.customer_identity ? (
+                          <span className="inline-flex items-center rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-xs text-zinc-600 dark:text-zinc-300">
+                            {contact.customer_identity}
                           </span>
-                        ))
-                      ) : (
-                        <span className="text-xs text-zinc-400 dark:text-zinc-600">&mdash;</span>
-                      )}
-                      {contact.tags && contact.tags.length > 3 && (
-                        <span className="text-xs text-zinc-400 dark:text-zinc-500">
-                          +{contact.tags.length - 3}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">{formatDateTime(contact.last_seen)}</span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="text-sm text-zinc-600 dark:text-zinc-300">{contact.conversation_count}</span>
-                  </td>
+                        ) : (
+                          <span className="text-xs text-zinc-400 dark:text-zinc-600">&mdash;</span>
+                        )}
+                        {contact.sales_stage && (
+                          <span className="inline-flex items-center rounded-full bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-600 dark:text-indigo-400">
+                            {contact.sales_stage}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                  {isVisible('last_seen') && (
+                    <td className="px-4 py-3">
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400">{formatDateTime(contact.last_seen)}</span>
+                    </td>
+                  )}
+                  {isVisible('conversations') && (
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-sm text-zinc-600 dark:text-zinc-300">{contact.conversation_count}</span>
+                    </td>
+                  )}
                   <td className="px-4 py-3">
                     <Link
                       href={`/contacts/${contact.id}`}
+                      onClick={(e) => e.stopPropagation()}
                       className="inline-flex items-center gap-1 text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
                     >
                       查看
@@ -311,6 +403,10 @@ export default function ContactsPage() {
           </div>
         )}
       </div>
+      {/* 匯入 CSV Dialog */}
+      {user?.role === 'admin' && (
+        <ImportDialog open={showImport} onOpenChange={setShowImport} onSuccess={() => refetch()} />
+      )}
       {/* 新增客戶 Dialog */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">

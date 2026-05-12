@@ -13,9 +13,7 @@ import {
   ArrowLeft,
   Clock,
   Calendar,
-  Tag,
-  X,
-  Plus,
+  UserCircle,
   MessageSquare,
   Brain,
   ChevronDown,
@@ -26,98 +24,54 @@ import {
   Send,
   AlertTriangle,
   ListTodo,
+  Pencil,
+  Save,
 } from 'lucide-react';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-// ── Tag Section ────────────────────────────────────────
+// ── Identity / Stage Section（PR-2 取代 Tag 系統） ────────
 
-function TagSection({
-  contactId,
-  tags,
-  onUpdate,
+const IDENTITY_LABEL: Record<string, string> = {
+  designer: '設計師',
+  homeowner: '屋主',
+  dealer: '建材行',
+  contractor: '工班',
+  unknown: '未分類',
+};
+
+const STAGE_LABEL: Record<string, string> = {
+  initial: '初次接觸',
+  evaluating: '評估中',
+  quoted: '已報價',
+  won: '已成交',
+  lost: '已流失',
+};
+
+function IdentityStageSection({
+  customerIdentity,
+  salesStage,
 }: {
-  contactId: string | number;
-  tags: { id: string | number; tag_name: string; category: string | null }[];
-  onUpdate: () => void;
+  customerIdentity?: string | null;
+  salesStage?: string | null;
 }) {
-  const [adding, setAdding] = useState(false);
-  const [newTag, setNewTag] = useState('');
-
-  const handleAdd = async () => {
-    if (!newTag.trim()) return;
-    try {
-      await contactsApi.addTag(contactId, newTag.trim());
-      setNewTag('');
-      setAdding(false);
-      onUpdate();
-    } catch {
-      // ignore
-    }
-  };
-
-  const handleRemove = async (tagId: string | number) => {
-    try {
-      await contactsApi.removeTag(contactId, tagId);
-      onUpdate();
-    } catch {
-      // ignore
-    }
-  };
-
   return (
     <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2">
-          <Tag className="w-4 h-4 text-indigo-400" />
-          標籤
-        </h3>
-        <button
-          onClick={() => setAdding(!adding)}
-          className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-400 dark:hover:text-indigo-300 flex items-center gap-1"
-        >
-          <Plus className="w-3 h-3" />
-          新增
-        </button>
+      <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2 mb-3">
+        <UserCircle className="w-4 h-4 text-indigo-400" />
+        身份 / 銷售階段
+      </h3>
+      <div className="flex items-center justify-between py-1.5">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">客戶身份</span>
+        <span className="text-sm text-zinc-700 dark:text-zinc-200">
+          {customerIdentity ? (IDENTITY_LABEL[customerIdentity] || customerIdentity) : '—'}
+        </span>
       </div>
-
-      {adding && (
-        <div className="flex gap-2 mb-3">
-          <input
-            type="text"
-            value={newTag}
-            onChange={(e) => setNewTag(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-            placeholder="輸入標籤名稱..."
-            aria-label="輸入標籤名稱"
-            className="flex-1 px-3 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
-            autoFocus
-          />
-          <Button size="sm" onClick={handleAdd}>
-            新增
-          </Button>
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-2">
-        {tags.length === 0 ? (
-          <span className="text-xs text-zinc-400 dark:text-zinc-500">尚無標籤</span>
-        ) : (
-          tags.map((tag) => (
-            <span
-              key={tag.id}
-              className="inline-flex items-center gap-1 rounded-full bg-zinc-100 border border-zinc-200 dark:bg-zinc-800 dark:border-zinc-700 px-2.5 py-1 text-xs text-zinc-600 dark:text-zinc-300"
-            >
-              {tag.tag_name}
-              <button
-                onClick={() => handleRemove(tag.id)}
-                className="hover:text-red-400 transition-colors"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          ))
-        )}
+      <div className="flex items-center justify-between py-1.5">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">銷售階段</span>
+        <span className="text-sm text-zinc-700 dark:text-zinc-200">
+          {salesStage ? (STAGE_LABEL[salesStage] || salesStage) : '—'}
+        </span>
       </div>
     </div>
   );
@@ -379,6 +333,177 @@ function NotesSection({
   );
 }
 
+// ── Contact Info Edit ──────────────────────────────────
+
+const INTENT_OPTIONS = [
+  { value: '', label: '未設定' },
+  { value: 'browsing', label: '瀏覽中' },
+  { value: 'interested', label: '有興趣' },
+  { value: 'ready_to_buy', label: '準備購買' },
+  { value: 'purchased', label: '已購買' },
+];
+
+const BUDGET_OPTIONS = [
+  { value: '', label: '未設定' },
+  { value: 'under_50k', label: '5 萬以下' },
+  { value: '50k_200k', label: '5-20 萬' },
+  { value: '200k_500k', label: '20-50 萬' },
+  { value: 'over_500k', label: '50 萬以上' },
+];
+
+const STATUS_OPTIONS = [
+  { value: '', label: '未設定' },
+  { value: 'new', label: '新客戶' },
+  { value: 'following_up', label: '跟進中' },
+  { value: 'quoted', label: '已報價' },
+  { value: 'won', label: '成交' },
+  { value: 'lost', label: '流失' },
+];
+
+function ContactInfoEdit({
+  contactId,
+  contact,
+  onUpdate,
+}: {
+  contactId: string | number;
+  contact: ContactDetail;
+  onUpdate: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editPhone, setEditPhone] = useState(contact.phone || '');
+  const [editEmail, setEditEmail] = useState(contact.email || '');
+  const [editIntent, setEditIntent] = useState(contact.intent || '');
+  const [editBudget, setEditBudget] = useState(contact.budget_range || '');
+  const [editStatus, setEditStatus] = useState(contact.contact_status || '');
+
+  const handleStartEdit = () => {
+    setEditPhone(contact.phone || '');
+    setEditEmail(contact.email || '');
+    setEditIntent(contact.intent || '');
+    setEditBudget(contact.budget_range || '');
+    setEditStatus(contact.contact_status || '');
+    setEditing(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await contactsApi.updateContact(contactId, {
+        phone: editPhone || undefined,
+        email: editEmail || undefined,
+        intent: editIntent || undefined,
+        budget_range: editBudget || undefined,
+        contact_status: editStatus || undefined,
+      });
+      setEditing(false);
+      onUpdate();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '儲存失敗');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputClass = 'w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-indigo-500';
+  const selectClass = 'w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-indigo-500';
+
+  const intentLabel = INTENT_OPTIONS.find(o => o.value === (contact.intent || ''))?.label || contact.intent || '未設定';
+  const budgetLabel = BUDGET_OPTIONS.find(o => o.value === (contact.budget_range || ''))?.label || contact.budget_range || '未設定';
+  const statusLabel = STATUS_OPTIONS.find(o => o.value === (contact.contact_status || ''))?.label || contact.contact_status || '未設定';
+
+  return (
+    <div className="bg-white border border-zinc-200 shadow-sm dark:bg-zinc-950/50 dark:border-zinc-800 dark:shadow-none rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2">
+          <Pencil className="w-4 h-4 text-indigo-400" />
+          基本資料
+        </h3>
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setEditing(false)}
+              className="text-xs text-zinc-400 hover:text-zinc-200"
+            >
+              取消
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-400 dark:hover:text-indigo-300 flex items-center gap-1 disabled:opacity-50"
+            >
+              <Save className="w-3 h-3" />
+              {saving ? '儲存中...' : '儲存'}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleStartEdit}
+            className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-400 dark:hover:text-indigo-300 flex items-center gap-1"
+          >
+            <Pencil className="w-3 h-3" />
+            編輯
+          </button>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">電話</label>
+            <input type="text" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="輸入電話..." className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">Email</label>
+            <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="輸入 Email..." className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">意圖</label>
+            <select value={editIntent} onChange={(e) => setEditIntent(e.target.value)} className={selectClass}>
+              {INTENT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">預算範圍</label>
+            <select value={editBudget} onChange={(e) => setEditBudget(e.target.value)} className={selectClass}>
+              {BUDGET_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">客戶狀態</label>
+            <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className={selectClass}>
+              {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between py-1.5">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">電話</span>
+            <span className="text-sm text-zinc-700 dark:text-zinc-200">{contact.phone || '—'}</span>
+          </div>
+          <div className="flex items-center justify-between py-1.5">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">Email</span>
+            <span className="text-sm text-zinc-700 dark:text-zinc-200">{contact.email || '—'}</span>
+          </div>
+          <div className="flex items-center justify-between py-1.5">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">意圖</span>
+            <span className="text-sm text-zinc-700 dark:text-zinc-200">{intentLabel}</span>
+          </div>
+          <div className="flex items-center justify-between py-1.5">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">預算範圍</span>
+            <span className="text-sm text-zinc-700 dark:text-zinc-200">{budgetLabel}</span>
+          </div>
+          <div className="flex items-center justify-between py-1.5">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">客戶狀態</span>
+            <span className="text-sm text-zinc-700 dark:text-zinc-200">{statusLabel}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────
 
 export default function ContactDetailPage({
@@ -457,7 +582,8 @@ export default function ContactDetailPage({
       {/* Content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-4">
-          <TagSection contactId={contactId} tags={contact.tags} onUpdate={handleUpdate} />
+          <ContactInfoEdit contactId={contactId} contact={contact} onUpdate={handleUpdate} />
+          <IdentityStageSection customerIdentity={contact.customer_identity} salesStage={contact.sales_stage} />
           <ConversationTimeline conversations={contact.conversations} />
           <AnalysisSection analyses={contact.analyses} />
         </div>

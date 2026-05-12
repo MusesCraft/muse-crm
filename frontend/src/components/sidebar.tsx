@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Inbox, Users, LayoutDashboard, CheckSquare, Settings, Zap, LogOut, Sun, Moon, ChevronLeft, ChevronRight, X, Megaphone } from 'lucide-react';
+import { Inbox, Users, LayoutDashboard, CheckSquare, Settings, Zap, LogOut, Sun, Moon, ChevronLeft, ChevronRight, X, Package, FileText, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
@@ -12,9 +12,11 @@ import { dashboardApi } from '@/lib/api';
 const navItems = [
   { href: '/inbox', label: '收件匣', icon: Inbox, badgeKey: 'active_conversations' as const },
   { href: '/contacts', label: '客戶', icon: Users },
+  { href: '/quotes', label: '報價', icon: FileText },
   { href: '/dashboard', label: '儀表板', icon: LayoutDashboard },
   { href: '/actions', label: '待辦事項', icon: CheckSquare, badgeKey: 'pending_actions' as const },
-  { href: '/broadcast', label: '廣播', icon: Megaphone },
+  { href: '/inventory', label: '庫存', icon: Package },
+  { href: '/knowledge-base', label: '知識庫', icon: BookOpen },
   { href: '/settings', label: '設定', icon: Settings },
 ];
 
@@ -30,15 +32,13 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [collapsed, setCollapsed] = useState(false);
-  const [badges, setBadges] = useState<Record<string, number>>({});
-
-  useEffect(() => {
+  const [collapsed, setCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('muse_sidebar_collapsed');
-      if (saved === 'true') setCollapsed(true);
+      return localStorage.getItem('muse_sidebar_collapsed') === 'true';
     }
-  }, []);
+    return false;
+  });
+  const [badges, setBadges] = useState<Record<string, number>>({});
 
   // Fetch badge counts from API
   useEffect(() => {

@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { actionsApi, type Action } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { Avatar } from '@/components/avatar';
+import { ContactPreview } from '@/components/contact-preview';
 import { PriorityBadge, TypeBadge } from '@/components/badges';
 import { LoadingSpinner, EmptyState } from '@/components/loading';
 import { formatDateTime } from '@/lib/format';
@@ -14,11 +16,20 @@ import {
   Circle,
   CheckCircle2,
   Calendar,
-  AlertTriangle,
   ArrowUpDown,
   Filter,
   ClipboardList,
+  Plus,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 // -- Helpers --
 
@@ -77,10 +88,12 @@ function ActionCard({
   action,
   onToggleComplete,
   onStatusChange,
+  onClick,
 }: {
   action: Action;
   onToggleComplete: () => void;
   onStatusChange: (status: string) => void;
+  onClick: () => void;
 }) {
   const completed = action.status === 'completed';
   const cancelled = action.status === 'cancelled';
@@ -88,8 +101,9 @@ function ActionCard({
 
   return (
     <div
+      onClick={onClick}
       className={cn(
-        'bg-white border border-zinc-200 shadow-sm dark:bg-zinc-800/50 dark:border-transparent dark:shadow-none rounded-lg p-4 transition-all duration-200',
+        'bg-white border border-zinc-200 shadow-sm dark:bg-zinc-800/50 dark:border-transparent dark:shadow-none rounded-lg p-4 transition-all duration-200 cursor-pointer',
         completed && 'opacity-60',
         action.priority === 'high' && !completed && 'border-l-2 border-l-red-500',
         action.priority !== 'high' && 'border-l-2 border-l-transparent'
@@ -98,7 +112,7 @@ function ActionCard({
       <div className="flex items-start gap-3">
         {/* Checkbox */}
         <button
-          onClick={onToggleComplete}
+          onClick={(e) => { e.stopPropagation(); onToggleComplete(); }}
           className="mt-0.5 flex-shrink-0"
         >
           {completed ? (
@@ -126,15 +140,17 @@ function ActionCard({
           {/* Contact + Due Date */}
           <div className="flex items-center gap-4 mt-2.5">
             {action.contact && (
-              <Link
-                href={`/contacts/${action.contact_id}`}
-                className="flex items-center gap-1.5 group"
-              >
+              <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                 <Avatar name={action.contact.name} url={action.contact.avatar_url} size="sm" className="!w-5 !h-5 !text-[8px]" />
-                <span className="text-xs text-zinc-500 dark:text-zinc-400 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors">
-                  {action.contact.name}
-                </span>
-              </Link>
+                <ContactPreview contactId={action.contact_id}>
+                  <Link
+                    href={`/contacts/${action.contact_id}`}
+                    className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors"
+                  >
+                    {action.contact.name}
+                  </Link>
+                </ContactPreview>
+              </div>
             )}
 
             {action.due_date && (
@@ -151,7 +167,7 @@ function ActionCard({
         </div>
 
         {/* Status Select */}
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
           <StatusSelect
             status={action.status}
             onChange={onStatusChange}
@@ -169,10 +185,20 @@ type SortKey = 'priority' | 'due_date' | 'created_at';
 const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
 export default function ActionsPage() {
+  const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [priorityFilter, setPriorityFilter] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [sort, setSort] = useState<SortKey>('priority');
+
+  // Create action dialog state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createSubmitting, setCreateSubmitting] = useState(false);
+  const [newDescription, setNewDescription] = useState('');
+  const [newActionType, setNewActionType] = useState('followup');
+  const [newPriority, setNewPriority] = useState('medium');
+  const [newDueDate, setNewDueDate] = useState('');
+  const [newContactId, setNewContactId] = useState('');
 
   // Local state for optimistic updates
   const [localActions, setLocalActions] = useState<Action[] | null>(null);
@@ -182,7 +208,7 @@ export default function ActionsPage() {
     []
   );
 
-  const actions = localActions ?? fetchedActions ?? [];
+  const actions = useMemo(() => localActions ?? fetchedActions ?? [], [localActions, fetchedActions]);
 
   // Apply filters + sort
   const filtered = useMemo(() => {
@@ -259,6 +285,36 @@ export default function ActionsPage() {
     }
   }, [fetchedActions, refetch]);
 
+  const resetCreateForm = useCallback(() => {
+    setNewDescription('');
+    setNewActionType('followup');
+    setNewPriority('medium');
+    setNewDueDate('');
+    setNewContactId('');
+  }, []);
+
+  const handleCreate = useCallback(async () => {
+    if (!newDescription.trim() || !newContactId.trim()) return;
+    setCreateSubmitting(true);
+    try {
+      await actionsApi.createAction({
+        description: newDescription.trim(),
+        action_type: newActionType,
+        priority: newPriority,
+        due_date: newDueDate || undefined,
+        contact_id: newContactId.trim(),
+      });
+      setCreateOpen(false);
+      resetCreateForm();
+      setLocalActions(null);
+      refetch();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '建立失敗');
+    } finally {
+      setCreateSubmitting(false);
+    }
+  }, [newDescription, newActionType, newPriority, newDueDate, newContactId, resetCreateForm, refetch]);
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
@@ -274,6 +330,89 @@ export default function ActionsPage() {
             <span className="text-emerald-500 dark:text-emerald-400 font-medium">{completedCount}</span> 已完成
           </p>
         </div>
+
+        <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetCreateForm(); }}>
+          <DialogTrigger asChild>
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="w-4 h-4" />
+              新增待辦
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>新增待辦事項</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">描述 *</label>
+                <input
+                  type="text"
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder="輸入待辦描述..."
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">類型</label>
+                <select
+                  value={newActionType}
+                  onChange={(e) => setNewActionType(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="quote">報價</option>
+                  <option value="visit">參觀</option>
+                  <option value="call">通話</option>
+                  <option value="sample">寄樣</option>
+                  <option value="followup">跟進</option>
+                  <option value="measure">丈量</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">優先度</label>
+                <select
+                  value={newPriority}
+                  onChange={(e) => setNewPriority(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="high">高</option>
+                  <option value="medium">中</option>
+                  <option value="low">低</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">到期日</label>
+                <input
+                  type="date"
+                  value={newDueDate}
+                  onChange={(e) => setNewDueDate(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">客戶 ID *</label>
+                <input
+                  type="text"
+                  value={newContactId}
+                  onChange={(e) => setNewContactId(e.target.value)}
+                  placeholder="輸入客戶 ID..."
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setCreateOpen(false); resetCreateForm(); }}>
+                取消
+              </Button>
+              <Button
+                onClick={handleCreate}
+                disabled={createSubmitting || !newDescription.trim() || !newContactId.trim()}
+              >
+                {createSubmitting ? '建立中...' : '建立'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Filters */}
@@ -378,6 +517,7 @@ export default function ActionsPage() {
               action={action}
               onToggleComplete={() => handleToggleComplete(action)}
               onStatusChange={(s) => handleStatusChange(action, s)}
+              onClick={() => router.push(`/contacts/${action.contact_id}`)}
             />
           ))}
         </div>

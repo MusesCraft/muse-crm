@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, AlertTriangle, Shield } from 'lucide-react';
 import { Avatar } from '@/components/avatar';
 import { ChannelIcon } from '@/components/channel-icon';
 import { UrgencyBadgeCompact as UrgencyBadge } from '@/components/badges';
@@ -81,9 +81,12 @@ export function ConversationList({
             className="flex-1 px-2 py-1.5 bg-zinc-50 border border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300 focus:outline-none focus:border-indigo-500"
           >
             <option value="">全部狀態</option>
+            <option value="unassigned">待認領</option>
             <option value="active">活躍</option>
-            <option value="silent">沉默</option>
-            <option value="unanswered">未回</option>
+            <option value="waiting_customer">等待客戶</option>
+            <option value="escalated">已求援</option>
+            <option value="supervisor_taken">主管接管</option>
+            <option value="resolved">已解決</option>
             <option value="closed">已關閉</option>
           </select>
           <select
@@ -166,10 +169,22 @@ export function ConversationList({
                     {conv.last_message?.timestamp ? formatTime(conv.last_message.timestamp) : ''}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5 mt-0.5">
+                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                   <ChannelIcon channel={conv.channel} size={12} />
                   <StatusBadge status={conv.status} />
                   <UrgencyBadge urgency={conv.urgency} />
+                  {conv.status === 'escalated' && (
+                    <AlertTriangle
+                      className="w-3 h-3 text-red-500"
+                      aria-label="已求援"
+                    />
+                  )}
+                  {conv.status === 'supervisor_taken' && (
+                    <Shield
+                      className="w-3 h-3 text-purple-500"
+                      aria-label="主管接管中"
+                    />
+                  )}
                 </div>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 truncate">
                   {conv.last_message

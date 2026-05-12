@@ -81,8 +81,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new ApiError(res.status, body || res.statusText);
+    let errorMsg = res.statusText;
+    try {
+      const json = await res.json();
+      errorMsg = json.error || json.message || res.statusText;
+    } catch {
+      const text = await res.text().catch(() => '');
+      if (text) errorMsg = text;
+    }
+    throw new ApiError(res.status, errorMsg);
   }
 
   return res.json();
@@ -117,23 +124,15 @@ export interface Contact {
   first_seen: string;
   last_seen: string;
   conversation_count: number;
-  tags?: Tag[];
   priority?: 'high' | 'medium' | 'low';
   phone?: string | null;
   email?: string | null;
   contact_status?: string;
   intent?: string;
   budget_range?: string;
-}
-
-export interface Tag {
-  id: string | number;
-  /** Backend returns `name`; `tag_name` kept for backward compatibility */
-  name: string;
-  tag_name: string;
-  category: string | null;
-  contact_count?: number;
-  created_at?: string;
+  // PR-2 新增（FILE_STRUCTURE_PLAN §2.1）
+  customer_identity?: 'designer' | 'homeowner' | 'dealer' | 'contractor' | 'unknown' | null;
+  sales_stage?: 'initial' | 'evaluating' | 'quoted' | 'won' | 'lost' | null;
 }
 
 export interface Message {
@@ -147,6 +146,10 @@ export interface Message {
   is_read: boolean;
   platform_message_id: string | null;
   quick_intent?: string;
+  /** PR-2：內部備註（不對外發送） */
+  is_internal?: boolean;
+  /** PR-2：被 @ 提及的 user id 清單 */
+  mentions?: string[];
 }
 
 export interface Analysis {
@@ -172,6 +175,16 @@ export interface Conversation {
   last_message?: Message;
   messages?: Message[];
   analyses?: Analysis[];
+  /** PR-2：當前處理者 user id */
+  current_handler_id?: string | null;
+  /** PR-2：接管中的主管 user id */
+  supervisor_id?: string | null;
+  /** PR-2：旁聽者 user id 清單 */
+  watchers?: string[];
+  /** PR-2：求援/升級時間 */
+  escalated_at?: string | null;
+  /** PR-2：求援原因 */
+  escalation_reason?: string | null;
 }
 
 export interface Action {
@@ -204,7 +217,6 @@ export interface ContactDetail extends Contact {
   phone?: string | null;
   email?: string | null;
   notes_text?: string | null;
-  tags: Tag[];
   conversations: Conversation[];
   analyses: Analysis[];
   actions: Action[];
@@ -223,6 +235,10 @@ export interface DashboardStats {
   channel_distribution?: { channel: string; count: number }[];
   contact_status?: Record<string, number>;
   intent_distribution?: Record<string, number>;
+  avg_response_hours?: number | null;
+  conversion_funnel?: { total: number; engaged: number; quoted: number; won: number };
+  top_conversations?: { id: string; contact_name: string; channel: string; message_count: number; status: string; last_message_at: string | null }[];
+  message_activity?: { date: string; count: number }[];
 }
 
 export interface ChannelDistribution {
@@ -251,21 +267,14 @@ function transformContact(raw: any): Contact {
     first_seen: raw.first_seen_at || raw.first_seen || raw.created_at || '',
     last_seen: raw.last_active_at || raw.last_seen || raw.updated_at || '',
     conversation_count: raw.conversation_count ?? 0,
-    tags: raw.tags?.map(transformTag) || [],
     priority: raw.priority || undefined,
-  };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function transformTag(raw: any): Tag {
-  const tagName = raw.tag_name || raw.name || '';
-  return {
-    id: raw.id,
-    name: tagName,
-    tag_name: tagName,
-    category: raw.category ?? null,
-    contact_count: raw.contact_count,
-    created_at: raw.created_at,
+    phone: raw.phone ?? null,
+    email: raw.email ?? null,
+    contact_status: raw.contact_status ?? undefined,
+    intent: raw.intent ?? undefined,
+    budget_range: raw.budget_range ?? undefined,
+    customer_identity: raw.customer_identity ?? null,
+    sales_stage: raw.sales_stage ?? null,
   };
 }
 
@@ -282,6 +291,8 @@ function transformMessage(raw: any): Message {
     is_read: raw.is_read ?? false,
     platform_message_id: raw.meta_message_id || raw.platform_message_id || null,
     quick_intent: raw.quick_intent || undefined,
+    is_internal: raw.is_internal ?? false,
+    mentions: Array.isArray(raw.mentions) ? raw.mentions : [],
   };
 }
 
@@ -328,6 +339,11 @@ function transformConversation(raw: any): Conversation {
     last_message: raw.last_message ? transformMessage(raw.last_message) : undefined,
     messages: raw.messages?.map(transformMessage),
     analyses: raw.analyses?.map(transformAnalysis),
+    current_handler_id: raw.current_handler_id ?? null,
+    supervisor_id: raw.supervisor_id ?? null,
+    watchers: Array.isArray(raw.watchers) ? raw.watchers : [],
+    escalated_at: raw.escalated_at ?? null,
+    escalation_reason: raw.escalation_reason ?? null,
   };
 }
 
@@ -371,11 +387,11 @@ function transformContactDetail(raw: any): ContactDetail {
     phone: raw.phone || null,
     email: raw.email || null,
     notes_text: raw.notes || null,
-    tags: raw.tags?.map(transformTag) || [],
     conversations: raw.conversations?.map(transformConversation) || [],
     analyses: raw.analyses?.map(transformAnalysis) || [],
     actions: raw.actions?.map(transformAction) || [],
-    notes: raw.notes?.map(transformNote) || [],
+    // 注意：raw.notes 是字串時為備註內文，是陣列才是 UserNote 清單
+    notes: Array.isArray(raw.notes) ? raw.notes.map(transformNote) : [],
   };
 }
 
@@ -388,6 +404,9 @@ export const inboxApi = {
     status?: string;
     channel?: string;
     search?: string;
+    view?: 'mine' | 'unassigned' | 'team';
+    handler_id?: string;
+    escalated?: boolean;
   }) {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.set('page', String(params.page));
@@ -395,6 +414,9 @@ export const inboxApi = {
     if (params?.status) searchParams.set('status', params.status);
     if (params?.channel) searchParams.set('channel', params.channel);
     if (params?.search) searchParams.set('search', params.search);
+    if (params?.view) searchParams.set('view', params.view);
+    if (params?.handler_id) searchParams.set('handler_id', params.handler_id);
+    if (params?.escalated) searchParams.set('escalated', 'true');
     const qs = searchParams.toString();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw = await request<any>(`/inbox/conversations${qs ? `?${qs}` : ''}`);
@@ -433,6 +455,69 @@ export const inboxApi = {
   },
 };
 
+// ── Conversation Ops API（PR-3/4） ──────────────────────
+
+export interface ConversationEventEntry {
+  id: string;
+  conversation_id: string;
+  event_type: string;
+  actor_id: string | null;
+  target_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export const conversationOpsApi = {
+  async assign(conversationId: string | number, userId?: string) {
+    return await request<{ data: Conversation }>(`/inbox/conversations/${conversationId}/assign`, {
+      method: 'POST',
+      body: JSON.stringify(userId ? { user_id: userId } : {}),
+    });
+  },
+  async escalate(conversationId: string | number, reason: string) {
+    return await request<{ data: Conversation }>(`/inbox/conversations/${conversationId}/escalate`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  },
+  async takeOver(conversationId: string | number, opts?: { note?: string; force?: boolean }) {
+    return await request<{ data: Conversation }>(`/inbox/conversations/${conversationId}/take-over`, {
+      method: 'POST',
+      body: JSON.stringify(opts || {}),
+    });
+  },
+  async returnToAgent(conversationId: string | number) {
+    return await request<{ data: Conversation }>(`/inbox/conversations/${conversationId}/return`, {
+      method: 'POST',
+    });
+  },
+  async watch(conversationId: string | number) {
+    return await request<{ data: Conversation }>(`/inbox/conversations/${conversationId}/watch`, {
+      method: 'POST',
+    });
+  },
+  async unwatch(conversationId: string | number) {
+    return await request<{ data: Conversation }>(`/inbox/conversations/${conversationId}/watch`, {
+      method: 'DELETE',
+    });
+  },
+  async resolve(conversationId: string | number) {
+    return await request<{ data: Conversation }>(`/inbox/conversations/${conversationId}/resolve`, {
+      method: 'POST',
+    });
+  },
+  async reopen(conversationId: string | number) {
+    return await request<{ data: Conversation }>(`/inbox/conversations/${conversationId}/reopen`, {
+      method: 'POST',
+    });
+  },
+  async getEvents(conversationId: string | number) {
+    return await request<{ data: ConversationEventEntry[] }>(
+      `/inbox/conversations/${conversationId}/events`
+    );
+  },
+};
+
 // ── Contacts API ───────────────────────────────────────
 
 export const contactsApi = {
@@ -440,17 +525,23 @@ export const contactsApi = {
     page?: number;
     per_page?: number;
     search?: string;
-    tag?: string;
     channel?: string;
     source_type?: string;
+    contact_status?: string;
+    intent?: string;
+    customer_identity?: string;
+    sales_stage?: string;
   }) {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.set('page', String(params.page));
     if (params?.per_page) searchParams.set('per_page', String(params.per_page));
     if (params?.search) searchParams.set('search', params.search);
-    if (params?.tag) searchParams.set('tag', params.tag);
     if (params?.channel) searchParams.set('channel', params.channel);
     if (params?.source_type) searchParams.set('source_type', params.source_type);
+    if (params?.contact_status) searchParams.set('contact_status', params.contact_status);
+    if (params?.intent) searchParams.set('intent', params.intent);
+    if (params?.customer_identity) searchParams.set('customer_identity', params.customer_identity);
+    if (params?.sales_stage) searchParams.set('sales_stage', params.sales_stage);
     const qs = searchParams.toString();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw = await request<any>(`/contacts${qs ? `?${qs}` : ''}`);
@@ -472,26 +563,26 @@ export const contactsApi = {
       method: 'POST',
       body: JSON.stringify({ content }),
     });
-    // Backend wraps in { message, note }
     const noteData = raw.note || raw;
     return transformNote(noteData);
   },
 
-  async addTag(contactId: string | number, tagName: string, category?: string) {
+  async updateContact(id: string | number, data: {
+    phone?: string;
+    email?: string;
+    intent?: string;
+    budget_range?: string;
+    contact_status?: string;
+    customer_identity?: string;
+    sales_stage?: string;
+  }) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw = await request<any>(`/contacts/${contactId}/tags`, {
-      method: 'POST',
-      body: JSON.stringify({ tag_name: tagName, category }),
+    const raw = await request<any>(`/contacts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     });
-    // Backend wraps in { message, tag }
-    const tagData = raw.tag || raw;
-    return transformTag(tagData);
-  },
-
-  async removeTag(contactId: string | number, tagId: string | number) {
-    return await request<{ message: string }>(`/contacts/${contactId}/tags/${tagId}`, {
-      method: 'DELETE',
-    });
+    const contactData = raw.contact || raw;
+    return transformContactDetail(contactData);
   },
 
   async createContact(data: {
@@ -502,10 +593,13 @@ export const contactsApi = {
     source_channel?: 'walk_in' | 'phone' | 'referral' | 'exhibition' | 'other';
     intent?: 'browsing' | 'interested' | 'ready_to_buy' | 'purchased';
     budget_range?: 'under_50k' | '50k_200k' | '200k_500k' | 'over_500k';
+    // 注意：preferred_products 在 PR-2 後端結構調整完成後會移除
     preferred_products?: string[];
     visit_date?: string;
     referral_source?: string;
     contact_status?: 'new' | 'following_up' | 'quoted' | 'won' | 'lost';
+    customer_identity?: 'designer' | 'homeowner' | 'dealer' | 'contractor' | 'unknown';
+    sales_stage?: 'initial' | 'evaluating' | 'quoted' | 'won' | 'lost';
   }) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw = await request<any>('/contacts', {
@@ -514,16 +608,6 @@ export const contactsApi = {
     });
     const contactData = raw.contact || raw;
     return transformContact(contactData);
-  },
-};
-
-// ── Tags API ───────────────────────────────────────────
-
-export const tagsApi = {
-  async getTags() {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw = await request<any[]>('/tags');
-    return ensureArray(raw).map(transformTag);
   },
 };
 
@@ -652,8 +736,21 @@ export interface SendMessageResponse {
   api_error?: string;
 }
 
+export interface SendMessageOptions {
+  /** PR-2：true 表示內部備註，不對外發送 */
+  isInternal?: boolean;
+  /** PR-2：被 @ 提及的 user id 清單 */
+  mentions?: string[];
+}
+
 export const inboxSendApi = {
-  async sendMessage(conversationId: string | number, content: string, messageType: 'text' | 'image' = 'text', mediaUrl?: string) {
+  async sendMessage(
+    conversationId: string | number,
+    content: string,
+    messageType: 'text' | 'image' = 'text',
+    mediaUrl?: string,
+    opts?: SendMessageOptions,
+  ) {
     const raw = await request<SendMessageResponse>(
       `/inbox/conversations/${conversationId}/send`,
       {
@@ -662,6 +759,8 @@ export const inboxSendApi = {
           content,
           message_type: messageType,
           media_url: mediaUrl,
+          is_internal: opts?.isInternal ?? false,
+          mentions: opts?.mentions ?? [],
         }),
       }
     );
@@ -747,6 +846,26 @@ export const ocrApi = {
 
 // ── Dashboard API ──────────────────────────────────────
 
+export interface FirstResponseTime {
+  p50_minutes: number | null;
+  p90_minutes: number | null;
+  sample_count: number;
+}
+
+export interface ResolutionRate {
+  period_days: number;
+  total: number;
+  resolved: number;
+  resolution_rate: number;
+}
+
+export interface EscalationRate {
+  period_days: number;
+  total: number;
+  escalated: number;
+  escalation_rate: number;
+}
+
 export const dashboardApi = {
   async getStats() {
     return await request<DashboardStats>('/dashboard/stats');
@@ -758,6 +877,120 @@ export const dashboardApi = {
 
   async getActivity(days = 30) {
     return await request<ActivityPoint[]>(`/dashboard/activity?days=${days}`);
+  },
+
+  // PR-7 主管 KPI（PRD §F10）
+  async getFirstResponseTime() {
+    return await request<FirstResponseTime>('/dashboard/first-response-time');
+  },
+  async getResolutionRate(days = 30) {
+    return await request<ResolutionRate>(`/dashboard/resolution-rate?days=${days}`);
+  },
+  async getEscalationRate(days = 30) {
+    return await request<EscalationRate>(`/dashboard/escalation-rate?days=${days}`);
+  },
+  async getConversationStatus() {
+    return await request<Record<string, number>>('/dashboard/conversation-status');
+  },
+  async getTodayConversations() {
+    return await request<{ today: number; yesterday: number }>('/dashboard/today-conversations');
+  },
+};
+
+// ── AI Copilot API（PR-6） ─────────────────────────────
+
+export interface ReplySuggestionItem {
+  text: string;
+  confidence?: number;
+  kb_refs?: string[];
+}
+
+export interface ReplySuggestionRecord {
+  id: string;
+  conversation_id: string;
+  suggestions: ReplySuggestionItem[];
+  model?: string | null;
+  used_suggestion_index?: number | null;
+  edited_before_send?: boolean | null;
+  created_at?: string | null;
+}
+
+export interface KnowledgeBaseItem {
+  id: string;
+  title: string;
+  content: string;
+  category?: string | null;
+  tags?: string[];
+}
+
+export interface ConversationSummary {
+  conversation_id: string;
+  summary: string;
+  is_stub?: boolean;
+}
+
+export const aiCopilotApi = {
+  async getSuggestions(conversationId: string | number) {
+    return await request<{ data: ReplySuggestionRecord }>(
+      `/ai/suggestions?conversation_id=${conversationId}`
+    );
+  },
+
+  async markSuggestionUsed(
+    recordId: string,
+    usedSuggestionIndex: number,
+    editedBeforeSend: boolean,
+  ) {
+    return await request<{ data: ReplySuggestionRecord }>(
+      `/ai/suggestions/${recordId}/used`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          used_suggestion_index: usedSuggestionIndex,
+          edited_before_send: editedBeforeSend,
+        }),
+      }
+    );
+  },
+
+  async getSummary(conversationId: string | number) {
+    return await request<ConversationSummary>(
+      `/ai/summary?conversation_id=${conversationId}`
+    );
+  },
+
+  async searchKnowledge(query: string, category?: string, topK = 5) {
+    const params = new URLSearchParams({ q: query, top_k: String(topK) });
+    if (category) params.set('category', category);
+    return await request<{ data: KnowledgeBaseItem[] }>(
+      `/ai/knowledge-search?${params.toString()}`
+    );
+  },
+};
+
+// ── Users API（給 AssignMenu 列出客服） ─────────────────
+
+export interface UserOption {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+}
+
+export const usersApi = {
+  async getAgents() {
+    // 後端 /users 列表（admin/manager 可呼叫），這裡只取 active 且為 user/agent 角色
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = await request<any>('/users');
+    const users: UserOption[] = ensureArray(raw?.data || raw).map((u: Record<string, unknown>) => ({
+      id: String(u.id),
+      name: String(u.name || u.email || ''),
+      email: String(u.email || ''),
+      role: String(u.role || ''),
+      is_active: u.is_active !== false,
+    }));
+    return users.filter((u) => u.is_active && ['user', 'agent', 'manager'].includes(u.role));
   },
 };
 
@@ -780,29 +1013,32 @@ export interface LlmBudget {
 
 export const llmApi = {
   async getUsageSummary(period: 'day' | 'week' | 'month'): Promise<LlmUsageSummary> {
-    const raw = await request<any>(`/llm/usage/summary?period=${period}`);
+    const raw = await request<Record<string, unknown>>(`/llm/usage/summary?period=${period}`);
+    const byModel = Array.isArray(raw.by_model) ? raw.by_model : [];
+    const byTask = Array.isArray(raw.by_task_type) ? raw.by_task_type : [];
     return {
-      period: raw.period || period,
-      total_tokens: raw.total_tokens || 0,
-      total_cost: raw.total_cost_usd ?? raw.total_cost ?? 0,
-      by_model: (raw.by_model || []).map((m: any) => ({
-        model: m.model,
-        tokens: m.tokens ?? m.total_tokens ?? 0,
-        cost: m.cost ?? m.estimated_cost_usd ?? 0,
+      period: (raw.period as string) || period,
+      total_tokens: (raw.total_tokens as number) || 0,
+      total_cost: (raw.total_cost_usd as number) ?? (raw.total_cost as number) ?? 0,
+      by_model: byModel.map((m: Record<string, unknown>) => ({
+        model: m.model as string,
+        tokens: (m.tokens as number) ?? (m.total_tokens as number) ?? 0,
+        cost: (m.cost as number) ?? (m.estimated_cost_usd as number) ?? 0,
       })),
-      by_task_type: (raw.by_task_type || []).map((t: any) => ({
-        task_type: t.task_type,
-        tokens: t.tokens ?? t.total_tokens ?? 0,
-        cost: t.cost ?? t.estimated_cost_usd ?? 0,
-        count: t.count ?? t.request_count ?? 0,
+      by_task_type: byTask.map((t: Record<string, unknown>) => ({
+        task_type: t.task_type as string,
+        tokens: (t.tokens as number) ?? (t.total_tokens as number) ?? 0,
+        cost: (t.cost as number) ?? (t.estimated_cost_usd as number) ?? 0,
+        count: (t.count as number) ?? (t.request_count as number) ?? 0,
       })),
     };
   },
 
   async getBudget(): Promise<LlmBudget> {
-    const raw = await request<any>('/llm/budget');
-    const limit = raw.cost?.limit_usd ?? raw.monthly_limit ?? 50;
-    const current = raw.cost?.current_usd ?? raw.current_usage ?? 0;
+    const raw = await request<Record<string, unknown>>('/llm/budget');
+    const cost = raw.cost as Record<string, number> | undefined;
+    const limit = cost?.limit_usd ?? (raw.monthly_limit as number) ?? 50;
+    const current = cost?.current_usd ?? (raw.current_usage as number) ?? 0;
     return {
       monthly_limit: limit,
       current_usage: current,
@@ -812,67 +1048,311 @@ export const llmApi = {
   },
 };
 
-// ── Broadcast API ──────────────────────────────────────
+// ── Admin API ──────────────────────────────────────────
 
-export interface Broadcast {
+export const adminApi = {
+  async importCsv(sheetUrl: string) {
+    return await request<{ message: string; created: number; failed: number; errors: string[] }>('/admin/import-csv', {
+      method: 'POST',
+      body: JSON.stringify({ sheet_url: sheetUrl }),
+    });
+  },
+};
+
+// ── Products & Inventory API ────────────────────────────
+
+export interface Product {
   id: string;
-  title: string;
-  content: string;
+  name: string;
+  sku: string | null;
+  category_id: string | null;
+  category_name: string | null;
+  material_type: string | null;
+  dimensions: string | null;
+  unit_price: number | null;
+  stock_quantity: number;
+  grade: string | null;
   image_url: string | null;
-  include_tags: string[];
-  exclude_tags: string[];
-  active_within_days: number | null;
-  target_channels: string[];
-  status: 'draft' | 'scheduled' | 'sending' | 'completed' | 'failed';
-  scheduled_at: string | null;
-  sent_at: string | null;
-  total_recipients: number;
-  sent_count: number;
-  failed_count: number;
+  status: string;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ProductCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  product_count: number;
+}
+
+export interface StockLog {
+  id: string;
+  product_id: string;
+  quantity_change: number;
+  reason: string;
+  reference_note: string | null;
   created_by: string | null;
   created_at: string;
 }
 
-export const broadcastApi = {
-  async list(page = 1, perPage = 20) {
-    return await request<PaginatedResponse<Broadcast>>(`/broadcasts?page=${page}&per_page=${perPage}`);
+export const productsApi = {
+  async getProducts(params?: { page?: number; per_page?: number; search?: string; category_id?: string; grade?: string; status?: string; material_type?: string; sort_by?: string; sort_order?: string }) {
+    const qs = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, String(v)); });
+    return await request<PaginatedResponse<Product>>(`/products?${qs.toString()}`);
+  },
+  async getProduct(id: string) {
+    return await request<Product & { stock_logs: StockLog[] }>(`/products/${id}`);
+  },
+  async createProduct(data: Partial<Product>) {
+    return await request<Product>('/products', { method: 'POST', body: JSON.stringify(data) });
+  },
+  async updateProduct(id: string, data: Partial<Product>) {
+    return await request<Product>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  },
+  async deleteProduct(id: string) {
+    return await request<{ message: string }>(`/products/${id}`, { method: 'DELETE' });
+  },
+  async adjustStock(id: string, data: { quantity_change: number; reason: string; note?: string }) {
+    return await request<{ product: Product; log: StockLog }>(`/products/${id}/stock`, { method: 'POST', body: JSON.stringify(data) });
+  },
+  async getCategories() {
+    return await request<ProductCategory[]>('/products/categories');
+  },
+  async createCategory(data: { name: string; description?: string }) {
+    return await request<ProductCategory>('/products/categories', { method: 'POST', body: JSON.stringify(data) });
+  },
+};
+
+// ── External Inventory API (進銷存系統 Proxy) ────────────
+
+export interface InvSizeSpec {
+  id: string;
+  code: string;
+  width: string;
+  length: string;
+  label: string;
+}
+
+export interface InvWarehouse {
+  id: string;
+  name: string;
+  code: string;
+  isDefault: boolean;
+}
+
+export interface InvProduct {
+  id: string;
+  legacySku: string | null;
+  legacyName: string | null;
+  newSku: string | null;
+  name: string;
+  variant: string | null;
+  baseCode: string | null;
+  unit: string | null;
+  sizeSpecId: string | null;
+  thickness: string | null;
+  safetyStock: number;
+  stock: number;
+  hiddenStock: number;
+  reservedStock: number;
+  stockStatus: string;
+  warehouseId: string | null;
+  location: string | null;
+  rack: string | null;
+  row: string | null;
+  shelf: string | null;
+  categoryId: string | null;
+  averageCost: number | null;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+  sizeSpec: InvSizeSpec | null;
+  warehouse: InvWarehouse | null;
+  customFields?: Record<string, unknown>;
+}
+
+export interface InvOverview {
+  totalProducts: number;
+  inStock: number;
+  lowStock: number;
+  outOfStock: number;
+  totalQuantity: number;
+}
+
+export interface InvLog {
+  id: string;
+  productId: string;
+  type: string;
+  quantity: number;
+  previousStock: number;
+  newStock: number;
+  channel: string;
+  counterpart: string | null;
+  orderRef: string | null;
+  scrapReason: string | null;
+  note: string | null;
+  date: string;
+  createdAt: string;
+  approvalStatus: string;
+  product?: { id: string; legacySku: string; legacyName: string; name: string };
+}
+
+export const inventoryApi = {
+  async getProducts(params?: { page?: number; limit?: number; search?: string }) {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.search) qs.set('search', params.search);
+    const q = qs.toString();
+    return await request<{ items: InvProduct[]; total: number; page: number; limit: number }>(`/inventory/products${q ? `?${q}` : ''}`);
   },
 
-  async create(data: {
-    title: string;
-    content: string;
-    image_url?: string;
-    include_tags: string[];
-    exclude_tags?: string[];
-    active_within_days?: number;
-    target_channels?: string[];
-    scheduled_at?: string;
-  }) {
-    return await request<{ message: string; broadcast: Broadcast }>('/broadcasts', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async getProduct(id: string) {
+    return await request<InvProduct>(`/inventory/products/${id}`);
   },
 
-  async get(id: string) {
-    return await request<Broadcast>(`/broadcasts/${id}`);
+  async getSizeSpecs() {
+    return await request<InvSizeSpec[]>('/inventory/products/size-specs');
   },
 
-  async preview(id: string) {
-    return await request<{ broadcast_id: string; recipient_count: number }>(`/broadcasts/${id}/preview`, {
-      method: 'POST',
-    });
+  async getOverview() {
+    return await request<InvOverview>('/inventory/overview');
   },
 
-  async send(id: string) {
-    return await request<{ message: string; broadcast: Broadcast }>(`/broadcasts/${id}/send`, {
-      method: 'POST',
-    });
+  async getLogs(params?: { page?: number; limit?: number; productId?: string }) {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.productId) qs.set('productId', params.productId);
+    const q = qs.toString();
+    return await request<{ logs: InvLog[]; total: number }>(`/inventory/logs${q ? `?${q}` : ''}`);
   },
 
-  async remove(id: string) {
-    return await request<{ message: string }>(`/broadcasts/${id}`, {
-      method: 'DELETE',
-    });
+  async inbound(data: { productId: string; quantity: number; note?: string; date?: string }) {
+    return await request('/inventory/inbound', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  async outbound(data: { productId: string; quantity: number; channel?: string; counterpart?: string; note?: string; date?: string }) {
+    return await request('/inventory/outbound', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  async health() {
+    return await request<{ status: string }>('/inventory/health');
+  },
+};
+
+// ── Quote API ───────────────────────────────────────────
+
+export interface QuoteItem {
+  id: string;
+  product_id: string | null;
+  product_name: string | null;
+  description: string;
+  material_type: string | null;
+  dimensions: string | null;
+  area_sqm: number | null;
+  unit_price: number;
+  quantity: number;
+  line_total: number;
+  grade: string | null;
+  notes: string | null;
+}
+
+export interface Quote {
+  id: string;
+  quote_number: string;
+  contact_id: string;
+  contact_name: string | null;
+  title: string;
+  status: string;
+  subtotal: number;
+  discount_pct: number;
+  installation_fee: number;
+  total: number;
+  notes: string | null;
+  valid_until: string | null;
+  items: QuoteItem[];
+  item_count: number;
+  created_at: string | null;
+  updated_at: string | null;
+  sent_at: string | null;
+  accepted_at: string | null;
+}
+
+export interface QuotePayload {
+  contact_id: string | number;
+  title: string;
+  status?: string;
+  notes?: string | null;
+  valid_until?: string | null;
+  discount_pct?: number;
+  installation_fee?: number;
+  items: Array<{
+    product_id?: string | null;
+    product_name?: string | null;
+    description: string;
+    material_type?: string | null;
+    dimensions?: string | null;
+    area_sqm?: number | null;
+    unit_price: number;
+    quantity: number;
+    grade?: string | null;
+    notes?: string | null;
+  }>;
+}
+
+export const quotesApi = {
+  async getQuotes(params?: { page?: number; per_page?: number; status?: string; contact_id?: string; search?: string }) {
+    const qs = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, String(v)); });
+    return await request<PaginatedResponse<Quote>>(`/quotes?${qs.toString()}`);
+  },
+  async getQuote(id: string) { return await request<Quote>(`/quotes/${id}`); },
+  async createQuote(data: QuotePayload) {
+    return await request<Quote>('/quotes', { method: 'POST', body: JSON.stringify(data) });
+  },
+  async updateQuote(id: string, data: Partial<QuotePayload>) {
+    return await request<Quote>(`/quotes/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  },
+  async updateStatus(id: string, status: string) {
+    return await request<Quote>(`/quotes/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  },
+  async deleteQuote(id: string) {
+    return await request<{ message: string }>(`/quotes/${id}`, { method: 'DELETE' });
+  },
+};
+
+// ── Roles API ───────────────────────────────────────────
+
+export interface Role {
+  id: string;
+  name: string;
+  color: string;
+  permissions: Record<string, boolean>;
+  position: number;
+  is_system: boolean;
+  created_at: string | null;
+}
+
+export const rolesApi = {
+  async getAll() {
+    return await request<Role[]>('/roles');
+  },
+  async create(data: { name: string; color: string; permissions: Record<string, boolean>; position?: number }) {
+    return await request<Role>('/roles', { method: 'POST', body: JSON.stringify(data) });
+  },
+  async update(id: string, data: Partial<{ name: string; color: string; permissions: Record<string, boolean>; position: number }>) {
+    return await request<Role>(`/roles/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  },
+  async delete(id: string) {
+    return await request<{ message: string }>(`/roles/${id}`, { method: 'DELETE' });
+  },
+  async assignToUser(userId: string, roleId: string) {
+    return await request<{ message: string }>(`/users/${userId}/roles`, { method: 'POST', body: JSON.stringify({ role_id: roleId }) });
+  },
+  async removeFromUser(userId: string, roleId: string) {
+    return await request<{ message: string }>(`/users/${userId}/roles/${roleId}`, { method: 'DELETE' });
   },
 };

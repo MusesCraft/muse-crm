@@ -1,13 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   contactsApi,
   inboxApi,
   type ContactDetail,
-  type Conversation,
-  type Analysis,
 } from '@/lib/api';
 import { useAsync } from '@/lib/hooks';
 import { Avatar } from '@/components/avatar';
@@ -20,19 +18,17 @@ import {
   ChevronRight,
   ChevronLeft,
   Phone,
-  MapPin,
   Mail,
   Building2,
   Calendar,
   Clock,
   Globe,
-  X,
   Search,
   Loader2,
   Brain,
   MessageSquare,
   StickyNote,
-  Tag,
+  UserCircle,
   TrendingUp,
   ShoppingBag,
   Lightbulb,
@@ -187,16 +183,6 @@ export function CustomerSidebar({
     ?? (existingAnalysis?.result as Record<string, unknown> | undefined)
     ?? null;
 
-  // Handle tag removal
-  const handleRemoveTag = async (tagId: string | number) => {
-    try {
-      await contactsApi.removeTag(contactId, tagId);
-      refetch();
-    } catch {
-      // ignore
-    }
-  };
-
   // ── Collapsed View ─────────────────────────────────
 
   if (collapsed) {
@@ -217,7 +203,7 @@ export function CustomerSidebar({
 
   if (contactError) {
     return (
-      <div className="w-80 bg-zinc-50 border-l border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 flex items-center justify-center transition-all duration-200">
+      <div className="w-full h-full bg-zinc-50 border-l border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 flex items-center justify-center transition-all duration-200">
         <div className="text-center py-8">
           <p className="text-red-500 text-sm mb-3">{contactError}</p>
           <button
@@ -233,7 +219,7 @@ export function CustomerSidebar({
 
   if (loading || !contact) {
     return (
-      <div className="w-80 bg-zinc-50 border-l border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 flex items-center justify-center transition-all duration-200">
+      <div className="w-full h-full bg-zinc-50 border-l border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 flex items-center justify-center transition-all duration-200">
         <LoadingSpinner />
       </div>
     );
@@ -243,7 +229,7 @@ export function CustomerSidebar({
   const recentNotes = notes.slice(0, 2);
 
   return (
-    <div className="w-80 bg-zinc-50 border-l border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 flex flex-col overflow-hidden transition-all duration-200">
+    <div className="w-full h-full bg-zinc-50 border-l border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 flex flex-col overflow-hidden transition-all duration-200">
       {/* ── Header ── */}
       <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-3">
         <Link href={`/contacts/${contactId}`} className="flex items-center gap-3 flex-1 min-w-0 group">
@@ -302,30 +288,24 @@ export function CustomerSidebar({
           </div>
         </div>
 
-        {/* ── Tags ── */}
+        {/* ── 客戶身份 / 銷售階段（PR-2 結構） ── */}
         <div className="p-4 border-b border-zinc-200/50 dark:border-zinc-800/50">
           <h4 className="text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <Tag className="w-3 h-3" />
-            標籤
+            <UserCircle className="w-3 h-3" />
+            客戶身份
           </h4>
           <div className="flex flex-wrap gap-1.5">
-            {contact.tags && contact.tags.length > 0 ? (
-              contact.tags.map((tag) => (
-                <span
-                  key={tag.id}
-                  className="inline-flex items-center gap-1 rounded-full bg-zinc-100 border border-zinc-200 dark:bg-zinc-800 dark:border-zinc-700 px-2 py-0.5 text-xs text-zinc-600 dark:text-zinc-300"
-                >
-                  {tag.tag_name}
-                  <button
-                    onClick={() => handleRemoveTag(tag.id)}
-                    className="hover:text-red-400 transition-colors p-1.5 -m-1 md:p-0 md:m-0"
-                  >
-                    <X className="w-3 h-3 md:w-2.5 md:h-2.5" />
-                  </button>
-                </span>
-              ))
+            {contact.customer_identity ? (
+              <span className="inline-flex items-center rounded-full bg-zinc-100 border border-zinc-200 dark:bg-zinc-800 dark:border-zinc-700 px-2 py-0.5 text-xs text-zinc-600 dark:text-zinc-300">
+                {contact.customer_identity}
+              </span>
             ) : (
-              <span className="text-xs text-zinc-400 dark:text-zinc-600">無標籤</span>
+              <span className="text-xs text-zinc-400 dark:text-zinc-600">未分類</span>
+            )}
+            {contact.sales_stage && (
+              <span className="inline-flex items-center rounded-full bg-indigo-50 border border-indigo-200 dark:bg-indigo-500/10 dark:border-indigo-500/20 px-2 py-0.5 text-xs text-indigo-600 dark:text-indigo-400">
+                {contact.sales_stage}
+              </span>
             )}
           </div>
         </div>

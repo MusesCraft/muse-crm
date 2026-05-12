@@ -21,11 +21,13 @@ import {
   CheckCircle,
   DollarSign,
   Loader2,
+  Shield,
 } from 'lucide-react';
+import RolesTab from './roles-tab';
 
 // ── Tab system ─────────────────────────────────────────
 
-type TabId = 'integration' | 'ai' | 'quick-replies' | 'notifications' | 'status' | 'urgency' | 'llm-cost';
+type TabId = 'integration' | 'ai' | 'quick-replies' | 'notifications' | 'status' | 'urgency' | 'llm-cost' | 'roles';
 
 const tabs: { id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'integration', label: 'LINE 整合', icon: Link2 },
@@ -35,6 +37,7 @@ const tabs: { id: TabId; label: string; icon: React.ComponentType<{ className?: 
   { id: 'notifications', label: '通知偏好', icon: Bell },
   { id: 'status', label: '客戶狀態', icon: Clock },
   { id: 'urgency', label: '緊急度規則', icon: AlertTriangle },
+  { id: 'roles', label: '身份組', icon: Shield },
 ];
 
 // ── LINE Integration Card ──────────────────────────────
@@ -576,17 +579,24 @@ function LlmCostCard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const changePeriod = useCallback((p: LlmPeriod) => {
     setLoading(true);
     setError(null);
+    setPeriod(p);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     Promise.all([
       llmApi.getUsageSummary(period).catch(() => null),
       llmApi.getBudget().catch(() => null),
     ]).then(([s, b]) => {
+      if (cancelled) return;
       setSummary(s);
       setBudget(b);
       if (!s && !b) setError('無法載入 LLM 用量資料');
-    }).finally(() => setLoading(false));
+    }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [period]);
 
   if (loading) {
@@ -621,7 +631,7 @@ function LlmCostCard() {
         {(['day', 'week', 'month'] as LlmPeriod[]).map((p) => (
           <button
             key={p}
-            onClick={() => setPeriod(p)}
+            onClick={() => changePeriod(p)}
             className={cn(
               'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
               period === p
@@ -747,6 +757,7 @@ const tabContentMap: Record<TabId, React.ComponentType> = {
   status: CustomerStatusCard,
   urgency: UrgencyRulesCard,
   'llm-cost': LlmCostCard,
+  'roles': RolesTab,
 };
 
 // ── Main Settings Page ─────────────────────────────────

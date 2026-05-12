@@ -33,14 +33,49 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('muse_token');
+    }
+    return null;
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !!localStorage.getItem('muse_token');
+    }
+    return true;
+  });
 
-  // 初始化：從 localStorage 讀取 token
+  // 用 refresh token 換發新 access token
+  const tryRefreshToken = useCallback(async (): Promise<boolean> => {
+    const refreshToken = localStorage.getItem('muse_refresh_token');
+    if (!refreshToken) return false;
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!res.ok) return false;
+
+      const data = await res.json();
+      localStorage.setItem('muse_token', data.token);
+      setToken(data.token);
+
+      const u = await fetchMe(data.token);
+      setUser(u);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // 初始化：驗證已儲存的 token
   useEffect(() => {
     const savedToken = localStorage.getItem('muse_token');
     if (savedToken) {
-      setToken(savedToken);
       fetchMe(savedToken)
         .then((u) => setUser(u))
         .catch(async () => {
@@ -53,10 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         })
         .finally(() => setIsLoading(false));
-    } else {
-      setIsLoading(false);
     }
-  }, []);
+  }, [tryRefreshToken]);
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await fetch(`${API_BASE}/auth/login`, {
@@ -84,32 +117,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('muse_refresh_token');
     setToken(null);
     setUser(null);
-  }, []);
-
-  // 用 refresh token 換發新 access token
-  const tryRefreshToken = useCallback(async (): Promise<boolean> => {
-    const refreshToken = localStorage.getItem('muse_refresh_token');
-    if (!refreshToken) return false;
-
-    try {
-      const res = await fetch(`${API_BASE}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      });
-
-      if (!res.ok) return false;
-
-      const data = await res.json();
-      localStorage.setItem('muse_token', data.token);
-      setToken(data.token);
-
-      const u = await fetchMe(data.token);
-      setUser(u);
-      return true;
-    } catch {
-      return false;
-    }
   }, []);
 
   // API 層偵測到 401 時自動清除登入狀態

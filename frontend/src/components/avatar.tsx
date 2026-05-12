@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 interface AvatarProps {
@@ -47,11 +48,15 @@ export function Avatar({ name: rawName, url, size = 'md', className }: AvatarPro
   const name = rawName || 'Unknown';
 
   if (url) {
+    const px = size === 'sm' ? 32 : size === 'md' ? 40 : 56;
     return (
-      <img
+      <Image
         src={url}
         alt={name}
+        width={px}
+        height={px}
         className={cn('rounded-full object-cover flex-shrink-0', sizeMap[size], className)}
+        unoptimized
       />
     );
   }

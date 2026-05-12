@@ -117,7 +117,7 @@ class AssignmentService:
                 func.count(Conversation.id),
             )
             .filter(Conversation.status.in_(
-                ('active', 'waiting_customer', 'escalated')
+                ('active', 'waiting_customer', 'escalated', 'supervisor_taken')
             ))
             .group_by(Conversation.current_handler_id)
             .all()

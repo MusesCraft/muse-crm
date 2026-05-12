@@ -83,42 +83,16 @@ def is_user(user: User) -> bool:
     return user.role == 'user'
 
 
-# ── 對話協作權限（v1.1 PRD §9.1） ─────────────────────────
-# v1.1 變更：移除「主管接管」(take-over)，主管不再成為對外回覆者。
-# 保留：旁聽（watch）、推 nudge、留 internal note、admin force-handle 例外。
+# ── PR-3 新增：對話接管與升級權限 ───────────────────────────
 
-def can_watch(user: User) -> bool:
-    """可以旁聽他人對話（manager / admin）"""
+def can_take_over(user: User) -> bool:
+    """可以接管他人對話（PRD §9.1：manager / admin）"""
     return user.role in ('manager', 'admin')
 
 
-def can_send_nudge(user: User) -> bool:
-    """可以推 nudge 給 agent（manager / admin）"""
-    return user.role in ('manager', 'admin')
-
-
-def can_leave_internal_note(user: User) -> bool:
-    """可以留 internal note + @mention（manager / admin / agent 都可以）"""
-    return user.role in ('user', 'agent', 'manager', 'admin')
-
-
-def can_force_take_handler(user: User) -> bool:
-    """
-    可以強制接管對話（admin only，緊急例外）。
-    使用場景：員工離職、客訴升級到法務、agent 明顯失職。需 reason + audit log。
-    """
+def can_force_take_over(user: User) -> bool:
+    """可以強制接管（admin only）"""
     return user.role == 'admin'
-
-
-def can_send_external_message(user: User) -> bool:
-    """
-    可以對客戶直接發送（is_internal=false）訊息。
-
-    v1.1：只有 agent / user 角色能直接發給客戶。
-    Admin 不在此列 — 若要發給客戶必須透過 force-handle 流程（會留 audit log）。
-    Manager / supervisor 不可發給客戶，只能留 internal note 或推 nudge。
-    """
-    return user.role in ('user', 'agent')
 
 
 def can_escalate(user: User) -> bool:

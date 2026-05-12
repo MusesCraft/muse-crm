@@ -3,16 +3,6 @@ MUSE CRM — Realtime Events
 
 WebSocket 事件處理：連線驗證（JWT）、加入 room。
 Namespace: /notifications
-
-v1.1 對話相關事件（PRD §6.4）：
-- conversation.assigned / conversation.escalated / conversation.resolved
-- supervisor.nudge.sent      ★ 新增：主管推 nudge 給 agent
-- supervisor.watching        ★ 新增：主管開始 / 停止旁聽
-- conversation.force_taken   ★ 新增：admin 強制接管（罕見、緊急例外）
-- ai.suggestion.ready / ai.risk.detected / notification.mention
-
-v1.1 移除：conversation.taken_over / conversation.returned
-（主管不再成為對外回覆者，所以沒有相應事件）
 """
 
 import logging

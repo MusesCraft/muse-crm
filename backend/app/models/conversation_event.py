@@ -19,16 +19,8 @@ class ConversationEvent(db.Model):
     """
     對話狀態變更事件。
 
-    用於記錄誰、在什麼時候、對對話做了什麼操作。
-
-    event_type 列舉（v1.1，PRD §5.2 / §6.3）：
-      assigned / escalated / nudge_sent / watched / unwatched /
-      resolved / reopened / closed / force_taken
-
-    v1.1 變更：
-      - 移除 taken_over / returned（主管不再成為對外回覆者）
-      - 新增 nudge_sent（主管推 nudge 給特定 agent）
-      - 保留 force_taken（admin 緊急例外接管）
+    用於記錄誰、在什麼時候、對對話做了什麼操作（assigned / escalated /
+    taken_over / returned / resolved / closed / reopened）。
     """
 
     __tablename__ = 'conversation_events'
@@ -41,7 +33,8 @@ class ConversationEvent(db.Model):
         nullable=False
     )
 
-    # 事件類型（v1.1，見 class docstring）
+    # 事件類型：assigned / escalated / taken_over / returned / watched / unwatched /
+    #          resolved / reopened / force_taken / closed
     event_type: Mapped[str] = mapped_column(String(40), nullable=False)
 
     # 觸發者

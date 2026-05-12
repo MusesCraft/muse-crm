@@ -241,8 +241,8 @@ def resolution_rate():
 @login_required
 def conversation_status_distribution():
     """
-    當前對話依 status 分組計數（PR-7 KPI 視圖，v1.1 移除 supervisor_taken）。
-    回傳: { unassigned, active, waiting_customer, escalated, resolved, closed }
+    當前對話依 status 分組計數（PR-7 KPI 視圖）。
+    回傳: { unassigned, active, waiting_customer, escalated, supervisor_taken, resolved, closed }
     """
     user = get_current_user()
     q = (
@@ -255,7 +255,7 @@ def conversation_status_distribution():
 
     result = {s: 0 for s in (
         'unassigned', 'active', 'waiting_customer',
-        'escalated', 'resolved', 'closed',
+        'escalated', 'supervisor_taken', 'resolved', 'closed',
     )}
     for status, cnt in rows:
         if status in result:
@@ -292,125 +292,6 @@ def today_conversations():
     return jsonify({
         'today': today_count,
         'yesterday': yesterday_count,
-    })
-
-
-@api_bp.route('/dashboard/team-overview', methods=['GET'])
-@login_required
-def team_overview():
-    """
-    主管視角：團隊員工工作量總覽（v1.1 新增，PRD §F10.1 / §7.2）。
-
-    僅 manager / admin 可呼叫。回傳每個 active 員工的：
-    - active_count：目前 active/waiting_customer/escalated 的對話數
-    - avg_response_minutes：近 30 天首次回覆平均時間（分鐘）
-    - nudges_received：近 30 天收到的 nudge 次數
-    - resolved_30d：近 30 天解決的對話數
-    """
-    from sqlalchemy import text as sa_text
-    actor = get_current_user()
-    if not actor or actor.role not in ('manager', 'admin'):
-        return jsonify({'error': '權限不足'}), 403
-
-    # 1. agent 清單（含 user / agent / manager 角色，過濾 is_active）
-    from ..models.user import User as UserModel
-    agents = (
-        UserModel.query
-        .filter(UserModel.is_active.is_(True))
-        .filter(UserModel.role.in_(('user', 'agent', 'manager')))
-        .all()
-    )
-
-    # 2. 每個 agent 目前 active 對話數
-    open_statuses = ('active', 'waiting_customer', 'escalated')
-    workload = dict(
-        db.session.query(
-            Conversation.current_handler_id,
-            func.count(Conversation.id),
-        )
-        .filter(Conversation.status.in_(open_statuses))
-        .filter(Conversation.current_handler_id.isnot(None))
-        .group_by(Conversation.current_handler_id)
-        .all()
-    )
-
-    # 3. 近 30 天每個 agent 收到的 nudge 數
-    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
-    from ..models import ConversationEvent
-    nudge_counts = dict(
-        db.session.query(
-            ConversationEvent.target_id,
-            func.count(ConversationEvent.id),
-        )
-        .filter(ConversationEvent.event_type == 'nudge_sent')
-        .filter(ConversationEvent.created_at >= thirty_days_ago)
-        .group_by(ConversationEvent.target_id)
-        .all()
-    )
-
-    # 4. 近 30 天每個 agent 解決的對話數
-    resolved_counts = dict(
-        db.session.query(
-            ConversationEvent.actor_id,
-            func.count(ConversationEvent.id),
-        )
-        .filter(ConversationEvent.event_type == 'resolved')
-        .filter(ConversationEvent.created_at >= thirty_days_ago)
-        .group_by(ConversationEvent.actor_id)
-        .all()
-    )
-
-    # 5. 平均首次回覆時間（per agent，近 30 天）
-    # 註：messages 表沒有 sender_id 欄位，這裡用 conversation.current_handler_id
-    # 作為「該對話 business 回覆者」的近似（與既有 first_response_time 端點口徑一致）。
-    avg_response_rows = db.session.execute(sa_text("""
-        WITH first_customer AS (
-            SELECT m.conversation_id, MIN(m.sent_at) AS t
-            FROM messages m
-            JOIN conversations c ON c.id = m.conversation_id
-            WHERE m.sender_type = 'customer'
-              AND COALESCE(m.is_internal, false) = false
-              AND c.created_at >= :start_date
-            GROUP BY m.conversation_id
-        ),
-        first_business AS (
-            SELECT m.conversation_id, MIN(m.sent_at) AS t
-            FROM messages m
-            JOIN first_customer fc ON fc.conversation_id = m.conversation_id
-            WHERE m.sender_type = 'business'
-              AND COALESCE(m.is_internal, false) = false
-              AND m.sent_at > fc.t
-            GROUP BY m.conversation_id
-        )
-        SELECT c.current_handler_id AS agent_id,
-               AVG(EXTRACT(EPOCH FROM (fb.t - fc.t)) / 60.0) AS avg_minutes
-        FROM first_customer fc
-        JOIN first_business fb ON fb.conversation_id = fc.conversation_id
-        JOIN conversations c ON c.id = fc.conversation_id
-        WHERE c.current_handler_id IS NOT NULL
-        GROUP BY c.current_handler_id
-    """), {'start_date': thirty_days_ago}).fetchall()
-    avg_response = {row.agent_id: float(row.avg_minutes) for row in avg_response_rows if row.avg_minutes is not None}
-
-    result = []
-    for u in agents:
-        result.append({
-            'id': str(u.id),
-            'name': u.name or u.email,
-            'email': u.email,
-            'role': u.role,
-            'active_count': int(workload.get(u.id, 0)),
-            'avg_response_minutes': avg_response.get(u.id),
-            'nudges_received': int(nudge_counts.get(u.id, 0)),
-            'resolved_30d': int(resolved_counts.get(u.id, 0)),
-        })
-
-    # 依 active_count 倒序
-    result.sort(key=lambda r: r['active_count'], reverse=True)
-
-    return jsonify({
-        'period_days': 30,
-        'data': result,
     })
 
 

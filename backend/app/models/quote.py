@@ -1,14 +1,15 @@
 """MUSE CRM — Quote Models (報價單)"""
 from datetime import datetime, timezone
+from sqlalchemy.dialects.postgresql import UUID
 from .. import db
 import uuid
 
 
 class Quote(db.Model):
     __tablename__ = 'quotes'
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = db.Column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     quote_number = db.Column(db.String(20), unique=True, nullable=False)  # QT-20260402-001
-    contact_id = db.Column(db.String(36), db.ForeignKey('contacts.id'), nullable=False)
+    contact_id = db.Column(UUID(as_uuid=False), db.ForeignKey('contacts.id'), nullable=False)
     title = db.Column(db.String(255), nullable=False)  # e.g. "客廳電視牆報價"
     status = db.Column(db.String(20), default='draft')  # draft/sent/accepted/rejected/expired
     subtotal = db.Column(db.Numeric(12, 2), default=0)
@@ -17,7 +18,7 @@ class Quote(db.Model):
     total = db.Column(db.Numeric(12, 2), default=0)
     notes = db.Column(db.Text, nullable=True)
     valid_until = db.Column(db.Date, nullable=True)
-    created_by = db.Column(db.String(36), nullable=True)
+    created_by = db.Column(UUID(as_uuid=False), nullable=True)
     sent_at = db.Column(db.DateTime(timezone=True), nullable=True)
     accepted_at = db.Column(db.DateTime(timezone=True), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -52,9 +53,9 @@ class Quote(db.Model):
 
 class QuoteItem(db.Model):
     __tablename__ = 'quote_items'
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    quote_id = db.Column(db.String(36), db.ForeignKey('quotes.id', ondelete='CASCADE'), nullable=False)
-    product_id = db.Column(db.String(36), db.ForeignKey('products.id'), nullable=True)
+    id = db.Column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
+    quote_id = db.Column(UUID(as_uuid=False), db.ForeignKey('quotes.id', ondelete='CASCADE'), nullable=False)
+    product_id = db.Column(UUID(as_uuid=False), db.ForeignKey('products.id'), nullable=True)
     description = db.Column(db.String(500), nullable=False)  # product name or custom line item
     material_type = db.Column(db.String(100))
     dimensions = db.Column(db.String(255))  # e.g. "320x180cm"

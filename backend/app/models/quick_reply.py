@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Optional, List
 from sqlalchemy import String, Text, Boolean, DateTime, Index
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 import uuid
@@ -14,7 +14,7 @@ class QuickReply(db.Model):
     __tablename__ = 'quick_replies'
 
     id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     category: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -23,7 +23,7 @@ class QuickReply(db.Model):
     priority: Mapped[Optional[str]] = mapped_column(String(20), default='template')
     attachments: Mapped[Optional[list]] = mapped_column(JSONB, default=list)
     is_system: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_by: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    created_by: Mapped[Optional[str]] = mapped_column(UUID(as_uuid=False), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=func.now()
     )

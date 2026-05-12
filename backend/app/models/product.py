@@ -1,11 +1,12 @@
 """MUSE CRM — Product & Inventory Models"""
 from datetime import datetime, timezone
+from sqlalchemy.dialects.postgresql import UUID
 from .. import db
 import uuid
 
 class ProductCategory(db.Model):
     __tablename__ = 'product_categories'
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = db.Column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -21,10 +22,10 @@ class ProductCategory(db.Model):
 
 class Product(db.Model):
     __tablename__ = 'products'
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = db.Column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = db.Column(db.String(255), nullable=False)
     sku = db.Column(db.String(100), unique=True, nullable=True)
-    category_id = db.Column(db.String(36), db.ForeignKey('product_categories.id'), nullable=True)
+    category_id = db.Column(UUID(as_uuid=False), db.ForeignKey('product_categories.id'), nullable=True)
     material_type = db.Column(db.String(100))  # quartz/engineered_stone/sintered_stone/marble/granite
     dimensions = db.Column(db.String(255))  # e.g. "3200x1600x20mm"
     unit_price = db.Column(db.Numeric(12, 2), nullable=True)
@@ -53,12 +54,12 @@ class Product(db.Model):
 
 class StockLog(db.Model):
     __tablename__ = 'stock_logs'
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    product_id = db.Column(db.String(36), db.ForeignKey('products.id'), nullable=False)
+    id = db.Column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
+    product_id = db.Column(UUID(as_uuid=False), db.ForeignKey('products.id'), nullable=False)
     quantity_change = db.Column(db.Integer, nullable=False)
     reason = db.Column(db.String(100))  # sale/return/damage/restock/adjustment
     reference_note = db.Column(db.Text, nullable=True)
-    created_by = db.Column(db.String(36), nullable=True)
+    created_by = db.Column(UUID(as_uuid=False), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):

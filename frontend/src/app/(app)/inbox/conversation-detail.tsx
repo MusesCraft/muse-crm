@@ -10,8 +10,7 @@ import { StatusBadge } from '@/components/status-badge';
 import { MessageListSkeleton } from '@/components/skeletons';
 import { MessageBubble } from './message-bubble';
 import { SendBar, type SendBarHandle } from './send-bar';
-import { WatchingIndicator } from '@/components/inbox/watching-indicator';
-import { NudgeButton } from '@/components/inbox/nudge-button';
+import { TakeOverBanner } from '@/components/inbox/take-over-banner';
 import { InternalNoteBubble } from '@/components/inbox/internal-note-bubble';
 import { Button } from '@/components/ui/button';
 import {
@@ -220,10 +219,9 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
   }, [conversationId, refetch]);
   useWebSocketEvent('conversation.assigned', refreshOnEvent);
   useWebSocketEvent('conversation.escalated', refreshOnEvent);
+  useWebSocketEvent('conversation.taken_over', refreshOnEvent);
+  useWebSocketEvent('conversation.returned', refreshOnEvent);
   useWebSocketEvent('conversation.resolved', refreshOnEvent);
-  // v1.1：主管監看 + 強制接管事件也觸發刷新
-  useWebSocketEvent('supervisor.watching', refreshOnEvent);
-  useWebSocketEvent('conversation.force_taken', refreshOnEvent);
 
   useEffect(() => {
     const count = (conv?.messages?.length || 0) + localMessages.length;
@@ -344,8 +342,8 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
   if (!conv) return null;
 
   const isOpen = !['resolved', 'closed'].includes(conv.status);
-  const isManager = user?.role === 'admin' || user?.role === 'manager';
-  const canNudge = isManager && !!conv.current_handler_id && String(conv.current_handler_id) !== String(user?.id);
+  const showTakeOverBanner = conv.status === 'supervisor_taken' || conv.status === 'escalated';
+  const isMeTheSupervisor = !!(user && conv.supervisor_id && String(user.id) === String(conv.supervisor_id));
 
   return (
     <>
@@ -405,14 +403,6 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
             {analyzing ? '分析中...' : '深度分析'}
           </Button>
 
-          {canNudge && (
-            <NudgeButton
-              conversationId={conv.id}
-              defaultAgentId={conv.current_handler_id ?? null}
-              onSent={refetch}
-            />
-          )}
-
           {isOpen && (
             <Button
               variant="outline"
@@ -428,8 +418,14 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
         </div>
       </div>
 
-      {/* v1.1：主管監看指示（PRD §F3.3） */}
-      <WatchingIndicator watchers={conv.watchers} />
+      {/* Take Over Banner（主管接管中或求援狀態） */}
+      {showTakeOverBanner && (
+        <TakeOverBanner
+          conversationId={conv.id}
+          isSupervisor={isMeTheSupervisor}
+          onReturned={refetch}
+        />
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-1">

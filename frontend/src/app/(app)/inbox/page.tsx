@@ -9,7 +9,6 @@ import { ConversationDetail } from './conversation-detail';
 import { CustomerSidebar } from './customer-sidebar';
 import { CopilotPanel } from '@/components/copilot/copilot-panel';
 import { ResizeHandle } from '@/components/resize-handle';
-import { NudgeToast, type NudgePayload } from '@/components/inbox/nudge-toast';
 import { Inbox, Users, UserCheck, Building2, CheckCircle2, Archive, Sparkles, X, ChevronRight } from 'lucide-react';
 import { EmptyState } from '@/components/loading';
 import { cn } from '@/lib/utils';
@@ -227,15 +226,9 @@ export default function InboxPage() {
   const listRefresh = useCallback(() => refetch(), [refetch]);
   useWebSocketEvent('conversation.assigned', listRefresh);
   useWebSocketEvent('conversation.escalated', listRefresh);
+  useWebSocketEvent('conversation.taken_over', listRefresh);
+  useWebSocketEvent('conversation.returned', listRefresh);
   useWebSocketEvent('conversation.resolved', listRefresh);
-  useWebSocketEvent('supervisor.watching', listRefresh);
-  useWebSocketEvent('conversation.force_taken', listRefresh);
-
-  // v1.1：主管 nudge → 顯示 toast 通知
-  const [nudge, setNudge] = useState<NudgePayload | null>(null);
-  useWebSocketEvent('supervisor.nudge.sent', (data) => {
-    setNudge(data as NudgePayload);
-  });
 
   const handleSelect = useCallback((id: string | number) => {
     setSelectedId(id);
@@ -404,15 +397,6 @@ export default function InboxPage() {
           <span className="text-xs">Copilot</span>
         </button>
       )}
-
-      {/* v1.1：主管 Nudge Toast */}
-      <NudgeToast
-        incoming={nudge}
-        onOpenConversation={(convId) => {
-          handleSelect(convId);
-          setNudge(null);
-        }}
-      />
 
       {/* Mobile/tablet Copilot Drawer */}
       {copilotDrawerOpen && selectedId && (

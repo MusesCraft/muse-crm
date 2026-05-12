@@ -36,7 +36,8 @@ class Conversation(db.Model):
     
     # 基本資訊
     channel: Mapped[str] = mapped_column(String(50), nullable=False)
-    # PR-2 擴充 status enum：unassigned/active/waiting_customer/escalated/supervisor_taken/resolved/closed
+    # v1.1 對話狀態 enum：unassigned/active/waiting_customer/escalated/resolved/closed
+    # （v1.0 的 supervisor_taken 已移除 — 主管不再成為對外回覆者，PRD §F2.1）
     status: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
@@ -113,10 +114,10 @@ class Conversation(db.Model):
     
     # 約束和索引
     __table_args__ = (
-        # PR-2 擴充：對話狀態機（PRD §F2.1）
+        # v1.1：對話狀態機（PRD §F2.1）移除 supervisor_taken
         CheckConstraint(
             "status IN ('unassigned', 'active', 'waiting_customer', 'escalated', "
-            "'supervisor_taken', 'resolved', 'closed')",
+            "'resolved', 'closed')",
             name='ck_conversation_status'
         ),
         Index('idx_conversations_contact', 'contact_id'),
@@ -130,7 +131,7 @@ class Conversation(db.Model):
             'contact_id', 'channel',
             unique=True,
             postgresql_where=db.text(
-                "status IN ('unassigned', 'active', 'waiting_customer', 'escalated', 'supervisor_taken')"
+                "status IN ('unassigned', 'active', 'waiting_customer', 'escalated')"
             )
         ),
     )
@@ -138,22 +139,18 @@ class Conversation(db.Model):
     def __repr__(self) -> str:
         return f"<Conversation {self.id}: {self.status} on {self.channel}>"
     
-    # PR-2 新增：對話狀態判定 helpers
-    _OPEN_STATUSES = {'unassigned', 'active', 'waiting_customer', 'escalated', 'supervisor_taken'}
+    # v1.1：對話狀態判定 helpers（移除 supervisor_taken）
+    _OPEN_STATUSES = {'unassigned', 'active', 'waiting_customer', 'escalated'}
     _CLOSED_STATUSES = {'resolved', 'closed'}
 
     @property
     def is_active(self) -> bool:
-        """檢查對話是否仍在活躍狀態（含 PR-2 新增的開放狀態）"""
+        """檢查對話是否仍在活躍狀態（PRD §F2.1）"""
         return self.status in self._OPEN_STATUSES
 
     @property
     def is_escalated(self) -> bool:
         return self.status == 'escalated'
-
-    @property
-    def is_supervisor_taken(self) -> bool:
-        return self.status == 'supervisor_taken'
     
     @property
     def has_ad_referral(self) -> bool:

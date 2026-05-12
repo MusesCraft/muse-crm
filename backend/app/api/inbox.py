@@ -55,7 +55,7 @@ def list_conversations():
     Query parameters:
         - page: 頁碼（預設 1）
         - per_page: 每頁筆數（預設 20）
-        - status: 篩選狀態 unassigned/active/waiting_customer/escalated/supervisor_taken/resolved/closed
+        - status: 篩選狀態 unassigned/active/waiting_customer/escalated/resolved/closed
         - channel: 篩選渠道 messenger/instagram
         - search: 搜尋客戶名稱或訊息內容
         - view: 視圖（PR-2/PRD §F1.1）
@@ -236,7 +236,7 @@ def trigger_manual_analysis(conversation_id):
 
 @api_bp.route('/inbox/conversations/<conversation_id>/send', methods=['POST'])
 @login_required
-@require_role('admin', 'manager', 'user')
+@require_role('admin', 'manager', 'user', 'agent')
 def send_message(conversation_id):
     """
     發送訊息（文字或圖片）
@@ -245,6 +245,15 @@ def send_message(conversation_id):
         - content: 訊息內容（文字必填，圖片選填作為 caption）
         - message_type: 'text' | 'image'（預設 'text'）
         - media_url: 圖片 URL（message_type='image' 時必填）
+        - is_internal: 是否為內部備註（不會發給客戶）
+        - mentions: @提及的 user_id 陣列
+
+    Query parameter:
+        - force=true：admin 在強制接管流程下對客戶發訊（會留 audit log）
+
+    v1.1 限制：
+        - manager / supervisor 角色禁止 is_internal=false（不可直接發給客戶）
+        - admin 預設也不能直接對外發送，需在 URL 加 ?force=true 才能突破，並留 audit log
     """
     conversation = Conversation.query.get_or_404(conversation_id)
 
@@ -257,7 +266,6 @@ def send_message(conversation_id):
     content = (data.get('content') or '').strip()
     message_type = data.get('message_type', 'text')
     media_url = data.get('media_url')
-    # PR-2 新增：內部備註與 @ 提及
     is_internal = bool(data.get('is_internal', False))
     mentions = data.get('mentions') or []
     if not isinstance(mentions, list):
@@ -267,6 +275,34 @@ def send_message(conversation_id):
         return jsonify({'error': '請提供訊息內容'}), 400
     if message_type == 'image' and not media_url:
         return jsonify({'error': '請提供 media_url'}), 400
+
+    # v1.1 主管角色限制（PRD §F3.3）：manager / admin 不可直接對客戶發訊
+    actor = get_current_user()
+    force = request.args.get('force', '').lower() == 'true'
+    if not is_internal and actor and actor.role not in ('user', 'agent'):
+        if actor.role == 'admin' and force:
+            # admin 強制發送：寫 audit log
+            logger.warning(
+                f"[force-send] admin={actor.id} force-sent external message to conv={conversation_id}"
+            )
+            try:
+                from ..models import ConversationEvent
+                ev = ConversationEvent(
+                    conversation_id=conversation.id,
+                    event_type='force_taken',
+                    actor_id=actor.id,
+                    event_metadata={
+                        'force_send': True,
+                        'reason': 'admin 強制以管理員身份直接發送對外訊息',
+                    },
+                )
+                db.session.add(ev)
+            except Exception as e:
+                logger.warning(f"[force-send] audit log 寫入失敗: {e}")
+        else:
+            return jsonify({
+                'error': '主管不可直接對客戶發送訊息，請改用內部備註（is_internal=true）或推 nudge 給客服',
+            }), 403
 
     # 找到 PSID
     contact = conversation.contact

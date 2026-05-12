@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Search, ChevronLeft, ChevronRight, AlertTriangle, Shield } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, AlertTriangle, Eye } from 'lucide-react';
 import { Avatar } from '@/components/avatar';
 import { ChannelIcon } from '@/components/channel-icon';
 import { UrgencyBadgeCompact as UrgencyBadge } from '@/components/badges';
@@ -85,7 +85,6 @@ export function ConversationList({
             <option value="active">活躍</option>
             <option value="waiting_customer">等待客戶</option>
             <option value="escalated">已求援</option>
-            <option value="supervisor_taken">主管接管</option>
             <option value="resolved">已解決</option>
             <option value="closed">已關閉</option>
           </select>
@@ -179,10 +178,11 @@ export function ConversationList({
                       aria-label="已求援"
                     />
                   )}
-                  {conv.status === 'supervisor_taken' && (
-                    <Shield
-                      className="w-3 h-3 text-purple-500"
-                      aria-label="主管接管中"
+                  {/* v1.1：主管在監看（watchers 非空） */}
+                  {conv.watchers && conv.watchers.length > 0 && (
+                    <Eye
+                      className="w-3 h-3 text-sky-500"
+                      aria-label="主管正在監看"
                     />
                   )}
                 </div>

@@ -480,16 +480,25 @@ export const conversationOpsApi = {
       body: JSON.stringify({ reason }),
     });
   },
-  async takeOver(conversationId: string | number, opts?: { note?: string; force?: boolean }) {
-    return await request<{ data: Conversation }>(`/inbox/conversations/${conversationId}/take-over`, {
-      method: 'POST',
-      body: JSON.stringify(opts || {}),
-    });
+  /** v1.1：主管推 nudge 給特定 agent（PRD §F3.3） */
+  async sendNudge(conversationId: string | number, agentId: string, message: string) {
+    return await request<{ data: ConversationEventEntry }>(
+      `/inbox/conversations/${conversationId}/nudge`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ agent_id: agentId, message }),
+      }
+    );
   },
-  async returnToAgent(conversationId: string | number) {
-    return await request<{ data: Conversation }>(`/inbox/conversations/${conversationId}/return`, {
-      method: 'POST',
-    });
+  /** v1.1：admin 強制接管（緊急例外，需 reason） */
+  async forceHandle(conversationId: string | number, reason: string) {
+    return await request<{ data: Conversation }>(
+      `/inbox/conversations/${conversationId}/force-handle`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }
+    );
   },
   async watch(conversationId: string | number) {
     return await request<{ data: Conversation }>(`/inbox/conversations/${conversationId}/watch`, {
@@ -866,6 +875,17 @@ export interface EscalationRate {
   escalation_rate: number;
 }
 
+export interface TeamOverviewAgent {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  active_count: number;
+  avg_response_minutes: number | null;
+  nudges_received: number;
+  resolved_30d: number;
+}
+
 export const dashboardApi = {
   async getStats() {
     return await request<DashboardStats>('/dashboard/stats');
@@ -894,6 +914,12 @@ export const dashboardApi = {
   },
   async getTodayConversations() {
     return await request<{ today: number; yesterday: number }>('/dashboard/today-conversations');
+  },
+  /** v1.1：主管視角員工工作量（PRD §F10.1） */
+  async getTeamOverview() {
+    return await request<{ period_days: number; data: TeamOverviewAgent[] }>(
+      '/dashboard/team-overview'
+    );
   },
 };
 

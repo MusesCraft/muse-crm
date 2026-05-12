@@ -9,7 +9,9 @@ import {
   type ResolutionRate,
   type EscalationRate,
   type ActivityPoint,
+  type TeamOverviewAgent,
 } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useAsync } from '@/lib/hooks';
 import { DashboardSkeleton } from '@/components/skeletons';
 import {
@@ -22,6 +24,8 @@ import {
   ArrowDownRight,
   Globe,
   Activity,
+  Users,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -197,7 +201,6 @@ const statusOrder: { key: string; label: string; color: string }[] = [
   { key: 'active', label: '活躍', color: 'bg-emerald-500' },
   { key: 'waiting_customer', label: '等待客戶', color: 'bg-sky-500' },
   { key: 'escalated', label: '已求援', color: 'bg-red-500' },
-  { key: 'supervisor_taken', label: '主管接管', color: 'bg-purple-500' },
   { key: 'resolved', label: '已解決', color: 'bg-indigo-500' },
   { key: 'closed', label: '已關閉', color: 'bg-zinc-400' },
 ];
@@ -205,7 +208,7 @@ const statusOrder: { key: string; label: string; color: string }[] = [
 function ConversationStatusBar({ data }: { data: Record<string, number> }) {
   const entries = statusOrder.map((s) => ({ ...s, count: data[s.key] || 0 }));
   const total = entries.reduce((s, e) => s + e.count, 0) || 1;
-  const openCount = ['unassigned', 'active', 'waiting_customer', 'escalated', 'supervisor_taken']
+  const openCount = ['unassigned', 'active', 'waiting_customer', 'escalated']
     .reduce((s, k) => s + (data[k] || 0), 0);
 
   return (
@@ -242,6 +245,85 @@ function ConversationStatusBar({ data }: { data: Record<string, number> }) {
   );
 }
 
+// ── Team Overview（主管視角，v1.1 §F10.1） ──────────
+
+function TeamOverviewPanel({ data }: { data: TeamOverviewAgent[] }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="bg-white border border-zinc-200/80 dark:bg-zinc-900 dark:border-zinc-800 rounded-xl p-5 text-xs text-zinc-400">
+        尚無員工資料
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-zinc-200/80 dark:bg-zinc-900 dark:border-zinc-800 rounded-xl p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-2">
+          <Users className="w-4 h-4 text-indigo-400" />
+          主管視角：員工工作量
+        </h3>
+        <span className="text-[10px] text-zinc-400">近 30 天</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-zinc-400 dark:text-zinc-500 border-b border-zinc-100 dark:border-zinc-800">
+              <th className="text-left py-2 font-medium">員工</th>
+              <th className="text-right py-2 font-medium">角色</th>
+              <th className="text-right py-2 font-medium">處理中</th>
+              <th className="text-right py-2 font-medium">平均首回</th>
+              <th className="text-right py-2 font-medium">已解決</th>
+              <th className="text-right py-2 font-medium">收到 Nudge</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((agent) => (
+              <tr key={agent.id} className="border-b border-zinc-50 dark:border-zinc-800/40 last:border-0">
+                <td className="py-2.5 text-zinc-700 dark:text-zinc-200 font-medium truncate max-w-[140px]">
+                  {agent.name}
+                </td>
+                <td className="py-2.5 text-right text-zinc-500 dark:text-zinc-400">
+                  {agent.role === 'manager' ? '主管' : agent.role === 'admin' ? '管理員' : '客服'}
+                </td>
+                <td className="py-2.5 text-right tabular-nums">
+                  <span className={cn(
+                    'inline-flex items-center px-1.5 py-0.5 rounded text-[10px]',
+                    agent.active_count >= 8
+                      ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300'
+                      : agent.active_count >= 5
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                        : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'
+                  )}>
+                    {agent.active_count}
+                  </span>
+                </td>
+                <td className="py-2.5 text-right text-zinc-600 dark:text-zinc-300 tabular-nums">
+                  {agent.avg_response_minutes != null
+                    ? formatMinutes(agent.avg_response_minutes)
+                    : '--'}
+                </td>
+                <td className="py-2.5 text-right text-zinc-600 dark:text-zinc-300 tabular-nums">
+                  {agent.resolved_30d}
+                </td>
+                <td className="py-2.5 text-right text-zinc-600 dark:text-zinc-300 tabular-nums">
+                  <span className="inline-flex items-center gap-1">
+                    {agent.nudges_received > 0 && <Bell className="w-3 h-3 text-indigo-400" />}
+                    {agent.nudges_received}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-3 text-[10px] text-zinc-400">
+        處理中 ≥ 8：紅標警示；處理中 5-7：黃標。平均首回為近 30 天的首次回覆時間。
+      </p>
+    </div>
+  );
+}
+
 // ── Helpers ──────────────────────────────────────────
 
 function formatMinutes(m: number | null): string {
@@ -259,6 +341,9 @@ function formatPercent(rate: number | null | undefined): string {
 // ── Main Dashboard ───────────────────────────────────
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  const isManager = user?.role === 'admin' || user?.role === 'manager';
+
   const { data: stats, loading: statsLoading, error: statsError, refetch } = useAsync<DashboardStats>(
     () => dashboardApi.getStats(),
     []
@@ -269,6 +354,11 @@ export default function DashboardPage() {
   const { data: today } = useAsync(() => dashboardApi.getTodayConversations(), []);
   const { data: convStatus } = useAsync(() => dashboardApi.getConversationStatus(), []);
   const { data: activity } = useAsync<ActivityPoint[]>(() => dashboardApi.getActivity(30), []);
+  // v1.1：主管視角面板，只在 manager/admin 顯示
+  const { data: teamOverview } = useAsync(
+    () => (isManager ? dashboardApi.getTeamOverview() : Promise.resolve(null)),
+    [isManager],
+  );
 
   if (statsLoading) return <div className="p-4 md:p-6 max-w-7xl mx-auto"><DashboardSkeleton /></div>;
 
@@ -338,6 +428,11 @@ export default function DashboardPage() {
       {/* Row 2：對話狀態分佈 */}
       {convStatus && (
         <ConversationStatusBar data={convStatus} />
+      )}
+
+      {/* v1.1：主管視角（manager / admin 才看得到） */}
+      {isManager && teamOverview && (
+        <TeamOverviewPanel data={teamOverview.data} />
       )}
 
       {/* Row 3：對話流入趨勢 + 渠道分佈 */}

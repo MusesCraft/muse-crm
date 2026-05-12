@@ -150,6 +150,8 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
   const sendingRef = useRef(false);
 
   const canManage = user?.role === 'admin' || user?.role === 'manager';
+  // v1.1：主管角色（manager）強制只能留 internal note。admin 走另一條 force-handle 路徑。
+  const isSupervisorOnly = user?.role === 'manager';
 
   // Reset state when conversation changes
   useEffect(() => {
@@ -157,8 +159,9 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
     setImagePreview(null);
     setShowQuickReplies(false);
     setPendingAttachments([]);
-    setIsInternal(false);
-  }, [conversationId]);
+    // 主管預設且鎖定 isInternal=true
+    setIsInternal(isSupervisorOnly);
+  }, [conversationId, isSupervisorOnly]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -346,20 +349,26 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
       {/* Action Row（求援 / 分配 / 內部備註 toggle） */}
       <div className="px-4 pt-2 flex items-center gap-2 flex-wrap">
         <button
-          onClick={() => setIsInternal((v) => !v)}
+          onClick={() => !isSupervisorOnly && setIsInternal((v) => !v)}
           aria-pressed={isInternal}
+          disabled={isSupervisorOnly}
+          title={isSupervisorOnly ? '您是主管角色，僅能留下內部備註' : undefined}
           className={cn(
             'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors',
             isInternal
               ? 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-500/20 dark:text-yellow-300 dark:border-yellow-500/40'
-              : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 dark:hover:bg-zinc-700'
+              : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 dark:hover:bg-zinc-700',
+            isSupervisorOnly && 'opacity-90 cursor-not-allowed'
           )}
         >
           <StickyNote className="w-3.5 h-3.5" />
-          {isInternal ? '內部備註模式' : '切到內部備註'}
+          {isSupervisorOnly ? '主管：僅內部備註' : isInternal ? '內部備註模式' : '切到內部備註'}
         </button>
 
-        <EscalationButton conversationId={conversationId} onEscalated={onConversationChanged} />
+        {/* agent 才需要「求援」按鈕；主管自己不會 escalate 給自己 */}
+        {!isSupervisorOnly && (
+          <EscalationButton conversationId={conversationId} onEscalated={onConversationChanged} />
+        )}
 
         {canManage && agents.length > 0 && (
           <AssignMenu
@@ -454,7 +463,11 @@ export const SendBar = forwardRef<SendBarHandle, SendBarProps>(function SendBar(
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={isInternal ? '留下內部備註，僅團隊可見' : '輸入訊息...'}
+          placeholder={isSupervisorOnly
+            ? '您是主管角色，僅能留下內部備註與 @提及員工'
+            : isInternal
+              ? '留下內部備註，僅團隊可見'
+              : '輸入訊息...'}
           aria-label="輸入訊息"
           rows={1}
           className={cn(

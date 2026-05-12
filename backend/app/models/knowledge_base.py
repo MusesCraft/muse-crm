@@ -47,8 +47,7 @@ class KnowledgeBase(db.Model):
     __table_args__ = (
         Index('idx_kb_category', 'category'),
         Index('idx_kb_active', 'is_active'),
-        # 全文搜尋（PG-side fallback；向量檢索由 service 層處理）
-        Index('idx_kb_content_fts', func.to_tsvector('simple', func.coalesce(content, '')), postgresql_using='gin'),
+        # TODO: 全文搜尋 GIN index 待 alembic migration 補（SQLAlchemy 無法 render REGCONFIG literal）
     )
 
     def to_dict(self, include_embedding: bool = False) -> dict:

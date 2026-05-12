@@ -88,8 +88,7 @@ class Message(db.Model):
         Index('idx_messages_conversation', 'conversation_id', 'sent_at'),
         Index('idx_messages_contact', 'contact_id'),
         Index('idx_messages_meta_id', 'meta_message_id'),
-        # 全文搜尋索引（PostgreSQL 特定）
-        Index('idx_messages_content_search', func.to_tsvector('simple', func.coalesce(content, '')), postgresql_using='gin'),
+        # TODO: 全文搜尋 GIN index 待 alembic migration 補（SQLAlchemy 無法 render REGCONFIG literal）
     )
     
     def __repr__(self) -> str:

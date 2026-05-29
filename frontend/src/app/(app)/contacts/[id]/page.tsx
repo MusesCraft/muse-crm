@@ -3,7 +3,7 @@
 import { use, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { contactsApi, actionsApi, type ContactDetail, type Action } from '@/lib/api';
-import { useAsync } from '@/lib/hooks';
+import { useAsync, useWebSocketEvent } from '@/lib/hooks';
 import { Avatar } from '@/components/avatar';
 import { ChannelBadge } from '@/components/channel-icon';
 import { StatusBadge } from '@/components/status-badge';
@@ -46,6 +46,10 @@ const STAGE_LABEL: Record<string, string> = {
   quoted: '已報價',
   won: '已成交',
   lost: '已流失',
+};
+
+type NewActionPayload = {
+  contact_id?: string | number | null;
 };
 
 function IdentityStageSection({
@@ -519,6 +523,14 @@ export default function ContactDetailPage({
     () => contactsApi.getContact(contactId),
     [contactId]
   );
+
+  const refreshOnNewAction = useCallback((payload: NewActionPayload) => {
+    const payloadContactId = payload?.contact_id;
+    if (!payloadContactId || String(payloadContactId) === String(contactId)) {
+      refetch();
+    }
+  }, [contactId, refetch]);
+  useWebSocketEvent('new_action', refreshOnNewAction);
 
   const handleUpdate = useCallback(() => {
     refetch();

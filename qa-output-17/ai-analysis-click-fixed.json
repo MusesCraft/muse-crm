@@ -1,0 +1,9 @@
+{
+  "buttons": 2,
+  "analyzePosts": [
+    "http://localhost:5000/api/v1/inbox/conversations/conv-1/analyze"
+  ],
+  "persistedVisible": 1,
+  "fakePositiveVisible": 0,
+  "events": []
+}

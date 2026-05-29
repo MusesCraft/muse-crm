@@ -218,6 +218,8 @@ class ActionService:
                 event='new_action',
                 data={
                     'action_id': str(action.id),
+                    'contact_id': str(action.contact_id) if action.contact_id else None,
+                    'conversation_id': str(action.conversation_id) if action.conversation_id else None,
                     'description': description,
                     'priority': effective_priority,
                     'due_date': due_date.isoformat(),
@@ -280,6 +282,8 @@ class ActionService:
                 event='new_action',
                 data={
                     'action_id': str(action.id),
+                    'contact_id': str(action.contact_id) if action.contact_id else None,
+                    'conversation_id': str(action.conversation_id) if action.conversation_id else None,
                     'description': description,
                     'priority': priority,
                     'due_date': due_date.isoformat(),

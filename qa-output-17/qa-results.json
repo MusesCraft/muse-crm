@@ -1,0 +1,926 @@
+{
+  "results": [
+    {
+      "area": "Auth",
+      "step": "login",
+      "status": "PASS",
+      "detail": "http://localhost:3017/inbox"
+    },
+    {
+      "area": "Dialog",
+      "step": "confirm",
+      "status": "PASS",
+      "detail": "確定要發送這則訊息？"
+    },
+    {
+      "area": "Inbox Send",
+      "step": "API success",
+      "status": "FAIL",
+      "detail": "no response"
+    },
+    {
+      "area": "Inbox Send",
+      "step": "UI append",
+      "status": "PASS",
+      "detail": "before=0, after=1"
+    },
+    {
+      "area": "Dialog",
+      "step": "confirm",
+      "status": "PASS",
+      "detail": "確定要發送這則訊息？"
+    },
+    {
+      "area": "Internal Note",
+      "step": "send/API",
+      "status": "WARN",
+      "detail": "no response"
+    },
+    {
+      "area": "Internal Note",
+      "step": "UI visible",
+      "status": "PASS",
+      "detail": "internal note copy visibility"
+    },
+    {
+      "area": "Quick Replies",
+      "step": "open/list",
+      "status": "PASS",
+      "detail": "quick reply panel"
+    },
+    {
+      "area": "Quick Replies",
+      "step": "insert into composer",
+      "status": "PASS",
+      "detail": "您好，我們可以先確認尺寸與材質後提供正式報價。"
+    },
+    {
+      "area": "Escalation",
+      "step": "open",
+      "status": "PASS",
+      "detail": "dialog/panel"
+    },
+    {
+      "area": "Escalation",
+      "step": "submit/API",
+      "status": "WARN",
+      "detail": "no response"
+    },
+    {
+      "area": "Resolve",
+      "step": "mark resolved",
+      "status": "PASS",
+      "detail": "api 200"
+    },
+    {
+      "area": "Inbox Views",
+      "step": "待認領→林屋主",
+      "status": "PASS",
+      "detail": "跳到主要內容 | MUSE |  | 主選單 |  | 收件匣 | 客戶 | 報價 | 儀表板 | 待辦事項 | 3 | 庫存 | 知識庫 | 設定 | QA |  | QA Admin |  | qa-admin@muse.local |  | 視圖 |  | 我的對話 | 待認領 | 團隊視圖 | 已解決 | 已關閉 | 收件匣 | 全部狀態 | 待"
+    },
+    {
+      "area": "Inbox Views",
+      "step": "團隊視圖/陳建材行",
+      "status": "PASS",
+      "detail": "team view"
+    },
+    {
+      "area": "Inbox Filters",
+      "step": "狀態已求援",
+      "status": "PASS",
+      "detail": "status filter"
+    },
+    {
+      "area": "Inbox Filters",
+      "step": "渠道Instagram",
+      "status": "PASS",
+      "detail": "channel filter"
+    },
+    {
+      "area": "Inbox Search",
+      "step": "搜尋 陳",
+      "status": "PASS",
+      "detail": "search"
+    },
+    {
+      "area": "Contacts",
+      "step": "open/content",
+      "status": "PASS",
+      "detail": "/contacts"
+    },
+    {
+      "area": "Quotes",
+      "step": "open/content",
+      "status": "PASS",
+      "detail": "/quotes"
+    },
+    {
+      "area": "Dashboard",
+      "step": "open/content",
+      "status": "PASS",
+      "detail": "/dashboard"
+    },
+    {
+      "area": "Actions",
+      "step": "open/content",
+      "status": "PASS",
+      "detail": "/actions"
+    },
+    {
+      "area": "Inventory",
+      "step": "open/content",
+      "status": "PASS",
+      "detail": "/inventory"
+    },
+    {
+      "area": "Knowledge Base",
+      "step": "open/content",
+      "status": "PASS",
+      "detail": "/knowledge-base"
+    },
+    {
+      "area": "Settings",
+      "step": "open/content",
+      "status": "PASS",
+      "detail": "/settings"
+    },
+    {
+      "area": "Contacts Detail",
+      "step": "王設計師",
+      "status": "PASS",
+      "detail": "http://localhost:3017/contacts"
+    },
+    {
+      "area": "Contacts Detail",
+      "step": "林屋主",
+      "status": "PASS",
+      "detail": "http://localhost:3017/contacts"
+    }
+  ],
+  "issues": [
+    {
+      "severity": "High",
+      "area": "Inbox Send",
+      "title": "Send API not successful",
+      "detail": "No successful /messages response captured"
+    },
+    {
+      "severity": "Medium",
+      "area": "Resolve",
+      "title": "Click failed",
+      "detail": "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByRole('button', { name: /標記已解決/ }).first()\n"
+    },
+    {
+      "severity": "High",
+      "area": "API",
+      "title": "4xx/5xx responses observed",
+      "detail": "[\n  {\n    \"method\": \"GET\",\n    \"status\": 503,\n    \"url\": \"http://localhost:5000/api/v1/inventory/overview\"\n  },\n  {\n    \"method\": \"GET\",\n    \"status\": 503,\n    \"url\": \"http://localhost:5000/api/v1/inventory/products/size-specs\"\n  },\n  {\n    \"method\": \"GET\",\n    \"status\": 503,\n    \"url\": \"http://localhost:5000/api/v1/inventory/products?page=1&limit=500\"\n  },\n  {\n    \"method\": \"GET\",\n    \"status\": 503,\n    \"url\": \"http://localhost:5000/api/v1/inventory/products/size-specs\"\n  },\n  {\n    \"method\": \"GET\",\n    \"status\": 503,\n    \"url\": \"http://localhost:5000/api/v1/inventory/products?page=1&limit=500\"\n  },\n  {\n    \"method\": \"GET\",\n    \"status\": 503,\n    \"url\": \"http://localhost:5000/api/v1/inventory/overview\"\n  }\n]"
+    },
+    {
+      "severity": "Medium",
+      "area": "Console",
+      "title": "Console/page errors observed",
+      "detail": "[\n  {\n    \"type\": \"pageerror\",\n    \"text\": \"Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\\n\\n- A server/client branch `if (typeof window !== 'undefined')`.\\n- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.\\n- Date formatting in a user's locale which doesn't match the server.\\n- External changing data without sending a snapshot of it along with the HTML.\\n- Invalid HTML tag nesting.\\n\\nIt can also happen if the client has a browser extension installed which messes with the HTML before React loaded.\\n\\nhttps://react.dev/link/hydration-mismatch\\n\\n  ...\\n    <RenderFromTemplateContext>\\n      <ScrollAndFocusHandler segmentPath={[...]}>\\n        <InnerScrollAndFocusHandler segmentPath={[...]} focusAndScrollRef={{apply:false, ...}}>\\n          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>\\n            <LoadingBoundary name=\\\"login/\\\" loading={null}>\\n              <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>\\n                <RedirectBoundary>\\n                  <RedirectErrorBoundary router={{...}}>\\n                    <InnerLayoutRouter url=\\\"/login\\\" tree={[...]} params={{}} cacheNode={{rsc:<Fragment>, ...}} ...>\\n                      <SegmentViewNode type=\\\"page\\\" pagePath=\\\"login/page...\\\">\\n                        <SegmentTrieNode>\\n                        <ClientPageRoot Component={function LoginPage} serverProvidedParams={{...}}>\\n                          <LoginPage params={Promise} searchParams={Promise}>\\n+                           <div\\n+                             className=\\\"min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-50 ...\\\"\\n+                           >\\n-                           <Suspense>\\n                      ...\\n                    ...\\n          ...\\n\"\n  },\n  {\n    \"type\": \"warning\",\n    \"text\": \"Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.\"\n  },\n  {\n    \"type\": \"warning\",\n    \"text\": \"Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.\"\n  },\n  {\n    \"type\": \"error\",\n    \"text\": \"Failed to load resource: the server responded with a status of 503 (SERVICE UNAVAILABLE)\"\n  },\n  {\n    \"type\": \"error\",\n    \"text\": \"Failed to load resource: the server responded with a status of 503 (SERVICE UNAVAILABLE)\"\n  },\n  {\n    \"type\": \"error\",\n    \"text\": \"Failed to load resource: the server responded with a status of 503 (SERVICE UNAVAILABLE)\"\n  },\n  {\n    \"type\": \"error\",\n    \"text\": \"Failed to load resource: the server responded with a status of 503 (SERVICE UNAVAILABLE)\"\n  },\n  {\n    \"type\": \"error\",\n    \"text\": \"Failed to load resource: the server responded with a status of 503 (SERVICE UNAVAILABLE)\"\n  },\n  {\n    \"type\": \"error\",\n    \"text\": \"Failed to load resource: the server responded with a status of 503 (SERVICE UNAVAILABLE)\"\n  }\n]"
+    }
+  ],
+  "apiEvents": [
+    {
+      "method": "POST",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/auth/login"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/ai/summary?conversation_id=054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/contacts/a04c9465-5761-41c3-a99a-f4e5b117a676"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/ai/summary?conversation_id=054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/contacts/a04c9465-5761-41c3-a99a-f4e5b117a676"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/ai/knowledge-search?q=%E9%80%99%E6%98%AF%E7%8F%BE%E5%A0%B4%E7%85%A7%E7%89%87&top_k=3"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/users"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/users"
+    },
+    {
+      "method": "POST",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a/send"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/users"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/users"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "POST",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a/send"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/users"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/users"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/quick-replies"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/quick-replies"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations/054c0389-89c6-4150-baaf-e7e2bf09490a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/auth/me"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=unassigned"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&view=team"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&status=escalated&view=team"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&status=escalated&channel=instagram&view=team"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/inbox/conversations?page=1&per_page=20&status=escalated&channel=instagram&search=%E9%99%B3&view=team"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/auth/me"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/contacts?page=1&per_page=20"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/contacts?page=1&per_page=20"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/auth/me"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/quotes?page=1&per_page=20"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/quotes?page=1&per_page=20"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/auth/me"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/first-response-time"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/resolution-rate?days=30"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/escalation-rate?days=30"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/today-conversations"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/conversation-status"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/activity?days=30"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/first-response-time"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/resolution-rate?days=30"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/escalation-rate?days=30"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/today-conversations"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/conversation-status"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/activity?days=30"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/auth/me"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/actions"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/actions"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/auth/me"
+    },
+    {
+      "method": "GET",
+      "status": 503,
+      "url": "http://localhost:5000/api/v1/inventory/overview"
+    },
+    {
+      "method": "GET",
+      "status": 503,
+      "url": "http://localhost:5000/api/v1/inventory/products/size-specs"
+    },
+    {
+      "method": "GET",
+      "status": 503,
+      "url": "http://localhost:5000/api/v1/inventory/products?page=1&limit=500"
+    },
+    {
+      "method": "GET",
+      "status": 503,
+      "url": "http://localhost:5000/api/v1/inventory/products/size-specs"
+    },
+    {
+      "method": "GET",
+      "status": 503,
+      "url": "http://localhost:5000/api/v1/inventory/products?page=1&limit=500"
+    },
+    {
+      "method": "GET",
+      "status": 503,
+      "url": "http://localhost:5000/api/v1/inventory/overview"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/auth/me"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/knowledge-base?"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/knowledge-base?"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/auth/me"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/auth/me"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/contacts?page=1&per_page=20"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/contacts?page=1&per_page=20"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/contacts/a04c9465-5761-41c3-a99a-f4e5b117a676"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/auth/me"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/contacts?page=1&per_page=20"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/contacts?page=1&per_page=20"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/contacts/9832f17f-2ce0-48cd-a910-db4a9b5d1169"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/auth/me"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/contacts?page=1&per_page=20"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/contacts?page=1&per_page=20"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "http://localhost:5000/api/v1/dashboard/stats"
+    }
+  ],
+  "consoleErrors": [
+    {
+      "type": "pageerror",
+      "text": "Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.\n- Date formatting in a user's locale which doesn't match the server.\n- External changing data without sending a snapshot of it along with the HTML.\n- Invalid HTML tag nesting.\n\nIt can also happen if the client has a browser extension installed which messes with the HTML before React loaded.\n\nhttps://react.dev/link/hydration-mismatch\n\n  ...\n    <RenderFromTemplateContext>\n      <ScrollAndFocusHandler segmentPath={[...]}>\n        <InnerScrollAndFocusHandler segmentPath={[...]} focusAndScrollRef={{apply:false, ...}}>\n          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>\n            <LoadingBoundary name=\"login/\" loading={null}>\n              <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>\n                <RedirectBoundary>\n                  <RedirectErrorBoundary router={{...}}>\n                    <InnerLayoutRouter url=\"/login\" tree={[...]} params={{}} cacheNode={{rsc:<Fragment>, ...}} ...>\n                      <SegmentViewNode type=\"page\" pagePath=\"login/page...\">\n                        <SegmentTrieNode>\n                        <ClientPageRoot Component={function LoginPage} serverProvidedParams={{...}}>\n                          <LoginPage params={Promise} searchParams={Promise}>\n+                           <div\n+                             className=\"min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-50 ...\"\n+                           >\n-                           <Suspense>\n                      ...\n                    ...\n          ...\n"
+    },
+    {
+      "type": "warning",
+      "text": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}."
+    },
+    {
+      "type": "warning",
+      "text": "Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}."
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 503 (SERVICE UNAVAILABLE)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 503 (SERVICE UNAVAILABLE)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 503 (SERVICE UNAVAILABLE)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 503 (SERVICE UNAVAILABLE)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 503 (SERVICE UNAVAILABLE)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 503 (SERVICE UNAVAILABLE)"
+    }
+  ]
+}

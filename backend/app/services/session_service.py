@@ -17,6 +17,36 @@ from ..realtime.emitter import emit_scoped
 logger = logging.getLogger(__name__)
 
 
+def _emit_conversation_closed_events(conversation: Conversation, contact: Optional[Contact], reason: str) -> None:
+    contact_name = contact.display_name if contact else '未知客戶'
+    closed_at = getattr(conversation, 'closed_at', None)
+    payload = {
+        'conversation_id': str(conversation.id),
+        'contact_id': str(conversation.contact_id),
+        'contact_name': contact_name,
+        'reason': reason,
+        'status': conversation.status,
+        'message_count': conversation.message_count or 0,
+        'closed_at': closed_at.isoformat() if closed_at else None,
+    }
+    assigned_user_id = str(contact.assigned_to) if contact and getattr(contact, 'assigned_to', None) else None
+    assigned_user = getattr(contact, 'assigned_user', None) if contact else None
+    team_id = str(assigned_user.team_id) if getattr(assigned_user, 'team_id', None) else None
+
+    emit_scoped(
+        event='session_closed',
+        data=payload,
+        assigned_user_id=assigned_user_id,
+        team_id=team_id,
+    )
+    emit_scoped(
+        event='conversation.closed',
+        data=payload,
+        assigned_user_id=assigned_user_id,
+        team_id=team_id,
+    )
+
+
 def _get_min_messages_for_analysis() -> int:
     """取得觸發 LLM 分析的最低訊息數門檻（CRM-017）"""
     from flask import current_app
@@ -152,20 +182,10 @@ class SessionService:
             
             logger.info(f"對話已關閉：{conversation_id}, 原因：{reason}")
 
-            # WebSocket 推送 session_closed
+            # WebSocket 推送 session_closed + conversation.closed
             try:
                 contact = db.session.get(Contact, conversation.contact_id)
-                contact_name = contact.display_name if contact else '未知客戶'
-                emit_scoped(
-                    event='session_closed',
-                    data={
-                        'conversation_id': conversation_id,
-                        'contact_name': contact_name,
-                        'message_count': conversation.message_count or 0,
-                    },
-                    assigned_user_id=getattr(contact, 'assigned_to', None) if contact else None,
-                    team_id=None,
-                )
+                _emit_conversation_closed_events(conversation, contact, reason)
             except Exception as ws_err:
                 logger.warning(f"[close_conversation] WebSocket 推送失敗: {ws_err}")
 
@@ -209,12 +229,14 @@ class SessionService:
         )
         
         closed_count = 0
+        closed_conversations = []
         
         for conv in expired_conversations:
             if conv.is_expired:
                 try:
                     conv.close_conversation()
                     closed_count += 1
+                    closed_conversations.append(conv)
                     
                     # 觸發 LLM 分析（短對話跳過，CRM-017）
                     _min_msgs = _get_min_messages_for_analysis()
@@ -231,6 +253,12 @@ class SessionService:
             try:
                 db.session.commit()
                 logger.info(f"已清理 {closed_count} 個過期對話")
+                for conv in closed_conversations:
+                    try:
+                        contact = db.session.get(Contact, conv.contact_id)
+                        _emit_conversation_closed_events(conv, contact, 'timeout')
+                    except Exception as ws_err:
+                        logger.warning(f"[cleanup_expired_conversations] WebSocket 推送失敗: {ws_err}")
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"提交清理結果失敗：{e}")

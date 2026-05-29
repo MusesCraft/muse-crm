@@ -1,0 +1,110 @@
+{
+  "timestamp": "2026-05-28T03:48:50.691Z",
+  "scope": {
+    "FRONT": "https://frontend-production-0866.up.railway.app",
+    "API": "https://backend-production-5171.up.railway.app/api/v1",
+    "conversation_id": "6fb8aec0-03a5-407f-844a-aed67a44d092",
+    "contact": "王設計師"
+  },
+  "results": [
+    {
+      "area": "API Auth",
+      "step": "login",
+      "status": "PASS",
+      "detail": "{\"avatar_url\":null,\"created_at\":\"2026-05-12T05:49:34.584072+00:00\",\"email\":\"admin@muse-crm.com\",\"id\":\"c6a42a51-9462-400a-ad3d-45802e1ef0c5\",\"is_active\":true,\"name\":\"Admin\",\"role\":\"admin\",\"roles\":[],\"team_id\":null}"
+    },
+    {
+      "area": "API Inbox",
+      "step": "list conversations",
+      "status": "PASS",
+      "detail": "200; total=4"
+    },
+    {
+      "area": "Scope",
+      "step": "selected conversation",
+      "status": "PASS",
+      "detail": "conversation=6fb8aec0-03a5-407f-844a-aed67a44d092; contact=王設計師; messages=4; status=escalated"
+    },
+    {
+      "area": "API Detail",
+      "step": "before analyze",
+      "status": "PASS",
+      "detail": "200; analyses=0; messages=4"
+    },
+    {
+      "area": "API Analyze",
+      "step": "manual trigger",
+      "status": "PASS",
+      "detail": "202; {\"conversation_id\":\"6fb8aec0-03a5-407f-844a-aed67a44d092\",\"message\":\"分析任務已提交\",\"task_id\":\"dad628ae-d2c0-4ec6-8b5c-2f3f4c212d84\",\"trigger_type\":\"manual\"}"
+    },
+    {
+      "area": "API Analyze",
+      "step": "poll persisted analysis",
+      "status": "WARN",
+      "detail": "before=0; after=0"
+    },
+    {
+      "area": "Browser Inbox",
+      "step": "load",
+      "status": "PASS",
+      "detail": "https://frontend-production-0866.up.railway.app/inbox"
+    },
+    {
+      "area": "Browser Detail",
+      "step": "conversation/contact visible",
+      "status": "WARN",
+      "detail": "王設計師"
+    },
+    {
+      "area": "Browser AI",
+      "step": "analyze button present",
+      "status": "WARN",
+      "detail": "深度分析 button"
+    }
+  ],
+  "issues": [
+    {
+      "severity": "High",
+      "area": "API Analyze",
+      "title": "Analysis task accepted but no new analysis became visible within 20s",
+      "detail": "task=dad628ae-d2c0-4ec6-8b5c-2f3f4c212d84; conversation=6fb8aec0-03a5-407f-844a-aed67a44d092",
+      "artifact": null
+    },
+    {
+      "severity": "High",
+      "area": "API Analyze",
+      "title": "No existing or new analysis data to validate sentiment",
+      "detail": "conversation=6fb8aec0-03a5-407f-844a-aed67a44d092",
+      "artifact": null
+    },
+    {
+      "severity": "Medium",
+      "area": "Browser AI",
+      "title": "Neither analysis result nor deep analysis button visible",
+      "detail": "AI analysis area could not be exercised",
+      "artifact": "/Users/muse/Developer/muse-crm/qa-output-17/screenshots-ai-tone/02-conversation-detail.png"
+    }
+  ],
+  "apiEvents": [
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/auth/me"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/dashboard/stats"
+    }
+  ],
+  "consoleEvents": [],
+  "artifacts": [
+    "/Users/muse/Developer/muse-crm/qa-output-17/screenshots-ai-tone/01-inbox-loaded.png",
+    "/Users/muse/Developer/muse-crm/qa-output-17/screenshots-ai-tone/02-conversation-detail.png"
+  ]
+}

@@ -6,18 +6,58 @@ Dashboard 統計數據相關 API 端點。
 
 from datetime import datetime, timedelta, timezone
 from flask import current_app, jsonify, request
-from sqlalchemy import func, and_, distinct, desc
+from sqlalchemy import func, and_, desc, text
+from sqlalchemy.orm import aliased
 
 from . import api_bp
 from ..models import Contact, Conversation, Message, Action, Analysis
 from .. import db
 from ..utils.auth import login_required
-from ..utils.permissions import get_current_user
+from ..utils.permissions import get_current_user, require_role
 from ..utils.scope import apply_contact_scope
+
+
+def _scoped_contacts_query(user=None):
+    user = user or get_current_user()
+    query = Contact.query.filter(Contact.is_merged == False)
+    return apply_contact_scope(query, user) if user else query
+
+
+def _scoped_conversations_query(user=None):
+    user = user or get_current_user()
+    query = Conversation.query.join(Contact, Conversation.contact_id == Contact.id)
+    return apply_contact_scope(query, user) if user else query
+
+
+def _scoped_conversation_ids_subquery(user=None):
+    return (
+        _scoped_conversations_query(user)
+        .with_entities(Conversation.id.label('id'))
+        .subquery()
+    )
+
+
+def _scoped_messages_query(user=None):
+    user = user or get_current_user()
+    query = Message.query.join(Contact, Message.contact_id == Contact.id)
+    return apply_contact_scope(query, user) if user else query
+
+
+def _scoped_actions_query(user=None):
+    user = user or get_current_user()
+    query = Action.query.join(Contact, Action.contact_id == Contact.id)
+    return apply_contact_scope(query, user) if user else query
+
+
+def _scoped_analyses_query(user=None):
+    user = user or get_current_user()
+    query = Analysis.query.join(Contact, Analysis.contact_id == Contact.id)
+    return apply_contact_scope(query, user) if user else query
 
 
 @api_bp.route('/dashboard/overview', methods=['GET'])
 @login_required
+@require_role('admin', 'manager')
 def dashboard_overview():
     """
     Dashboard 總覽數據
@@ -30,9 +70,7 @@ def dashboard_overview():
     user = get_current_user()
 
     # 基礎 Contact 查詢（套用 scope）
-    contact_q = Contact.query.filter(Contact.is_merged == False)
-    if user:
-        contact_q = apply_contact_scope(contact_q, user)
+    contact_q = _scoped_contacts_query(user)
 
     # 總客戶數
     total_contacts = contact_q.count()
@@ -41,9 +79,7 @@ def dashboard_overview():
     new_contacts = contact_q.filter(Contact.created_at >= start_date).count()
 
     # 基礎 Conversation 查詢（套用 scope）
-    conv_q = Conversation.query.join(Contact, Conversation.contact_id == Contact.id)
-    if user:
-        conv_q = apply_contact_scope(conv_q, user)
+    conv_q = _scoped_conversations_query(user)
 
     # 總對話數
     total_conversations = conv_q.count()
@@ -55,9 +91,7 @@ def dashboard_overview():
     new_conversations = conv_q.filter(Conversation.created_at >= start_date).count()
 
     # 基礎 Action 查詢（套用 scope）
-    action_q = Action.query.join(Contact, Action.contact_id == Contact.id)
-    if user:
-        action_q = apply_contact_scope(action_q, user)
+    action_q = _scoped_actions_query(user)
 
     # 待辦動作統計
     pending_actions = action_q.filter(
@@ -75,9 +109,10 @@ def dashboard_overview():
         Action.status == 'completed'
     ).count()
     
-    # LLM 分析統計
-    total_analyses = Analysis.query.count()
-    recent_analyses = Analysis.query.filter(
+    # LLM 分析統計（套用 scope）
+    analysis_q = _scoped_analyses_query(user)
+    total_analyses = analysis_q.count()
+    recent_analyses = analysis_q.filter(
         Analysis.created_at >= start_date
     ).count()
     
@@ -106,6 +141,7 @@ def dashboard_overview():
 
 @api_bp.route('/dashboard/trends', methods=['GET'])
 @login_required
+@require_role('admin', 'manager')
 def conversation_trends():
     """
     對話量趨勢數據（按日統計）
@@ -115,10 +151,12 @@ def conversation_trends():
     """
     days = max(1, min(request.args.get('days', 30, type=int), 365))
     start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    user = get_current_user()
 
     # 按日統計對話數
     results = (
-        db.session.query(
+        _scoped_conversations_query(user)
+        .with_entities(
             func.date(Conversation.created_at).label('date'),
             func.count(Conversation.id).label('count')
         )
@@ -144,14 +182,16 @@ def conversation_trends():
 
 @api_bp.route('/dashboard/channels', methods=['GET'])
 @login_required
+@require_role('admin', 'manager')
 def channel_distribution():
     """渠道分布統計"""
+    user = get_current_user()
     results = (
-        db.session.query(
+        _scoped_contacts_query(user)
+        .with_entities(
             Contact.source_channel.label('channel'),
             func.count(Contact.id).label('count')
         )
-        .filter(Contact.is_merged == False)
         .group_by(Contact.source_channel)
         .order_by(func.count(Contact.id).desc())
         .all()
@@ -172,39 +212,63 @@ def channel_distribution():
 
 @api_bp.route('/dashboard/first-response-time', methods=['GET'])
 @login_required
+@require_role('admin', 'manager')
 def first_response_time():
     """
     首次回覆時間 P50 / P90（單位：分鐘）。
     對每個對話：找出第一則 customer 訊息 → 之後第一則 business 訊息的時間差。
     """
-    from sqlalchemy import text as sa_text
-    rows = db.session.execute(sa_text("""
-        WITH first_customer AS (
-            SELECT conversation_id, MIN(sent_at) AS t
-            FROM messages
-            WHERE sender_type = 'customer' AND COALESCE(is_internal, false) = false
-            GROUP BY conversation_id
-        ),
-        first_business AS (
-            SELECT m.conversation_id, MIN(m.sent_at) AS t
-            FROM messages m
-            JOIN first_customer fc ON fc.conversation_id = m.conversation_id
-            WHERE m.sender_type = 'business'
-              AND COALESCE(m.is_internal, false) = false
-              AND m.sent_at > fc.t
-            GROUP BY m.conversation_id
-        ),
-        diffs AS (
-            SELECT EXTRACT(EPOCH FROM (fb.t - fc.t)) / 60.0 AS minutes
-            FROM first_customer fc
-            JOIN first_business fb ON fb.conversation_id = fc.conversation_id
+    user = get_current_user()
+    scoped_conversation_ids = _scoped_conversation_ids_subquery(user)
+
+    first_customer = (
+        db.session.query(
+            Message.conversation_id.label('conversation_id'),
+            func.min(Message.sent_at).label('t'),
         )
-        SELECT
-            percentile_cont(0.5) WITHIN GROUP (ORDER BY minutes) AS p50,
-            percentile_cont(0.9) WITHIN GROUP (ORDER BY minutes) AS p90,
-            COUNT(*) AS sample_count
-        FROM diffs
-    """)).fetchone()
+        .join(scoped_conversation_ids, Message.conversation_id == scoped_conversation_ids.c.id)
+        .filter(
+            Message.sender_type == 'customer',
+            func.coalesce(Message.is_internal, False).is_(False),
+        )
+        .group_by(Message.conversation_id)
+        .subquery()
+    )
+
+    business_message = aliased(Message)
+    first_business = (
+        db.session.query(
+            business_message.conversation_id.label('conversation_id'),
+            func.min(business_message.sent_at).label('t'),
+        )
+        .join(first_customer, first_customer.c.conversation_id == business_message.conversation_id)
+        .filter(
+            business_message.sender_type == 'business',
+            func.coalesce(business_message.is_internal, False).is_(False),
+            business_message.sent_at > first_customer.c.t,
+        )
+        .group_by(business_message.conversation_id)
+        .subquery()
+    )
+
+    diffs = (
+        db.session.query(
+            (func.extract('epoch', first_business.c.t - first_customer.c.t) / 60.0).label('minutes')
+        )
+        .select_from(first_customer)
+        .join(first_business, first_business.c.conversation_id == first_customer.c.conversation_id)
+        .subquery()
+    )
+
+    rows = (
+        db.session.query(
+            func.percentile_cont(0.5).within_group(diffs.c.minutes).label('p50'),
+            func.percentile_cont(0.9).within_group(diffs.c.minutes).label('p90'),
+            func.count().label('sample_count'),
+        )
+        .select_from(diffs)
+        .first()
+    )
 
     return jsonify({
         'p50_minutes': float(rows.p50) if rows and rows.p50 is not None else None,
@@ -215,6 +279,7 @@ def first_response_time():
 
 @api_bp.route('/dashboard/resolution-rate', methods=['GET'])
 @login_required
+@require_role('admin', 'manager')
 def resolution_rate():
     """
     解決率（resolved / total）（PRD §F10）。
@@ -222,9 +287,11 @@ def resolution_rate():
     """
     days = max(1, min(request.args.get('days', 30, type=int), 365))
     start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    user = get_current_user()
 
-    total = Conversation.query.filter(Conversation.created_at >= start_date).count()
-    resolved = Conversation.query.filter(
+    conv_q = _scoped_conversations_query(user)
+    total = conv_q.filter(Conversation.created_at >= start_date).count()
+    resolved = conv_q.filter(
         Conversation.created_at >= start_date,
         Conversation.status.in_(('resolved', 'closed')),
     ).count()
@@ -239,6 +306,7 @@ def resolution_rate():
 
 @api_bp.route('/dashboard/conversation-status', methods=['GET'])
 @login_required
+@require_role('admin', 'manager')
 def conversation_status_distribution():
     """
     當前對話依 status 分組計數（PR-7 KPI 視圖）。
@@ -246,11 +314,9 @@ def conversation_status_distribution():
     """
     user = get_current_user()
     q = (
-        db.session.query(Conversation.status, func.count(Conversation.id))
-        .join(Contact, Conversation.contact_id == Contact.id)
+        _scoped_conversations_query(user)
+        .with_entities(Conversation.status, func.count(Conversation.id))
     )
-    if user:
-        q = apply_contact_scope(q, user)
     rows = q.group_by(Conversation.status).all()
 
     result = {s: 0 for s in (
@@ -268,6 +334,7 @@ def conversation_status_distribution():
 
 @api_bp.route('/dashboard/today-conversations', methods=['GET'])
 @login_required
+@require_role('admin', 'manager')
 def today_conversations():
     """今日新對話數（以 Asia/Taipei 計算日界）"""
     user = get_current_user()
@@ -281,9 +348,7 @@ def today_conversations():
     today_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
     yesterday_start = today_start - timedelta(days=1)
 
-    q = Conversation.query.join(Contact, Conversation.contact_id == Contact.id)
-    if user:
-        q = apply_contact_scope(q, user)
+    q = _scoped_conversations_query(user)
     today_count = q.filter(Conversation.created_at >= today_start).count()
     yesterday_count = q.filter(
         Conversation.created_at >= yesterday_start,
@@ -297,13 +362,16 @@ def today_conversations():
 
 @api_bp.route('/dashboard/escalation-rate', methods=['GET'])
 @login_required
+@require_role('admin', 'manager')
 def escalation_rate():
     """求援率 = escalated 對話數 / 全部開放對話數（PRD §F10）"""
     days = max(1, min(request.args.get('days', 30, type=int), 365))
     start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    user = get_current_user()
 
-    total = Conversation.query.filter(Conversation.created_at >= start_date).count()
-    escalated = Conversation.query.filter(
+    conv_q = _scoped_conversations_query(user)
+    total = conv_q.filter(Conversation.created_at >= start_date).count()
+    escalated = conv_q.filter(
         Conversation.created_at >= start_date,
         Conversation.escalated_at.isnot(None),
     ).count()
@@ -318,16 +386,20 @@ def escalation_rate():
 
 @api_bp.route('/dashboard/actions/completion', methods=['GET'])
 @login_required
+@require_role('admin', 'manager')
 def action_completion_rate():
     """待辦動作完成率統計"""
-    total_actions = Action.query.count()
-    completed_actions = Action.query.filter(Action.status == 'completed').count()
+    user = get_current_user()
+    action_q = _scoped_actions_query(user)
+    total_actions = action_q.count()
+    completed_actions = action_q.filter(Action.status == 'completed').count()
     
     completion_rate = (completed_actions / total_actions * 100) if total_actions > 0 else 0
     
     # 按狀態分組統計
     status_stats = (
-        db.session.query(
+        action_q
+        .with_entities(
             Action.status,
             func.count(Action.id).label('count')
         )
@@ -353,6 +425,7 @@ def action_completion_rate():
 
 @api_bp.route('/dashboard/stats', methods=['GET'])
 @login_required
+@require_role('admin', 'manager')
 def dashboard_stats():
     """
     Dashboard 統計數據（簡化版，供前端 DashboardStats 使用）
@@ -362,26 +435,18 @@ def dashboard_stats():
     """
     user = get_current_user()
 
-    contact_q = Contact.query.filter(Contact.is_merged == False)
-    if user:
-        contact_q = apply_contact_scope(contact_q, user)
+    contact_q = _scoped_contacts_query(user)
     total_contacts = contact_q.count()
 
-    conv_q = Conversation.query.join(Contact, Conversation.contact_id == Contact.id)
-    if user:
-        conv_q = apply_contact_scope(conv_q, user)
+    conv_q = _scoped_conversations_query(user)
     total_conversations = conv_q.count()
     active_conversations = conv_q.filter(Conversation.status == 'active').count()
 
     # 訊息數量：透過 Contact scope 過濾
-    msg_q = Message.query.join(Contact, Message.contact_id == Contact.id)
-    if user:
-        msg_q = apply_contact_scope(msg_q, user)
+    msg_q = _scoped_messages_query(user)
     total_messages = msg_q.count()
 
-    action_q = Action.query.join(Contact, Action.contact_id == Contact.id)
-    if user:
-        action_q = apply_contact_scope(action_q, user)
+    action_q = _scoped_actions_query(user)
     pending_actions = action_q.filter(
         Action.status.in_(['pending', 'assigned', 'in_progress'])
     ).count()
@@ -421,11 +486,11 @@ def dashboard_stats():
 
     # 渠道分布
     channel_results = (
-        db.session.query(
+        contact_q
+        .with_entities(
             Contact.source_channel,
             func.count(Contact.id)
         )
-        .filter(Contact.is_merged.is_(False))
         .group_by(Contact.source_channel)
         .order_by(func.count(Contact.id).desc())
         .all()
@@ -437,11 +502,11 @@ def dashboard_stats():
 
     # 客戶跟進狀態分布
     status_results = (
-        db.session.query(
+        contact_q
+        .with_entities(
             Contact.contact_status,
             func.count(Contact.id)
         )
-        .filter(Contact.is_merged.is_(False))
         .group_by(Contact.contact_status)
         .order_by(func.count(Contact.id).desc())
         .all()
@@ -450,11 +515,11 @@ def dashboard_stats():
 
     # 購買意向分布
     intent_results = (
-        db.session.query(
+        contact_q
+        .with_entities(
             Contact.intent,
             func.count(Contact.id)
         )
-        .filter(Contact.is_merged.is_(False))
         .group_by(Contact.intent)
         .order_by(func.count(Contact.id).desc())
         .all()
@@ -462,7 +527,6 @@ def dashboard_stats():
     intent_data = {i or 'unknown': cnt for i, cnt in intent_results}
 
     # 轉換漏斗
-    from sqlalchemy import literal_column
     funnel_total = total_contacts
     funnel_engaged = contact_q.filter(
         Contact.contact_status.in_(['following_up', 'quoted', 'won'])
@@ -475,24 +539,38 @@ def dashboard_stats():
     # 平均回覆時間（小時）
     avg_response_hours = None
     try:
-        from sqlalchemy import text as sa_text
-        result = db.session.execute(sa_text("""
-            SELECT AVG(EXTRACT(EPOCH FROM (m2.sent_at - m1.sent_at))/3600)::numeric(10,1) AS avg_hours
-            FROM messages m1
-            JOIN messages m2 ON m1.conversation_id = m2.conversation_id
-            WHERE m1.sender_type = 'customer' AND m2.sender_type = 'business'
-            AND m2.sent_at > m1.sent_at
-            AND m2.sent_at - m1.sent_at < INTERVAL '7 days'
-        """)).scalar()
+        scoped_conversation_ids = _scoped_conversation_ids_subquery(user)
+        customer_message = aliased(Message)
+        business_message = aliased(Message)
+        result = (
+            db.session.query(
+                func.avg(
+                    func.extract('epoch', business_message.sent_at - customer_message.sent_at) / 3600.0
+                )
+            )
+            .select_from(customer_message)
+            .join(scoped_conversation_ids, customer_message.conversation_id == scoped_conversation_ids.c.id)
+            .join(
+                business_message,
+                and_(
+                    business_message.conversation_id == customer_message.conversation_id,
+                    business_message.sender_type == 'business',
+                    business_message.sent_at > customer_message.sent_at,
+                    business_message.sent_at - customer_message.sent_at < text("INTERVAL '7 days'"),
+                ),
+            )
+            .filter(customer_message.sender_type == 'customer')
+            .scalar()
+        )
         if result is not None:
-            avg_response_hours = float(result)
+            avg_response_hours = round(float(result), 1)
     except Exception:
         pass
 
     # 熱門對話 Top 5
     top_convs_q = (
-        db.session.query(Conversation, Contact)
-        .join(Contact, Conversation.contact_id == Contact.id)
+        _scoped_conversations_query(user)
+        .with_entities(Conversation, Contact)
         .order_by(desc(Conversation.message_count))
         .limit(5)
         .all()
@@ -512,7 +590,8 @@ def dashboard_stats():
     # 30 天訊息活動趨勢
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     activity_results = (
-        db.session.query(
+        msg_q
+        .with_entities(
             func.date(Message.sent_at).label('date'),
             func.count(Message.id).label('count'),
         )
@@ -563,6 +642,7 @@ def dashboard_stats():
 
 @api_bp.route('/dashboard/channel-distribution', methods=['GET'])
 @login_required
+@require_role('admin', 'manager')
 def channel_distribution_compat():
     """渠道分布統計（前端相容別名）"""
     return channel_distribution()
@@ -570,6 +650,7 @@ def channel_distribution_compat():
 
 @api_bp.route('/dashboard/activity', methods=['GET'])
 @login_required
+@require_role('admin', 'manager')
 def dashboard_activity():
     """
     活動趨勢（前端相容格式）
@@ -578,10 +659,12 @@ def dashboard_activity():
     """
     days = max(1, min(request.args.get('days', 30, type=int), 365))
     start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    user = get_current_user()
     
     # 按日統計對話數
     conv_results = dict(
-        db.session.query(
+        _scoped_conversations_query(user)
+        .with_entities(
             func.date(Conversation.created_at).label('date'),
             func.count(Conversation.id).label('count')
         )
@@ -592,7 +675,8 @@ def dashboard_activity():
     
     # 按日統計訊息數
     msg_results = dict(
-        db.session.query(
+        _scoped_messages_query(user)
+        .with_entities(
             func.date(Message.sent_at).label('date'),
             func.count(Message.id).label('count')
         )
@@ -618,6 +702,7 @@ def dashboard_activity():
 
 @api_bp.route('/dashboard/export', methods=['GET'])
 @login_required
+@require_role('admin', 'manager')
 def export_dashboard_csv():
     """
     匯出 Dashboard 數據為 CSV

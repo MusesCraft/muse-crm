@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useId } from 'react';
-import { quickRepliesApi, llmApi, type QuickReplyItem, type LlmUsageSummary, type LlmBudget } from '@/lib/api';
+import { quickRepliesApi, llmApi, type QuickReplyAttachment, type QuickReplyItem, type LlmUsageSummary, type LlmBudget } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
@@ -20,8 +20,10 @@ import {
   Copy,
   CheckCircle,
   DollarSign,
+  Image as ImageIcon,
   Loader2,
   Shield,
+  X,
 } from 'lucide-react';
 import RolesTab from './roles-tab';
 
@@ -363,6 +365,9 @@ function QuickRepliesManagementCard() {
   const [formCategory, setFormCategory] = useState('');
   const [formTitle, setFormTitle] = useState('');
   const [formContent, setFormContent] = useState('');
+  const [formAttachments, setFormAttachments] = useState<QuickReplyAttachment[]>([]);
+  const [formAttachmentUrl, setFormAttachmentUrl] = useState('');
+  const [formAttachmentLabel, setFormAttachmentLabel] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
 
   const categoryLabels: Record<string, string> = {
@@ -390,12 +395,40 @@ function QuickRepliesManagementCard() {
 
   useEffect(() => { loadReplies(); }, [loadReplies]);
 
+  const resetForm = () => {
+    setFormTitle('');
+    setFormContent('');
+    setFormAttachments([]);
+    setFormAttachmentUrl('');
+    setFormAttachmentLabel('');
+  };
+
+  const handleAddAttachment = () => {
+    const url = formAttachmentUrl.trim();
+    if (!url) return;
+    setFormAttachments((items) => [
+      ...items,
+      { type: 'image', url, label: formAttachmentLabel.trim() || undefined },
+    ]);
+    setFormAttachmentUrl('');
+    setFormAttachmentLabel('');
+  };
+
+  const handleRemoveAttachment = (index: number) => {
+    setFormAttachments((items) => items.filter((_, i) => i !== index));
+  };
+
   const handleAdd = async () => {
     if (!formTitle.trim() || !formContent.trim() || !formCategory.trim()) return;
     setSaving(true);
     try {
-      await quickRepliesApi.create({ category: formCategory.trim(), title: formTitle.trim(), content: formContent.trim() });
-      setFormTitle(''); setFormContent(''); setShowAddForm(false);
+      await quickRepliesApi.create({
+        category: formCategory.trim(),
+        title: formTitle.trim(),
+        content: formContent.trim(),
+        attachments: formAttachments,
+      });
+      resetForm(); setShowAddForm(false);
       await loadReplies();
     } catch (err) {
       console.error('Create failed:', err);
@@ -423,6 +456,9 @@ function QuickRepliesManagementCard() {
     setFormCategory(reply.category);
     setFormTitle(reply.title);
     setFormContent(reply.content);
+    setFormAttachments(reply.attachments || []);
+    setFormAttachmentUrl('');
+    setFormAttachmentLabel('');
     setShowAddForm(false);
   };
 
@@ -430,8 +466,13 @@ function QuickRepliesManagementCard() {
     if (!formTitle.trim() || !formContent.trim() || !editingId) return;
     setSaving(true);
     try {
-      await quickRepliesApi.update(editingId, { category: formCategory.trim(), title: formTitle.trim(), content: formContent.trim() });
-      setEditingId(null); setFormTitle(''); setFormContent('');
+      await quickRepliesApi.update(editingId, {
+        category: formCategory.trim(),
+        title: formTitle.trim(),
+        content: formContent.trim(),
+        attachments: formAttachments,
+      });
+      setEditingId(null); resetForm();
       await loadReplies();
     } catch (err) {
       console.error('Update failed:', err);
@@ -441,7 +482,7 @@ function QuickRepliesManagementCard() {
     }
   };
 
-  const handleCancelEdit = () => { setEditingId(null); setShowAddForm(false); setFormTitle(''); setFormContent(''); };
+  const handleCancelEdit = () => { setEditingId(null); setShowAddForm(false); resetForm(); };
 
   if (loading) {
     return (
@@ -492,7 +533,7 @@ function QuickRepliesManagementCard() {
           <span className="text-xs text-zinc-400">{filteredCount} 條語錄</span>
         </div>
         <button
-          onClick={() => { setShowAddForm(true); setEditingId(null); setFormTitle(''); setFormContent(''); setFormCategory(filterCategory !== 'all' ? filterCategory : displayCategories[0] || 'general'); }}
+          onClick={() => { setShowAddForm(true); setEditingId(null); resetForm(); setFormCategory(filterCategory !== 'all' ? filterCategory : displayCategories[0] || 'general'); }}
           className="flex items-center gap-1 text-xs font-medium text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 flex-shrink-0"
         >
           <Plus className="w-3.5 h-3.5" /> 新增語錄
@@ -507,10 +548,17 @@ function QuickRepliesManagementCard() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
             <div>
               <Label htmlFor="qr-category" className="sr-only">分類</Label>
-              <select id="qr-category" value={formCategory} onChange={(e) => setFormCategory(e.target.value)}
-                className="text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+              <input
+                id="qr-category"
+                list="qr-category-options"
+                value={formCategory}
+                onChange={(e) => setFormCategory(e.target.value)}
+                placeholder="自訂分類"
+                className="w-full sm:w-36 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1.5 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+              <datalist id="qr-category-options">
                 {displayCategories.map((c) => <option key={c} value={c}>{categoryLabels[c] || c}</option>)}
-              </select>
+              </datalist>
             </div>
             <div className="flex-1">
               <Label htmlFor="qr-title" className="sr-only">標題</Label>
@@ -522,6 +570,56 @@ function QuickRepliesManagementCard() {
             <Label htmlFor="qr-content" className="sr-only">內容</Label>
             <textarea id="qr-content" value={formContent} onChange={(e) => setFormContent(e.target.value)} placeholder="內容..." rows={2}
               className="w-full text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" />
+          </div>
+          <div className="rounded-lg border border-zinc-200 bg-white p-2.5 dark:border-zinc-700 dark:bg-zinc-900/60">
+            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+              <ImageIcon className="h-3.5 w-3.5" />
+              圖片附件
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[1fr_160px_auto]">
+              <input
+                type="url"
+                value={formAttachmentUrl}
+                onChange={(e) => setFormAttachmentUrl(e.target.value)}
+                placeholder="圖片 URL"
+                className="text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+              <input
+                type="text"
+                value={formAttachmentLabel}
+                onChange={(e) => setFormAttachmentLabel(e.target.value)}
+                placeholder="圖片名稱"
+                className="text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+              <button
+                type="button"
+                onClick={handleAddAttachment}
+                disabled={!formAttachmentUrl.trim()}
+                className="inline-flex items-center justify-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                加入
+              </button>
+            </div>
+            {formAttachments.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {formAttachments.map((att, index) => (
+                  <div key={`${att.url}-${index}`} className="group relative flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-1.5 pr-7 dark:border-zinc-700 dark:bg-zinc-800">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={att.url} alt={att.label || '快捷回覆圖片'} className="h-10 w-10 rounded object-cover" />
+                    <span className="max-w-32 truncate text-[11px] text-zinc-500 dark:text-zinc-400">{att.label || att.url}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAttachment(index)}
+                      aria-label="移除圖片附件"
+                      className="absolute right-1 top-1 rounded p-0.5 text-zinc-400 hover:bg-zinc-200 hover:text-red-500 dark:hover:bg-zinc-700"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2 justify-end">
             <button onClick={handleCancelEdit} className="text-xs font-medium text-zinc-500 px-3 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-700">取消</button>
@@ -546,10 +644,16 @@ function QuickRepliesManagementCard() {
               </p>
               {items.map((item) => (
                 <div key={item.id} className="flex items-start gap-2 md:gap-3 p-2 md:p-2.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-zinc-700 dark:text-zinc-200 truncate">{item.title}</p>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-2">{item.content}</p>
-                  </div>
+	                  <div className="flex-1 min-w-0">
+	                    <p className="text-xs font-medium text-zinc-700 dark:text-zinc-200 truncate">{item.title}</p>
+	                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-2">{item.content}</p>
+	                    {item.attachments && item.attachments.length > 0 && (
+	                      <div className="mt-1 flex items-center gap-1.5 text-[10px] text-indigo-500">
+	                        <ImageIcon className="h-3 w-3" />
+	                        {item.attachments.filter((att) => att.type === 'image').length} 張圖片
+	                      </div>
+	                    )}
+	                  </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                     <button onClick={() => handleEdit(item)} className="p-1.5 text-zinc-400 hover:text-indigo-500"><Pencil className="w-3 h-3" /></button>
                     <button onClick={() => handleDelete(item.id)} disabled={saving} className="p-1.5 text-zinc-400 hover:text-red-500 disabled:opacity-50"><Trash2 className="w-3 h-3" /></button>

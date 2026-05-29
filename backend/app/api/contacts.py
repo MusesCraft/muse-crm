@@ -18,6 +18,7 @@ from ..utils.permissions import get_current_user, require_role
 from ..utils.scope import apply_contact_scope
 from ..services.contact_service import ContactService, infer_contact_priority
 from ..services.merge_service import MergeService
+from ..realtime.emitter import emit_contact_updated
 
 
 def _check_contact_access(contact):
@@ -342,56 +343,66 @@ def update_contact(contact_id):
     if not data:
         return jsonify({'error': '缺少請求資料'}), 400
 
+    changed_fields = []
+
+    def set_if_changed(field, value):
+        current = getattr(contact, field)
+        if current != value and str(current) != str(value):
+            changed_fields.append(field)
+        setattr(contact, field, value)
+
     # 可更新的欄位
     if 'display_name' in data:
-        contact.display_name = data['display_name']
+        set_if_changed('display_name', data['display_name'])
     if 'notes' in data:
-        contact.notes = data['notes']
+        set_if_changed('notes', data['notes'])
     if 'source_channel' in data:
-        contact.source_channel = data['source_channel']
+        set_if_changed('source_channel', data['source_channel'])
     if 'source_type' in data:
-        contact.source_type = data['source_type']
+        set_if_changed('source_type', data['source_type'])
     if 'phone' in data:
-        contact.phone = data['phone']
+        set_if_changed('phone', data['phone'])
     if 'email' in data:
-        contact.email = data['email']
+        set_if_changed('email', data['email'])
     if 'external_crm_id' in data:
-        contact.external_crm_id = data['external_crm_id']
+        set_if_changed('external_crm_id', data['external_crm_id'])
     if 'intent' in data:
-        contact.intent = data['intent']
+        set_if_changed('intent', data['intent'])
     if 'budget_range' in data:
-        contact.budget_range = data['budget_range']
+        set_if_changed('budget_range', data['budget_range'])
     if 'preferred_products' in data:
-        contact.preferred_products = data['preferred_products']
+        set_if_changed('preferred_products', data['preferred_products'])
     if 'visit_date' in data:
         if data['visit_date']:
             try:
-                contact.visit_date = date.fromisoformat(data['visit_date'])
+                visit_date = date.fromisoformat(data['visit_date'])
             except ValueError:
                 return jsonify({'error': 'visit_date 格式必須為 YYYY-MM-DD'}), 400
         else:
-            contact.visit_date = None
+            visit_date = None
+        set_if_changed('visit_date', visit_date)
     if 'referral_source' in data:
-        contact.referral_source = data['referral_source']
+        set_if_changed('referral_source', data['referral_source'])
     if 'contact_status' in data:
-        contact.contact_status = data['contact_status']
+        set_if_changed('contact_status', data['contact_status'])
     if 'customer_identity' in data:
         valid_identities = ('designer', 'homeowner', 'dealer', 'contractor', 'unknown')
         if data['customer_identity'] and data['customer_identity'] not in valid_identities:
             return jsonify({'error': f'customer_identity 必須為 {", ".join(valid_identities)} 之一'}), 400
-        contact.customer_identity = data['customer_identity']
+        set_if_changed('customer_identity', data['customer_identity'])
     if 'sales_stage' in data:
         valid_stages = ('initial', 'evaluating', 'quoted', 'won', 'lost')
         if data['sales_stage'] and data['sales_stage'] not in valid_stages:
             return jsonify({'error': f'sales_stage 必須為 {", ".join(valid_stages)} 之一'}), 400
-        contact.sales_stage = data['sales_stage']
+        set_if_changed('sales_stage', data['sales_stage'])
     if 'assigned_to' in data:
         # 指派任務：需要 admin 或 manager 角色
         if user and user.role == 'user':
             return jsonify({'error': '權限不足，無法指派客戶'}), 403
-        contact.assigned_to = data['assigned_to']
+        set_if_changed('assigned_to', data['assigned_to'])
 
     db.session.commit()
+    emit_contact_updated(contact, changed_fields)
 
     return jsonify({
         'message': '客戶資料已更新',

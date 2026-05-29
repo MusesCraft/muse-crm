@@ -20,6 +20,13 @@ MODEL_PRICING = {
     'anthropic/claude-3.5-sonnet': {'input': Decimal('3.0'), 'output': Decimal('15.0')},
     'openai/gpt-4': {'input': Decimal('30.0'), 'output': Decimal('60.0')},
     'google/gemini-2.0-flash-lite-001': {'input': Decimal('0.075'), 'output': Decimal('0.3')},
+    # ChatGPT / Codex subscription OAuth models（訂閱帳號成本不以 API token 單價估算）
+    'gpt-5.5': {'input': Decimal('0'), 'output': Decimal('0')},
+    'gpt-5.4': {'input': Decimal('0'), 'output': Decimal('0')},
+    'gpt-5.4-mini': {'input': Decimal('0'), 'output': Decimal('0')},
+    'gpt-5.3-codex': {'input': Decimal('0'), 'output': Decimal('0')},
+    'gpt-5.3-codex-spark': {'input': Decimal('0'), 'output': Decimal('0')},
+    'gpt-5.2': {'input': Decimal('0'), 'output': Decimal('0')},
     # 別名對應
     'google/gemini-2.0-flash-lite': {'input': Decimal('0.075'), 'output': Decimal('0.3')},
 }

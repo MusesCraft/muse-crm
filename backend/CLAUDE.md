@@ -100,14 +100,14 @@ railway link -p "muse-crm-backend" -s "inspiring-strength"
 railway up --detach
 
 # 驗證
-curl -s https://inspiring-strength-production-a8ca.up.railway.app/api/v1/health
+curl -s https://backend-production-5171.up.railway.app/api/v1/health
 
 # 測試 API 端點（帶認證）
-TOKEN=$(curl -s -X POST https://inspiring-strength-production-a8ca.up.railway.app/api/v1/auth/login \
+TOKEN=$(curl -s -X POST https://backend-production-5171.up.railway.app/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@muse-crm.com","password":"Muse@2026!"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+  -d '{"email":"admin@muse-crm.com","password": "***"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
-curl -s https://inspiring-strength-production-a8ca.up.railway.app/api/v1/contacts \
+curl -s https://backend-production-5171.up.railway.app/api/v1/contacts \
   -H "Authorization: Bearer $TOKEN"
 ```
 

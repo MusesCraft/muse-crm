@@ -39,9 +39,9 @@ export function AssignMenu({ conversationId, agents, currentHandlerId, onAssigne
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-500/20">
+        <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#7C3AED] dark:text-purple-300 bg-[#F5F3FF] dark:bg-purple-500/10 border border-[#DDD6FE] dark:border-purple-500/20 rounded-lg hover:bg-[#EDE9FE] dark:hover:bg-purple-500/20">
           <UserCheck className="w-3.5 h-3.5" />
-          分配
+          轉交
           {busy && <Loader2 className="w-3 h-3 animate-spin" />}
         </button>
       </PopoverTrigger>
@@ -56,7 +56,7 @@ export function AssignMenu({ conversationId, agents, currentHandlerId, onAssigne
               onClick={() => handleAssign(a.id)}
               disabled={busy}
               className={`w-full text-left px-2 py-1.5 text-xs rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
-                a.id === currentHandlerId ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-zinc-700 dark:text-zinc-200'
+                a.id === currentHandlerId ? 'bg-[#F5F3FF] dark:bg-purple-500/10 text-[#7C3AED] dark:text-purple-300' : 'text-zinc-700 dark:text-zinc-200'
               }`}
             >
               {a.name}

@@ -26,7 +26,7 @@ class MockWebhookSender:
     
     def __init__(self, base_url: str = 'http://localhost:5000', app_secret: str = None):
         self.base_url = base_url.rstrip('/')
-        self.webhook_url = f"{self.base_url}/api/webhook"
+        self.webhook_url = f"{self.base_url}/api/v1/webhook"
         self.app_secret = app_secret or 'test_app_secret'  # 預設測試 secret
         
     def _generate_signature(self, payload: str) -> str:

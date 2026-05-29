@@ -57,13 +57,13 @@ class BaseConfig:
         CORS_ORIGINS = _cors_env
     elif os.environ.get('RAILWAY_ENVIRONMENT'):
         # Railway 部署：限制為前端域名
-        CORS_ORIGINS = 'https://miraculous-flow-production-e93d.up.railway.app'
+        CORS_ORIGINS = 'https://frontend-production-0866.up.railway.app'
     else:
         CORS_ORIGINS = '*'  # 本地開發允許所有來源
 
     # Celery
-    CELERY_BROKER_URL = REDIS_URL
-    CELERY_RESULT_BACKEND = REDIS_URL
+    CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', REDIS_URL)
+    CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', REDIS_URL)
 
     # 進銷存系統（muse-inventory）
     INVENTORY_API_URL = os.environ.get('INVENTORY_API_URL', 'http://localhost:3003/api')
@@ -126,8 +126,11 @@ class TestingConfig(BaseConfig):
     SECRET_KEY = 'test-secret-key'
     JWT_SECRET_KEY = 'test-jwt-secret-key'
 
-    # 測試用 PostgreSQL（避免 JSONB 兼容性問題）
-    SQLALCHEMY_DATABASE_URI = 'postgresql://muse:muse_dev@localhost:5432/muse_crm_test'
+    # 測試用 PostgreSQL（避免 JSONB 兼容性問題）。可用 TEST_DATABASE_URL 覆蓋。
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        'TEST_DATABASE_URL',
+        'postgresql://muse:muse_dev@localhost:5432/muse_crm_test',
+    )
 
     # 測試時不需要真實的 API keys
     OPENROUTER_API_KEY = 'test-key'

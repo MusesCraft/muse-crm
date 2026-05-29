@@ -32,6 +32,16 @@ def _safe_params():
     return {k: v for k, v in request.args.to_dict().items() if k in _ALLOWED_LIST_PARAMS}
 
 
+# ── Compatibility / Overview ──
+
+@api_bp.route('/inventory', methods=['GET'])
+@login_required
+def inventory_root():
+    """Compatibility endpoint for legacy smoke checks; returns inventory overview."""
+    resp = inventory_client.get('/inventory/overview')
+    return _proxy_response(resp)
+
+
 # ── Products ──
 
 @api_bp.route('/inventory/products', methods=['GET'])

@@ -5,20 +5,20 @@ import { cn } from '@/lib/utils';
 // PR-2 對話狀態 + 既有 action / 衍生狀態
 const statusStyles: Record<string, string> = {
   // Conversation 新 enum
-  unassigned: 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400',
-  active: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400',
-  waiting_customer: 'bg-sky-500/10 text-sky-600 border-sky-500/20 dark:text-sky-400',
-  escalated: 'bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-400',
-  supervisor_taken: 'bg-purple-500/10 text-purple-600 border-purple-500/20 dark:text-purple-400',
-  resolved: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20 dark:text-indigo-400',
-  closed: 'bg-zinc-500/10 text-zinc-600 border-zinc-500/20 dark:text-zinc-400',
+  unassigned: 'bg-[#F5F3FF] text-[#7C3AED] border-[#DDD6FE] dark:bg-indigo-500/10 dark:text-indigo-300 dark:border-indigo-500/20',
+  active: 'bg-[#EFF6FF] text-[#2563EB] border-blue-200 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20',
+  waiting_customer: 'bg-[#EFF6FF] text-[#2563EB] border-blue-200 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20',
+  escalated: 'bg-red-50 text-[#DC2626] border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20',
+  supervisor_taken: 'bg-[#F5F3FF] text-[#7C3AED] border-[#DDD6FE] dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20',
+  resolved: 'bg-green-50 text-[#16A34A] border-green-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20',
+  closed: 'bg-zinc-100 text-[#6B7280] border-zinc-200 dark:bg-zinc-500/10 dark:text-zinc-400 dark:border-zinc-500/20',
   // 衍生狀態（前端 list 篩選用）
-  silent: 'bg-zinc-500/10 text-zinc-500 border-zinc-400/20 dark:text-zinc-400',
-  unanswered: 'bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400',
+  silent: 'bg-zinc-100 text-[#6B7280] border-zinc-200 dark:bg-zinc-500/10 dark:text-zinc-400 dark:border-zinc-500/20',
+  unanswered: 'bg-[#FEF3C7] text-[#92400E] border-amber-200 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20',
   // Action 狀態
-  pending: 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400',
-  completed: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20 dark:text-indigo-400',
-  overdue: 'bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-400',
+  pending: 'bg-[#FEF3C7] text-[#92400E] border-amber-200 dark:text-amber-400',
+  completed: 'bg-green-50 text-[#16A34A] border-green-200 dark:text-emerald-400',
+  overdue: 'bg-red-50 text-[#DC2626] border-red-200 dark:text-red-400',
 };
 
 const statusLabels: Record<string, string> = {

@@ -1,0 +1,61 @@
+{
+  "frontend": "https://frontend-production-0866.up.railway.app",
+  "api": "https://backend-production-5171.up.railway.app/api/v1",
+  "conversation_id": "6fb8aec0-03a5-407f-844a-aed67a44d092",
+  "contact_id": "4dcd9332-a91e-40be-959e-9e5fb91b879a",
+  "contact_name": "王設計師",
+  "old_identity": "designer",
+  "test_identity": "homeowner",
+  "api_after_patch_identity": "homeowner",
+  "before_contains_old_identity": false,
+  "after_wait_contains_new_identity": false,
+  "after_wait_contains_old_identity": false,
+  "after_reload_contains_new_identity": false,
+  "screenshots": {
+    "before": "/Users/muse/Developer/muse-crm/qa-output-17/tag-sync-playwright/before.png",
+    "after_wait": "/Users/muse/Developer/muse-crm/qa-output-17/tag-sync-playwright/after-wait.png",
+    "after_reload": "/Users/muse/Developer/muse-crm/qa-output-17/tag-sync-playwright/after-reload.png"
+  },
+  "api_request_summary": [
+    [
+      "REQ",
+      "GET",
+      "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    ],
+    [
+      "REQ",
+      "GET",
+      "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=team"
+    ],
+    [
+      "RES",
+      200,
+      "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    ],
+    [
+      "RES",
+      200,
+      "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=team"
+    ],
+    [
+      "REQ",
+      "GET",
+      "https://backend-production-5171.up.railway.app/api/v1/contacts/4dcd9332-a91e-40be-959e-9e5fb91b879a"
+    ],
+    [
+      "RES",
+      200,
+      "https://backend-production-5171.up.railway.app/api/v1/contacts/4dcd9332-a91e-40be-959e-9e5fb91b879a"
+    ],
+    [
+      "REQ",
+      "GET",
+      "https://backend-production-5171.up.railway.app/api/v1/contacts/4dcd9332-a91e-40be-959e-9e5fb91b879a"
+    ],
+    [
+      "RES",
+      200,
+      "https://backend-production-5171.up.railway.app/api/v1/contacts/4dcd9332-a91e-40be-959e-9e5fb91b879a"
+    ]
+  ]
+}

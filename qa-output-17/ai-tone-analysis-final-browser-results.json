@@ -1,0 +1,135 @@
+{
+  "timestamp": "2026-05-28T03:52:24.019Z",
+  "scope": {
+    "FRONT": "https://frontend-production-0866.up.railway.app",
+    "API": "https://backend-production-5171.up.railway.app/api/v1",
+    "conversation_id": "6fb8aec0-03a5-407f-844a-aed67a44d092",
+    "contact": "王設計師"
+  },
+  "results": [
+    {
+      "area": "Setup",
+      "step": "target",
+      "status": "PASS",
+      "detail": "王設計師 6fb8aec0-03a5-407f-844a-aed67a44d092"
+    },
+    {
+      "area": "Browser Detail",
+      "step": "selected conversation not contact page",
+      "status": "PASS",
+      "detail": "https://frontend-production-0866.up.railway.app/inbox"
+    },
+    {
+      "area": "Browser AI",
+      "step": "AI sidebar visible",
+      "status": "PASS",
+      "detail": "跳到主要內容 | MUSE |  | 主選單 |  | 收件匣 | 客戶 | 報價 | 儀表板 | 待辦事項 | 庫存 | 知識庫 | 設定 | A |  | Admin |  | admin@muse-crm.com |  | 視圖 |  | 我的對話 | 待認領 | 團隊視圖 | 已解決 | 已關閉 | 收件匣 | 全部狀態 | 待認領 | 活躍 | 等待客戶 | 已求援 | 主管接管 | 已解決 | 已關閉 | 全部渠道 | Messenger | Instagram | LINE | 王 | 王設計師 | 5月12日 | 已求援 |  | 當然可以，週六我們在內湖展間 10:00-18:00 開放 |  | 陳 | 陳屋主 | 5月12日 | 待認領 |  | 當然可以，週六我們在內湖展間 10:00-18:00 開放 |  | 林 | 林建材行 | 5月12日 | 主管接管 |  | 當然可以，週六我們在內湖展間 10:00-18:00 開放 |  | 張 | 張師傅 | 5月12日 | 已解決 |  | 當然可以，週六我們在內湖展間 "
+    },
+    {
+      "area": "Browser AI",
+      "step": "deep analyze button visible",
+      "status": "PASS",
+      "detail": "深度分析"
+    },
+    {
+      "area": "Browser AI",
+      "step": "POST /analyze captured",
+      "status": "WARN",
+      "detail": "none"
+    },
+    {
+      "area": "Browser AI",
+      "step": "analysis visible after click",
+      "status": "WARN",
+      "detail": "panel content"
+    }
+  ],
+  "issues": [],
+  "apiEvents": [
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/auth/me"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=team"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/ai/summary?conversation_id=6fb8aec0-03a5-407f-844a-aed67a44d092"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations/6fb8aec0-03a5-407f-844a-aed67a44d092"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/contacts/4dcd9332-a91e-40be-959e-9e5fb91b879a"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations/6fb8aec0-03a5-407f-844a-aed67a44d092"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/users"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/ai/knowledge-search?q=%E5%8F%AF%E4%BB%A5%E9%80%B1%E6%9C%AB%E7%9C%8B%E5%AF%A6%E5%93%81%E5%97%8E%EF%BC%9F&top_k=3"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations/6fb8aec0-03a5-407f-844a-aed67a44d092"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=team"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations/6fb8aec0-03a5-407f-844a-aed67a44d092"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations/6fb8aec0-03a5-407f-844a-aed67a44d092"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=team"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations/6fb8aec0-03a5-407f-844a-aed67a44d092"
+    }
+  ],
+  "consoleEvents": [],
+  "artifacts": [
+    "/Users/muse/Developer/muse-crm/qa-output-17/screenshots-ai-tone/07-inbox-conversation-selected-correct.png",
+    "/Users/muse/Developer/muse-crm/qa-output-17/screenshots-ai-tone/08-inbox-after-deep-analysis.png"
+  ]
+}

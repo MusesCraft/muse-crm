@@ -1,0 +1,310 @@
+{
+  "generatedAt": "2026-05-28T06:34:27.709Z",
+  "urls": {
+    "frontend": "https://frontend-production-0866.up.railway.app",
+    "backend": "https://backend-production-5171.up.railway.app/api/v1"
+  },
+  "buttonsInitial": [
+    {
+      "i": 2,
+      "text": "",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 3,
+      "text": "切換至淺色模式",
+      "title": "切換至淺色模式",
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 4,
+      "text": "登出",
+      "title": "登出",
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 5,
+      "text": "我的對話",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 6,
+      "text": "待認領",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 7,
+      "text": "團隊視圖",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 8,
+      "text": "已解決",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 9,
+      "text": "已關閉",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 15,
+      "text": "王\n王設計師\n5月12日\n已求援\n\n當然可以，週六我們在內湖展間 10:00-18:00 開放",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 16,
+      "text": "陳\n陳屋主\n5月12日\n待認領\n\n當然可以，週六我們在內湖展間 10:00-18:00 開放",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 17,
+      "text": "林\n林建材行\n5月12日\n主管接管\n\n當然可以，週六我們在內湖展間 10:00-18:00 開放",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 18,
+      "text": "張\n張師傅\n5月12日\n已解決\n\n當然可以，週六我們在內湖展間 10:00-18:00 開放",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    }
+  ],
+  "buttonTextsAfter": [
+    {
+      "i": 2,
+      "text": "",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 3,
+      "text": "切換至淺色模式",
+      "title": "切換至淺色模式",
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 4,
+      "text": "登出",
+      "title": "登出",
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 5,
+      "text": "我的對話",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 6,
+      "text": "待認領",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 7,
+      "text": "團隊視圖",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 8,
+      "text": "已解決",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 9,
+      "text": "已關閉",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 15,
+      "text": "王\n王設計師\n5月12日\n已求援\n\n當然可以，週六我們在內湖展間 10:00-18:00 開放",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 16,
+      "text": "陳\n陳屋主\n5月12日\n待認領\n\n當然可以，週六我們在內湖展間 10:00-18:00 開放",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 17,
+      "text": "林\n林建材行\n5月12日\n主管接管\n\n當然可以，週六我們在內湖展間 10:00-18:00 開放",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "i": 18,
+      "text": "張\n張師傅\n5月12日\n已解決\n\n當然可以，週六我們在內湖展間 10:00-18:00 開放",
+      "title": null,
+      "aria": null,
+      "disabled": false,
+      "visible": true
+    }
+  ],
+  "probeResults": [
+    {
+      "button": "溫和回覆",
+      "present": false
+    },
+    {
+      "button": "報價說明",
+      "present": false
+    },
+    {
+      "button": "邀約丈量",
+      "present": false
+    }
+  ],
+  "quickRepliesPanelOpened": false,
+  "termPresence": {
+    "機器人": false,
+    "Bot": false,
+    "bot": false,
+    "callback": false,
+    "inline keyboard": false,
+    "互動按鈕": false,
+    "WebApp": false,
+    "按鈕回覆": false
+  },
+  "api": {
+    "allConversationsStatus": 200,
+    "allConversationCount": 4,
+    "telegramConversationsStatus": 200,
+    "telegramConversationCount": 0,
+    "unsupportedSend": {
+      "status": 500,
+      "body": "{\n  \"error\": \"Database Error\",\n  \"message\": \"\\u8cc7\\u6599\\u5eab\\u64cd\\u4f5c\\u5931\\u6557\\uff0c\\u8acb\\u7a0d\\u5f8c\\u91cd\\u8a66\"\n}\n",
+      "conversationId": "6fb8aec0-03a5-407f-844a-aed67a44d092"
+    }
+  },
+  "network": {
+    "failedRequests": [
+      {
+        "url": "https://frontend-production-0866.up.railway.app/contacts/7e112dd2-040b-4250-96ac-9738e24c13f4?_rsc=17wme",
+        "method": "GET",
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "https://frontend-production-0866.up.railway.app/contacts/f39c18b0-5566-4203-8159-181e5e280f8f?_rsc=17wme",
+        "method": "GET",
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "https://frontend-production-0866.up.railway.app/contacts/4dcd9332-a91e-40be-959e-9e5fb91b879a?_rsc=17wme",
+        "method": "GET",
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "https://frontend-production-0866.up.railway.app/contacts/bef65102-99ed-467b-b453-2cf5d57ae6c0?_rsc=17wme",
+        "method": "GET",
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "https://frontend-production-0866.up.railway.app/contacts/7e112dd2-040b-4250-96ac-9738e24c13f4?_rsc=tm4db",
+        "method": "GET",
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "https://frontend-production-0866.up.railway.app/contacts/4dcd9332-a91e-40be-959e-9e5fb91b879a?_rsc=tm4db",
+        "method": "GET",
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "https://frontend-production-0866.up.railway.app/contacts/f39c18b0-5566-4203-8159-181e5e280f8f?_rsc=tm4db",
+        "method": "GET",
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "https://frontend-production-0866.up.railway.app/contacts/bef65102-99ed-467b-b453-2cf5d57ae6c0?_rsc=tm4db",
+        "method": "GET",
+        "failure": "net::ERR_ABORTED"
+      }
+    ],
+    "apiResponses": [
+      {
+        "url": "https://backend-production-5171.up.railway.app/api/v1/auth/me",
+        "status": 200,
+        "method": "GET"
+      },
+      {
+        "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=mine",
+        "status": 200,
+        "method": "GET"
+      },
+      {
+        "url": "https://backend-production-5171.up.railway.app/api/v1/dashboard/stats",
+        "status": 200,
+        "method": "GET"
+      },
+      {
+        "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=team",
+        "status": 200,
+        "method": "GET"
+      }
+    ]
+  },
+  "consoleMessages": [],
+  "artifacts": [
+    "bot-buttons-inbox-initial.png",
+    "bot-buttons-conversation-detail.png"
+  ]
+}

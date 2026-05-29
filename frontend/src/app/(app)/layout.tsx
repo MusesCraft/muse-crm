@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/sidebar';
 import { useAuth } from '@/lib/auth';
 import { LoadingSpinner } from '@/components/loading';
-import { Menu } from 'lucide-react';
+import { Menu, ShieldAlert } from 'lucide-react';
+import { canAccessRoute } from '@/lib/rbac';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -52,6 +54,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return null;
   }
 
+  const canAccessCurrentRoute = canAccessRoute(user?.role, pathname);
+
   return (
     <div className="min-h-screen">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-indigo-600 focus:text-white focus:rounded-lg">
@@ -83,8 +87,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         id="main-content"
         className={`min-h-screen transition-all duration-200 ${sidebarCollapsed ? 'md:ml-[68px]' : 'md:ml-[220px]'}`}
       >
-        {children}
+        {canAccessCurrentRoute ? children : <ForbiddenPage />}
       </main>
+    </div>
+  );
+}
+
+function ForbiddenPage() {
+  return (
+    <div className="min-h-screen flex items-center justify-center px-6">
+      <div className="w-full max-w-md text-center">
+        <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 flex items-center justify-center">
+          <ShieldAlert className="h-6 w-6" />
+        </div>
+        <p className="text-sm font-semibold text-red-600 dark:text-red-400">403</p>
+        <h1 className="mt-2 text-xl font-bold text-zinc-900 dark:text-white">沒有權限存取此頁面</h1>
+        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+          這個功能需要更高的角色權限，請改用側欄中可用的功能。
+        </p>
+      </div>
     </div>
   );
 }

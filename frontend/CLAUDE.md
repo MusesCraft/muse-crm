@@ -72,7 +72,7 @@ railway link -p "muse-crm-frontend"
 railway up --detach
 
 # 3. 瀏覽器驗證
-# https://miraculous-flow-production-e93d.up.railway.app
+# https://frontend-production-0866.up.railway.app
 ```
 
 不使用 `npm run dev` 本地跑。所有測試直接在 Railway 線上環境進行。

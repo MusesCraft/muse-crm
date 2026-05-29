@@ -99,9 +99,10 @@ npm run dev
 
 | 端點 | 方法 | 說明 |
 |------|------|------|
-| `/api/health` | GET | 健康檢查 |
-| `/api/webhook` | GET/POST | Meta Webhook |
-| `/api/inbox/conversations` | GET | 對話列表 |
+| `/api/health` | GET | 輕量健康檢查 |
+| `/api/v1/health` | GET | 完整健康檢查（DB/Redis/Meta） |
+| `/api/v1/webhook` | GET/POST | Meta Webhook |
+| `/api/v1/inbox/conversations` | GET | 對話列表 |
 | `/api/contacts` | GET | 客戶列表 |
 | `/api/actions` | GET | 待辦動作 |
 | `/api/dashboard/overview` | GET | Dashboard 統計 |
@@ -111,7 +112,7 @@ npm run dev
 
 在 Meta 開發者後台設定 Webhook URL：
 ```
-https://your-domain.com/api/webhook
+https://your-domain.com/api/v1/webhook
 ```
 
 驗證 Token: 使用 `.env` 中的 `META_VERIFY_TOKEN`

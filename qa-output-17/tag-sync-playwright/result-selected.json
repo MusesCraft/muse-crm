@@ -1,0 +1,110 @@
+{
+  "conversation_id": "6fb8aec0-03a5-407f-844a-aed67a44d092",
+  "contact_id": "4dcd9332-a91e-40be-959e-9e5fb91b879a",
+  "contact_name": "王設計師",
+  "old_identity": "designer",
+  "test_identity": "homeowner",
+  "patched_identity": "homeowner",
+  "before_has_old": true,
+  "after_wait_has_new": false,
+  "after_wait_has_old": true,
+  "after_reload_has_new": true,
+  "visible_before_excerpt": [
+    "王設計師",
+    "王設計師",
+    "王設計師",
+    "客戶身份",
+    "designer"
+  ],
+  "visible_after_wait_excerpt": [
+    "王設計師",
+    "王設計師",
+    "王設計師",
+    "客戶身份",
+    "designer"
+  ],
+  "visible_after_reload_excerpt": [
+    "王設計師",
+    "王設計師",
+    "王設計師",
+    "客戶身份",
+    "homeowner"
+  ],
+  "apiLog": [
+    {
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=mine",
+      "ts": 1779885013826
+    },
+    {
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=team",
+      "ts": 1779885015524
+    },
+    {
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations/6fb8aec0-03a5-407f-844a-aed67a44d092",
+      "ts": 1779885018712
+    },
+    {
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/contacts/4dcd9332-a91e-40be-959e-9e5fb91b879a",
+      "ts": 1779885018730
+    },
+    {
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations/6fb8aec0-03a5-407f-844a-aed67a44d092",
+      "ts": 1779885018833
+    },
+    {
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations/6fb8aec0-03a5-407f-844a-aed67a44d092",
+      "ts": 1779885023629
+    },
+    {
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=team",
+      "ts": 1779885025680
+    },
+    {
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations/6fb8aec0-03a5-407f-844a-aed67a44d092",
+      "ts": 1779885028849
+    },
+    {
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations/6fb8aec0-03a5-407f-844a-aed67a44d092",
+      "ts": 1779885033755
+    },
+    {
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=mine",
+      "ts": 1779885035733
+    },
+    {
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=team",
+      "ts": 1779885037359
+    },
+    {
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations/6fb8aec0-03a5-407f-844a-aed67a44d092",
+      "ts": 1779885040476
+    },
+    {
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/contacts/4dcd9332-a91e-40be-959e-9e5fb91b879a",
+      "ts": 1779885040492
+    },
+    {
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations/6fb8aec0-03a5-407f-844a-aed67a44d092",
+      "ts": 1779885040597
+    }
+  ],
+  "screenshots": {
+    "before": "/Users/muse/Developer/muse-crm/qa-output-17/tag-sync-playwright/before-selected.png",
+    "after_wait": "/Users/muse/Developer/muse-crm/qa-output-17/tag-sync-playwright/after-wait-selected.png",
+    "after_reload": "/Users/muse/Developer/muse-crm/qa-output-17/tag-sync-playwright/after-reload-selected.png"
+  }
+}

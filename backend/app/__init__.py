@@ -67,12 +67,14 @@ def create_app(config_name: str = 'development') -> Flask:
     _configure_celery(app, celery)
 
     # 初始化 SocketIO（Redis message_queue 為可選，連不上也不阻塞啟動）
+    socketio_message_queue = None if app.config.get('TESTING') else app.config.get('REDIS_URL')
     try:
         socketio.init_app(
             app,
             cors_allowed_origins=cors_origins,
             async_mode='threading',
-            message_queue=app.config.get('REDIS_URL'),
+            manage_session=False,
+            message_queue=socketio_message_queue,
         )
     except Exception as _socketio_err:
         import logging
@@ -81,6 +83,7 @@ def create_app(config_name: str = 'development') -> Flask:
             app,
             cors_allowed_origins=cors_origins,
             async_mode='threading',
+            manage_session=False,
         )
     # 匯入事件處理器（確保註冊到 socketio）
     from .realtime import events  # noqa: F401

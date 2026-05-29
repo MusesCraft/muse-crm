@@ -1,0 +1,149 @@
+{
+  "timestamp": "2026-05-28T03:51:10.037Z",
+  "scope": {
+    "FRONT": "https://frontend-production-0866.up.railway.app",
+    "API": "https://backend-production-5171.up.railway.app/api/v1",
+    "conversation_id": "6fb8aec0-03a5-407f-844a-aed67a44d092",
+    "contact": "王設計師"
+  },
+  "latest_analysis": null,
+  "results": [
+    {
+      "area": "Setup",
+      "step": "conversation selected",
+      "status": "PASS",
+      "detail": "王設計師 6fb8aec0-03a5-407f-844a-aed67a44d092"
+    },
+    {
+      "area": "API Poll",
+      "step": "analysis count",
+      "status": "WARN",
+      "detail": "attempt=1; count=0"
+    },
+    {
+      "area": "API Poll",
+      "step": "analysis count",
+      "status": "WARN",
+      "detail": "attempt=2; count=0"
+    },
+    {
+      "area": "API Poll",
+      "step": "analysis count",
+      "status": "WARN",
+      "detail": "attempt=3; count=0"
+    },
+    {
+      "area": "API Poll",
+      "step": "analysis count",
+      "status": "WARN",
+      "detail": "attempt=4; count=0"
+    },
+    {
+      "area": "API Poll",
+      "step": "analysis count",
+      "status": "WARN",
+      "detail": "attempt=5; count=0"
+    },
+    {
+      "area": "API Poll",
+      "step": "analysis count",
+      "status": "WARN",
+      "detail": "attempt=6; count=0"
+    },
+    {
+      "area": "API Poll",
+      "step": "analysis count",
+      "status": "WARN",
+      "detail": "attempt=7; count=0"
+    },
+    {
+      "area": "API Poll",
+      "step": "analysis count",
+      "status": "WARN",
+      "detail": "attempt=8; count=0"
+    },
+    {
+      "area": "API Poll",
+      "step": "analysis count",
+      "status": "WARN",
+      "detail": "attempt=9; count=0"
+    },
+    {
+      "area": "API Poll",
+      "step": "analysis count",
+      "status": "WARN",
+      "detail": "attempt=10; count=0"
+    },
+    {
+      "area": "API Poll",
+      "step": "analysis count",
+      "status": "WARN",
+      "detail": "attempt=11; count=0"
+    },
+    {
+      "area": "API Poll",
+      "step": "analysis count",
+      "status": "WARN",
+      "detail": "attempt=12; count=0"
+    },
+    {
+      "area": "Browser Inbox",
+      "step": "team view contains contact",
+      "status": "PASS",
+      "detail": "王設計師"
+    },
+    {
+      "area": "Browser Detail",
+      "step": "AI panel visible",
+      "status": "PASS",
+      "detail": "跳到主要內容 | MUSE |  | 主選單 |  | 收件匣 | 客戶 | 報價 | 儀表板 | 待辦事項 | 庫存 | 知識庫 | 設定 | A |  | Admin |  | admin@muse-crm.com |  | 返回客戶列表 | 王 | 王設計師 | 已求援 | walk_in | manual | 首次互動：2026年5月12日 | 最後活躍：2026年5月12日 | 0 次對話 | 基本資料 | 編輯 | 電話 | 0912345678 | Email | — | 意圖 | 未設定 | 預算範圍 | 未設定 | 客戶狀態 | 新客戶 | 身份 / 銷售階段 | 客戶身份 | 設計師 | 銷售階段 | 評估中 | 對話歷史 | (1) | Messenger | "
+    },
+    {
+      "area": "Browser AI",
+      "step": "deep analyze button visible",
+      "status": "WARN",
+      "detail": "button=深度分析"
+    }
+  ],
+  "issues": [
+    {
+      "severity": "High",
+      "area": "API Analyze",
+      "title": "No persisted analysis after extended 60s poll",
+      "detail": "conversation=6fb8aec0-03a5-407f-844a-aed67a44d092",
+      "artifact": null
+    }
+  ],
+  "apiEvents": [
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/auth/me"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=mine"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/dashboard/stats"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/inbox/conversations?page=1&per_page=20&view=team"
+    },
+    {
+      "method": "GET",
+      "status": 200,
+      "url": "https://backend-production-5171.up.railway.app/api/v1/contacts/4dcd9332-a91e-40be-959e-9e5fb91b879a"
+    }
+  ],
+  "consoleEvents": [],
+  "artifacts": [
+    "/Users/muse/Developer/muse-crm/qa-output-17/screenshots-ai-tone/04-team-view.png",
+    "/Users/muse/Developer/muse-crm/qa-output-17/screenshots-ai-tone/05-selected-conversation-ai-panel.png"
+  ]
+}

@@ -1,8 +1,9 @@
 """
-MUSE CRM — LLM Service (OpenRouter API)
+MUSE CRM — LLM Service
 
-透過 OpenRouter API 呼叫 LLM 進行分析。
-支援 Claude 3.5 Sonnet 作為主要模型，GPT-4 作為 fallback。
+透過 OpenRouter 或 ChatGPT Codex provider 呼叫 LLM 進行分析。
+OpenRouter 支援 Claude 3.5 Sonnet 作為主要模型，GPT-4 作為 fallback；
+Codex provider 透過 ChatGPT 訂閱帳號的 Responses API 執行。
 
 功能：
 1. chat_completion() — 通用聊天補全
@@ -40,6 +41,9 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+CODEX_DEFAULT_BASE_URL = "https://chatgpt.com/backend-api/codex"
+CODEX_DEFAULT_MODEL = "gpt-5.5"
+CODEX_DEFAULT_TRIAGE_MODEL = "gpt-5.4-mini"
 
 # 模型優先順序：主要 → fallback（可擴展 chain）
 MODEL_PRIMARY = "anthropic/claude-3.5-sonnet"
@@ -91,7 +95,7 @@ class LLMBudgetExceededError(LLMServiceError):
 
 class LLMService:
     """
-    OpenRouter LLM 服務。
+    LLM 語意分析服務。
     
     使用方式：
         service = LLMService()
@@ -107,13 +111,22 @@ class LLMService:
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = MAX_RETRIES,
     ):
+        self.provider = os.environ.get("LLM_PROVIDER", "openrouter").strip().lower() or "openrouter"
+        self.base_url = os.environ.get("CODEX_BASE_URL", CODEX_DEFAULT_BASE_URL).rstrip("/")
+        self.codex_auth_source = os.environ.get("CODEX_AUTH_SOURCE", "hermes").strip().lower() or "hermes"
+        self.codex_model = os.environ.get("CODEX_MODEL", CODEX_DEFAULT_MODEL).strip() or CODEX_DEFAULT_MODEL
+        self.codex_triage_model = (
+            os.environ.get("CODEX_TRIAGE_MODEL", CODEX_DEFAULT_TRIAGE_MODEL).strip()
+            or CODEX_DEFAULT_TRIAGE_MODEL
+        )
+
         self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
-        if not self.api_key:
+        if self.provider != "codex" and not self.api_key:
             logger.warning("OPENROUTER_API_KEY 未設定，LLM 服務將無法使用")
 
-        self.primary_model = primary_model
+        self.primary_model = self.codex_model if self.provider == "codex" and primary_model == MODEL_PRIMARY else primary_model
         self.fallback_model = fallback_model
-        self.model_chain = model_chain or LLM_MODEL_CHAIN
+        self.model_chain = [self.primary_model] if self.provider == "codex" else (model_chain or LLM_MODEL_CHAIN)
         self.timeout = timeout
         self.max_retries = max_retries
         
@@ -216,15 +229,21 @@ class LLMService:
         Raises:
             LLMServiceError: API 呼叫失敗
         """
-        if not self.api_key:
+        if self.provider == "codex":
+            if not os.environ.get("CODEX_ACCESS_TOKEN") and self.codex_auth_source != "hermes":
+                logger.warning("Codex provider 已啟用，但 CODEX_ACCESS_TOKEN 未設定")
+        elif not self.api_key:
             raise LLMServiceError("OPENROUTER_API_KEY 未設定")
 
         # 建立 fallback chain：指定模型在前，其他 chain 成員在後（去重）
         primary = model or self.primary_model
-        models_to_try = [primary]
-        for m in self.model_chain:
-            if m not in models_to_try:
-                models_to_try.append(m)
+        if self.provider == "codex":
+            models_to_try = [primary]
+        else:
+            models_to_try = [primary]
+            for m in self.model_chain:
+                if m not in models_to_try:
+                    models_to_try.append(m)
 
         last_error = None
 
@@ -344,10 +363,38 @@ class LLMService:
         response_format: Optional[Dict],
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
-        執行單次 API 請求。
+        依 provider 分流執行單次 API 請求。
         
         Returns:
             Tuple[回應內容字典, 使用資訊字典]
+        """
+        if self.provider == "codex":
+            return self._make_codex_request(
+                messages=messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format=response_format,
+            )
+
+        return self._make_openrouter_request(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            response_format=response_format,
+        )
+
+    def _make_openrouter_request(
+        self,
+        messages: List[Dict[str, str]],
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        response_format: Optional[Dict],
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """
+        執行單次 OpenRouter Chat Completions API 請求。
         """
         payload: Dict[str, Any] = {
             "model": model,
@@ -424,6 +471,175 @@ class LLMService:
         # 嘗試解析 JSON 回應
         parsed_content = self._parse_json_response(content)
         
+        return parsed_content, usage_info
+
+    def _resolve_codex_access_token(self) -> str:
+        """
+        取得 Codex OAuth access token。
+
+        優先使用 CODEX_ACCESS_TOKEN；若 CODEX_AUTH_SOURCE=hermes，嘗試從
+        hermes_cli 目前登入的 Codex OAuth runtime credentials 取得。
+        """
+        env_token = os.environ.get("CODEX_ACCESS_TOKEN")
+        if env_token:
+            return env_token
+
+        auth_source = os.environ.get("CODEX_AUTH_SOURCE", self.codex_auth_source).strip().lower()
+        if auth_source != "hermes":
+            raise LLMServiceError(
+                "Codex access token 未設定：請設定 CODEX_ACCESS_TOKEN，"
+                f"或將 CODEX_AUTH_SOURCE 設為 hermes（目前為 {auth_source or 'empty'}）"
+            )
+
+        try:
+            from hermes_cli.auth import resolve_codex_runtime_credentials
+        except ImportError as e:
+            raise LLMServiceError(
+                "無法載入 hermes_cli.auth；請安裝 Hermes CLI，"
+                "或改用 CODEX_ACCESS_TOKEN 直接注入 Codex token"
+            ) from e
+
+        try:
+            creds = resolve_codex_runtime_credentials(refresh_if_expiring=True)
+        except Exception as e:
+            raise LLMServiceError(f"透過 Hermes 取得 Codex OAuth token 失敗: {e}") from e
+
+        access_token = creds.get("api_key")
+        if not access_token:
+            raise LLMServiceError("Hermes Codex credentials 未包含 api_key")
+
+        base_url = creds.get("base_url")
+        if base_url:
+            self.base_url = str(base_url).rstrip("/")
+
+        return access_token
+
+    @staticmethod
+    def _messages_to_codex_payload(messages: List[Dict[str, str]]) -> Dict[str, Any]:
+        """
+        將 OpenAI Chat Completions messages 轉為 Codex Responses API payload。
+        """
+        instruction_parts: List[str] = []
+        input_messages: List[Dict[str, Any]] = []
+
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if not isinstance(content, str):
+                content = json.dumps(content, ensure_ascii=False)
+
+            if role in ("system", "developer"):
+                if content.strip():
+                    instruction_parts.append(content.strip())
+                continue
+
+            input_messages.append({
+                "role": role if role in ("user", "assistant") else "user",
+                "content": [
+                    {"type": "input_text", "text": content}
+                ],
+            })
+
+        return {
+            "instructions": "\n\n".join(instruction_parts),
+            "input": input_messages,
+            "store": False,
+            "reasoning": {"effort": "medium", "summary": "auto"},
+            "include": ["reasoning.encrypted_content"],
+        }
+
+    @staticmethod
+    def _extract_codex_text(data: Dict[str, Any]) -> str:
+        """從 Codex Responses API 回應中抽出文字。"""
+        output_text = data.get("output_text")
+        if isinstance(output_text, str) and output_text.strip():
+            return output_text
+
+        text_parts: List[str] = []
+        for item in data.get("output", []) or []:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") != "message":
+                continue
+            for content in item.get("content", []) or []:
+                if not isinstance(content, dict):
+                    continue
+                if content.get("type") == "output_text" and isinstance(content.get("text"), str):
+                    text_parts.append(content["text"])
+
+        return "\n".join(part for part in text_parts if part.strip())
+
+    def _make_codex_request(
+        self,
+        messages: List[Dict[str, str]],
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        response_format: Optional[Dict],
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """
+        執行單次 ChatGPT Codex Responses API 請求。
+        """
+        access_token = self._resolve_codex_access_token()
+        payload = self._messages_to_codex_payload(messages)
+        payload["model"] = model
+        if max_tokens:
+            payload["max_output_tokens"] = max_tokens
+
+        start_time = time.time()
+
+        try:
+            response = self._session.post(
+                f"{self.base_url}/responses",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json",
+                    "session_id": "bbcrm-semantic-analysis",
+                    "x-client-request-id": "bbcrm-semantic-analysis",
+                },
+                timeout=self.timeout,
+            )
+        except requests.Timeout:
+            raise LLMTimeoutError(f"請求超時 ({self.timeout}s)")
+        except requests.ConnectionError as e:
+            raise LLMServiceError(f"Codex 連線失敗: {e}")
+        except requests.RequestException as e:
+            raise LLMServiceError(f"Codex 請求失敗: {e}")
+
+        elapsed_ms = int((time.time() - start_time) * 1000)
+
+        if response.status_code == 429:
+            raise LLMRateLimitError("Codex API 被限速 (429)")
+
+        if response.status_code != 200:
+            raise LLMServiceError(
+                f"Codex API 回應錯誤 ({response.status_code}): "
+                f"{response.text[:200]}"
+            )
+
+        try:
+            data = response.json()
+        except (json.JSONDecodeError, ValueError) as e:
+            raise LLMResponseParseError(f"Codex 回應 JSON 解析失敗: {e}")
+
+        content = self._extract_codex_text(data)
+        if not content:
+            raise LLMResponseParseError("Codex API 回應中沒有可解析文字內容")
+
+        usage_data = data.get("usage", {}) or {}
+        input_tokens = usage_data.get("input_tokens", 0)
+        output_tokens = usage_data.get("output_tokens", 0)
+        total_tokens = usage_data.get("total_tokens") or (input_tokens + output_tokens)
+        usage_info = {
+            "model_used": data.get("model", model),
+            "tokens_used": total_tokens,
+            "prompt_tokens": input_tokens,
+            "completion_tokens": output_tokens,
+            "processing_time_ms": elapsed_ms,
+        }
+
+        parsed_content = self._parse_json_response(content)
         return parsed_content, usage_info
     
     @staticmethod
@@ -590,12 +806,13 @@ class LLMService:
             Tuple[分類結果 {"intent": ..., "identity": ...}, 使用資訊]
         """
         messages = build_quick_triage_prompt(message_content)
+        model = self.codex_triage_model if self.provider == "codex" else TRIAGE_MODEL
         
         # 直接呼叫 _call_with_retry，指定輕量模型，不走 fallback
         try:
             result, usage = self._call_with_retry(
                 messages=messages,
-                model=TRIAGE_MODEL,
+                model=model,
                 temperature=0.0,
                 max_tokens=128,
                 response_format=None,

@@ -23,7 +23,7 @@ from ..tasks.session_tasks import analyze_message
 from ..tasks.analysis_tasks import quick_triage_message
 from ..services.merge_service import MergeService
 from ..services.notification_service import NotificationService
-from ..realtime.emitter import emit_scoped
+from ..realtime.emitter import emit_new_message
 from ..channels import ChannelEvent
 from ..channels.registry import channel_registry
 from ..utils.media_storage import download_and_store
@@ -99,10 +99,13 @@ def webhook_receive():
 
     # ── 先回 200 給 Meta，再背景處理（避免超時重發） ──
     for event in channel_events:
-        _webhook_executor.submit(
-            _handle_channel_event_with_context,
-            current_app._get_current_object(), event,
-        )
+        if current_app.config.get('TESTING'):
+            _handle_channel_event(event)
+        else:
+            _webhook_executor.submit(
+                _handle_channel_event_with_context,
+                current_app._get_current_object(), event,
+            )
 
     logger.info(f"✅ Meta Webhook 收到 {len(channel_events)} 個訊息事件")
     return 'OK', 200
@@ -227,19 +230,7 @@ def _handle_channel_event(event: 'ChannelEvent'):
 
             # ── 5.6 WebSocket 即時推送 new_message ──
             try:
-                contact_name = contact.display_name or '未知客戶'
-                emit_scoped(
-                    event='new_message',
-                    data={
-                        'contact_id': str(contact.id),
-                        'contact_name': contact_name,
-                        'channel': channel,
-                        'content_preview': message_text[:100] if message_text else '',
-                        'conversation_id': str(conversation.id),
-                    },
-                    assigned_user_id=getattr(contact, 'assigned_to', None),
-                    team_id=None,
-                )
+                emit_new_message(message=message, conversation=conversation, contact=contact)
             except Exception as ws_err:
                 logger.warning(f"[webhook] WebSocket 推送失敗: {ws_err}")
 

@@ -20,7 +20,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored === 'light' || stored === 'dark') return stored;
     }
-    return 'light';
+    return 'dark';
   });
   const mountedRef = useRef(false);
 
@@ -39,7 +39,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setTheme = (t: Theme) => setThemeState(t);
   const toggleTheme = () => setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
 
-  // Keep theme state centralized; the root element is updated after mount.
+  // Prevent flash: render nothing until mounted (server renders with dark class via suppressHydrationWarning)
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
       {children}

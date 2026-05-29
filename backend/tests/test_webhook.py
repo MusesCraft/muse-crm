@@ -72,7 +72,7 @@ class WebhookTestCase(unittest.TestCase):
     
     def test_webhook_verification_success(self):
         """測試 Webhook 驗證成功"""
-        response = self.client.get('/api/v1/webhook', query_string={
+        response = self.client.get('/api/webhook', query_string={
             'hub.mode': 'subscribe',
             'hub.verify_token': self.verify_token,
             'hub.challenge': 'test_challenge'
@@ -83,7 +83,7 @@ class WebhookTestCase(unittest.TestCase):
     
     def test_webhook_verification_failure(self):
         """測試 Webhook 驗證失敗"""
-        response = self.client.get('/api/v1/webhook', query_string={
+        response = self.client.get('/api/webhook', query_string={
             'hub.mode': 'subscribe',
             'hub.verify_token': 'wrong_token',
             'hub.challenge': 'test_challenge'
@@ -91,7 +91,7 @@ class WebhookTestCase(unittest.TestCase):
         
         self.assertEqual(response.status_code, 403)
     
-    @patch('app.channels.meta_adapter.meta_api.get_user_profile')
+    @patch('app.utils.meta_api.meta_api.get_user_profile')
     def test_messenger_text_message(self, mock_profile):
         """測試 Messenger 文字訊息處理"""
         # Mock profile API 回應
@@ -124,7 +124,7 @@ class WebhookTestCase(unittest.TestCase):
         
         # 發送 webhook
         response = self.client.post(
-            '/api/v1/webhook',
+            '/api/webhook',
             data=payload_str,
             headers={
                 'Content-Type': 'application/json',
@@ -166,7 +166,7 @@ class WebhookTestCase(unittest.TestCase):
         self.assertEqual(message.content, 'Hello, this is a test message!')
         self.assertEqual(message.meta_message_id, 'msg_123')
     
-    @patch('app.channels.meta_adapter.meta_api.get_user_profile')
+    @patch('app.utils.meta_api.meta_api.get_user_profile')
     def test_instagram_message(self, mock_profile):
         """測試 Instagram DM 訊息處理"""
         # Mock profile API 回應
@@ -200,7 +200,7 @@ class WebhookTestCase(unittest.TestCase):
         
         # 發送 webhook
         response = self.client.post(
-            '/api/v1/webhook',
+            '/api/webhook',
             data=payload_str,
             headers={
                 'Content-Type': 'application/json',
@@ -249,7 +249,7 @@ class WebhookTestCase(unittest.TestCase):
         signature = self._generate_signature(payload_str)
         
         response = self.client.post(
-            '/api/v1/webhook',
+            '/api/webhook',
             data=payload_str,
             headers={
                 'Content-Type': 'application/json',
@@ -295,7 +295,7 @@ class WebhookTestCase(unittest.TestCase):
         signature = self._generate_signature(payload_str)
         
         response = self.client.post(
-            '/api/v1/webhook',
+            '/api/webhook',
             data=payload_str,
             headers={
                 'Content-Type': 'application/json',
@@ -337,7 +337,7 @@ class WebhookTestCase(unittest.TestCase):
         
         # 發送第一次
         response1 = self.client.post(
-            '/api/v1/webhook',
+            '/api/webhook',
             data=payload_str,
             headers={
                 'Content-Type': 'application/json',
@@ -348,7 +348,7 @@ class WebhookTestCase(unittest.TestCase):
         
         # 發送第二次（模擬 Meta 重發）
         response2 = self.client.post(
-            '/api/v1/webhook',
+            '/api/webhook',
             data=payload_str,
             headers={
                 'Content-Type': 'application/json',
@@ -378,7 +378,7 @@ class WebhookTestCase(unittest.TestCase):
         payload_str = json.dumps(payload)
         
         response = self.client.post(
-            '/api/v1/webhook',
+            '/api/webhook',
             data=payload_str,
             headers={
                 'Content-Type': 'application/json',
@@ -390,7 +390,7 @@ class WebhookTestCase(unittest.TestCase):
     
     def test_health_check(self):
         """測試健康檢查端點"""
-        response = self.client.get('/api/v1/health')
+        response = self.client.get('/api/health')
         self.assertEqual(response.status_code, 200)
         
         data = response.get_json()

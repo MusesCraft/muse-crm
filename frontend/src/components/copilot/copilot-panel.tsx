@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { aiCopilotApi, type Analysis } from '@/lib/api';
-import { useAsync, useWebSocketEvent } from '@/lib/hooks';
+import { useAsync } from '@/lib/hooks';
 import { openSse } from '@/lib/sse';
 import { inboxApi, type Conversation } from '@/lib/api';
 import { IntentCard } from './intent-card';
@@ -52,13 +52,13 @@ function extractIntentFields(analyses: Analysis[] | undefined): {
 
 export function CopilotPanel({ conversationId }: Props) {
   // 對話摘要
-  const { data: summaryData, refetch: refetchSummary } = useAsync(
+  const { data: summaryData } = useAsync(
     () => aiCopilotApi.getSummary(conversationId),
     [conversationId],
   );
 
   // 對話內容（要用其中的 analyses / 最後客戶訊息）
-  const { data: conv, refetch: refetchConversation } = useAsync<Conversation>(
+  const { data: conv } = useAsync<Conversation>(
     () => inboxApi.getConversation(conversationId),
     [conversationId],
   );
@@ -67,13 +67,6 @@ export function CopilotPanel({ conversationId }: Props) {
   const [recordId, setRecordId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [streamMode, setStreamMode] = useState(true);
-
-  useWebSocketEvent<{ conversation_id?: string | number }>('analysis_complete', (payload) => {
-    if (String(payload.conversation_id) === String(conversationId)) {
-      refetchSummary();
-      refetchConversation();
-    }
-  });
 
   // 注意：切換對話時用父層 key={conversationId} 重新掛載本元件，
   // 即可自然重置上述 state，無須在 effect 內 setState。
@@ -144,8 +137,8 @@ export function CopilotPanel({ conversationId }: Props) {
   );
 
   return (
-    <div className="p-3 space-y-3 bg-[#F7F8FA] dark:bg-zinc-950">
-      <SummaryCard summary={summaryData?.summary || ''} />
+    <div className="p-3 space-y-3">
+      {intentFields.risks.length > 0 && <RiskAlert risks={intentFields.risks} />}
 
       <IntentCard
         intent={intentFields.intent}
@@ -154,9 +147,11 @@ export function CopilotPanel({ conversationId }: Props) {
         urgency={intentFields.urgency}
       />
 
-      <div className="bg-white dark:bg-zinc-900 border border-[#E5E7EB] dark:border-zinc-800 rounded-lg p-3">
+      <SummaryCard summary={summaryData?.summary || ''} />
+
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3">
         <div className="flex items-center justify-between mb-2">
-          <h4 className="text-[10px] uppercase tracking-wider text-[#6B7280] dark:text-zinc-400">建議動作 / 回覆草稿</h4>
+          <h4 className="text-[10px] uppercase tracking-wider text-zinc-400">回覆草稿</h4>
           <label className="flex items-center gap-1 text-[10px] text-zinc-400 select-none">
             <input
               type="checkbox"
@@ -170,7 +165,7 @@ export function CopilotPanel({ conversationId }: Props) {
         <button
           onClick={handleGenerate}
           disabled={generating}
-          className="w-full flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium bg-[#7C3AED] text-white rounded-lg hover:bg-[#6D28D9] disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50"
         >
           {generating && <Loader2 className="w-3 h-3 animate-spin" />}
           {generating ? '生成中…' : '產生回覆草稿'}
@@ -187,10 +182,8 @@ export function CopilotPanel({ conversationId }: Props) {
         </div>
       </div>
 
-      {intentFields.risks.length > 0 && <RiskAlert risks={intentFields.risks} />}
-
-      <div className="bg-white dark:bg-zinc-900 border border-[#E5E7EB] dark:border-zinc-800 rounded-lg p-3">
-        <h4 className="text-[10px] uppercase tracking-wider text-[#6B7280] dark:text-zinc-400 mb-2">知識庫推薦</h4>
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3">
+        <h4 className="text-[10px] uppercase tracking-wider text-zinc-400 mb-2">知識庫推薦</h4>
         {kbLoading ? (
           <p className="text-[11px] text-zinc-400 flex items-center gap-1">
             <Loader2 className="w-3 h-3 animate-spin" />

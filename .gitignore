@@ -47,15 +47,6 @@ venv.bak/
 # Claude Code agent state
 .claude/
 
-# Railway 環境變數備份（含敏感資料）
-.railway-backup-*.json
-.railway-vars-*.env
-.railway-pg-password
-
-# Agent/local scratch state
-.codex/
-*.before_all_features.pptx
-
 # Jupyter Notebook
 .ipynb_checkpoints
 

@@ -8,7 +8,6 @@ import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { useState, useEffect } from 'react';
 import { dashboardApi } from '@/lib/api';
-import { canAccessRoute } from '@/lib/rbac';
 
 const navItems = [
   { href: '/inbox', label: '收件匣', icon: Inbox, badgeKey: 'active_conversations' as const },
@@ -40,12 +39,9 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
     return false;
   });
   const [badges, setBadges] = useState<Record<string, number>>({});
-  const canViewDashboard = canAccessRoute(user?.role, '/dashboard');
 
   // Fetch badge counts from API
   useEffect(() => {
-    if (!canViewDashboard) return;
-
     dashboardApi.getStats()
       .then((stats) => {
         setBadges({
@@ -54,7 +50,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
         });
       })
       .catch(() => {});
-  }, [canViewDashboard]);
+  }, []);
 
   const toggleCollapsed = () => {
     const next = !collapsed;
@@ -85,7 +81,6 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
     : 'U';
 
   const sidebarWidth = collapsed ? 'w-[68px]' : 'w-[220px]';
-  const visibleNavItems = navItems.filter((item) => canAccessRoute(user?.role, item.href));
 
   return (
     <aside className={cn(
@@ -127,7 +122,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
         <p className="px-4 pt-4 pb-1 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">主選單</p>
       )}
       <nav className={cn('flex-1 py-2 space-y-0.5', collapsed ? 'px-2' : 'px-3')}>
-        {visibleNavItems.map((item) => {
+        {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
           return (
             <Link
@@ -147,7 +142,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
               {!collapsed && (
                 <>
                   <span className="flex-1">{item.label}</span>
-                  {canViewDashboard && item.badgeKey && badges[item.badgeKey] > 0 && (
+                  {item.badgeKey && badges[item.badgeKey] > 0 && (
                     <span className={cn(
                       'text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5',
                       isActive

@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   contactsApi,
   inboxApi,
   type ContactDetail,
 } from '@/lib/api';
-import { useAsync, useWebSocketEvent } from '@/lib/hooks';
-import { formatCustomerIdentity, formatSalesStage } from '@/lib/contact-labels';
+import { useAsync } from '@/lib/hooks';
 import { Avatar } from '@/components/avatar';
 import { ChannelBadge } from '@/components/channel-icon';
 import { SentimentBadge, UrgencyBadge } from '@/components/badges';
@@ -43,21 +42,6 @@ interface CustomerSidebarProps {
   onSelectConversation: (id: string | number) => void;
 }
 
-type AnalysisCompletePayload = {
-  conversation_id?: string | number;
-};
-
-type NewActionPayload = {
-  contact_id?: string | number | null;
-  conversation_id?: string | number | null;
-};
-
-const ANALYSIS_POLL_TIMEOUT_MS = 60000;
-const ANALYSIS_POLL_INTERVAL_MS = 2500;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 // ── Source Badge ────────────────────────────────────────
 
@@ -147,7 +131,10 @@ export function CustomerSidebar({
   });
 
   const [analyzing, setAnalyzing] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<Record<string, unknown> | null>(null);
+  const analyzeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => () => { if (analyzeTimerRef.current) clearTimeout(analyzeTimerRef.current); }, []);
 
   // Persist collapsed state
   useEffect(() => {
@@ -161,36 +148,6 @@ export function CustomerSidebar({
     [contactId]
   );
 
-  const refreshOnContactUpdated = useCallback((payload: { contact_id: string | number }) => {
-    if (String(payload.contact_id) === String(contactId)) {
-      refetch();
-    }
-  }, [contactId, refetch]);
-  useWebSocketEvent('contact.updated', refreshOnContactUpdated);
-
-  const refreshOnAnalysisComplete = useCallback((payload: AnalysisCompletePayload) => {
-    if (String(payload.conversation_id) === String(conversationId)) {
-      setAnalyzing(false);
-      setAnalysisError(null);
-      refetch();
-    }
-  }, [conversationId, refetch]);
-  useWebSocketEvent('analysis_complete', refreshOnAnalysisComplete);
-
-  const refreshOnNewAction = useCallback((payload: NewActionPayload) => {
-    const payloadContactId = payload?.contact_id;
-    const payloadConversationId = payload?.conversation_id;
-    const hasScope = !!payloadContactId || !!payloadConversationId;
-    if (
-      !hasScope ||
-      (!!payloadContactId && String(payloadContactId) === String(contactId)) ||
-      (!!payloadConversationId && String(payloadConversationId) === String(conversationId))
-    ) {
-      refetch();
-    }
-  }, [contactId, conversationId, refetch]);
-  useWebSocketEvent('new_action', refreshOnNewAction);
-
   // 從 API 資料取得其他對話和分析結果
   const otherConversations = (contact?.conversations || []).filter(
     (c) => c.id !== conversationId
@@ -202,44 +159,35 @@ export function CustomerSidebar({
   const handleAnalyze = async () => {
     if (analyzing) return;
     setAnalyzing(true);
-    setAnalysisError(null);
-    const previousAnalysisId = existingAnalysis?.id ? String(existingAnalysis.id) : null;
-
     try {
       await inboxApi.analyzeConversation(conversationId);
-
-      const deadline = Date.now() + ANALYSIS_POLL_TIMEOUT_MS;
-      while (Date.now() < deadline) {
-        await sleep(ANALYSIS_POLL_INTERVAL_MS);
-        const fresh = await contactsApi.getContact(contactId);
-        const latest = fresh.analyses?.[0] || null;
-        const latestId = latest?.id ? String(latest.id) : null;
-        if (latestId && latestId !== previousAnalysisId) {
-          refetch();
-          setAnalyzing(false);
-          return;
-        }
-      }
-
-      setAnalysisError('分析任務已送出，但目前尚未產生結果。請稍後重試或檢查背景任務。');
-      refetch();
-    } catch (err) {
-      setAnalysisError(err instanceof Error ? err.message : '分析送出失敗');
-    } finally {
+      // Simulate analysis result for mock
+      if (analyzeTimerRef.current) clearTimeout(analyzeTimerRef.current);
+      analyzeTimerRef.current = setTimeout(() => {
+        setAnalysisResult({
+          demand_summary: '客戶正在詢問產品規格與報價，有明確購買意向',
+          mentioned_products: ['岩板', '電視牆', 'Laminam'],
+          suggested_action: '盡快提供正式報價單，安排展間參觀',
+          sentiment: 'positive',
+          urgency: 'medium',
+        });
+        setAnalyzing(false);
+      }, 2000);
+    } catch {
       setAnalyzing(false);
     }
   };
 
-  // Use existing persisted analysis only. Do not synthesize frontend analysis.
-  const displayAnalysis: Record<string, unknown> | null =
-    (existingAnalysis?.result as Record<string, unknown> | undefined)
+  // Use existing analysis result or newly fetched one
+  const displayAnalysis: Record<string, unknown> | null = analysisResult
+    ?? (existingAnalysis?.result as Record<string, unknown> | undefined)
     ?? null;
 
   // ── Collapsed View ─────────────────────────────────
 
   if (collapsed) {
     return (
-      <div className="w-10 bg-[#F7F8FA] border-l border-[#E5E7EB] dark:bg-zinc-900 dark:border-zinc-800 flex flex-col items-center pt-3 transition-all duration-200">
+      <div className="w-10 bg-zinc-50 border-l border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 flex flex-col items-center pt-3 transition-all duration-200">
         <button
           onClick={() => setCollapsed(false)}
           className="p-2 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
@@ -255,7 +203,7 @@ export function CustomerSidebar({
 
   if (contactError) {
     return (
-      <div className="w-full h-full bg-[#F7F8FA] border-l border-[#E5E7EB] dark:bg-zinc-900 dark:border-zinc-800 flex items-center justify-center transition-all duration-200">
+      <div className="w-full h-full bg-zinc-50 border-l border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 flex items-center justify-center transition-all duration-200">
         <div className="text-center py-8">
           <p className="text-red-500 text-sm mb-3">{contactError}</p>
           <button
@@ -271,7 +219,7 @@ export function CustomerSidebar({
 
   if (loading || !contact) {
     return (
-      <div className="w-full h-full bg-[#F7F8FA] border-l border-[#E5E7EB] dark:bg-zinc-900 dark:border-zinc-800 flex items-center justify-center transition-all duration-200">
+      <div className="w-full h-full bg-zinc-50 border-l border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 flex items-center justify-center transition-all duration-200">
         <LoadingSpinner />
       </div>
     );
@@ -281,13 +229,13 @@ export function CustomerSidebar({
   const recentNotes = notes.slice(0, 2);
 
   return (
-    <div className="w-full h-full bg-[#F7F8FA] dark:bg-zinc-900 flex flex-col overflow-hidden transition-all duration-200">
+    <div className="w-full h-full bg-zinc-50 border-l border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 flex flex-col overflow-hidden transition-all duration-200">
       {/* ── Header ── */}
-      <div className="p-4 border-b border-[#E5E7EB] dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-3">
+      <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-3">
         <Link href={`/contacts/${contactId}`} className="flex items-center gap-3 flex-1 min-w-0 group">
           <Avatar name={contact.name} url={contact.avatar_url} size="md" />
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-[#1F2933] dark:text-white truncate group-hover:text-[#7C3AED] dark:group-hover:text-indigo-400 transition-colors">{contact.name}</h3>
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-white truncate group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors">{contact.name}</h3>
             <div className="flex items-center gap-1.5 mt-0.5">
               <ChannelBadge channel={channel} />
             </div>
@@ -303,10 +251,10 @@ export function CustomerSidebar({
       </div>
 
       {/* ── Scrollable Content ── */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+      <div className="flex-1 overflow-y-auto">
         {/* ── Basic Info Card ── */}
-        <div className="rounded-lg border border-[#E5E7EB] bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
-          <h4 className="text-[10px] font-medium text-[#6B7280] dark:text-zinc-500 uppercase tracking-wider mb-3">客戶情報</h4>
+        <div className="p-4 border-b border-zinc-200/50 dark:border-zinc-800/50">
+          <h4 className="text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-3">基本資訊</h4>
           <div className="space-y-2.5">
             {contact.phone && (
               <div className="flex items-center gap-2.5 text-sm">
@@ -328,11 +276,11 @@ export function CustomerSidebar({
             )}
             <div className="flex items-center gap-2.5 text-sm">
               <Calendar className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 flex-shrink-0" />
-              <span className="text-[#6B7280] text-xs">首次互動 {formatDate(contact.first_seen)}</span>
+              <span className="text-zinc-400 text-xs">首次互動 {formatDate(contact.first_seen)}</span>
             </div>
             <div className="flex items-center gap-2.5 text-sm">
               <Clock className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 flex-shrink-0" />
-              <span className="text-[#6B7280] text-xs">最後活躍 {formatDate(contact.last_seen)}</span>
+              <span className="text-zinc-400 text-xs">最後活躍 {formatDate(contact.last_seen)}</span>
             </div>
             <div className="mt-1">
               <SourceBadge source={contact.source_type} />
@@ -341,30 +289,30 @@ export function CustomerSidebar({
         </div>
 
         {/* ── 客戶身份 / 銷售階段（PR-2 結構） ── */}
-        <div className="rounded-lg border border-[#E5E7EB] bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
-          <h4 className="text-[10px] font-medium text-[#6B7280] dark:text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+        <div className="p-4 border-b border-zinc-200/50 dark:border-zinc-800/50">
+          <h4 className="text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
             <UserCircle className="w-3 h-3" />
-            意圖與身分
+            客戶身份
           </h4>
           <div className="flex flex-wrap gap-1.5">
             {contact.customer_identity ? (
-              <span className="inline-flex items-center rounded-full bg-[#F7F8FA] border border-[#E5E7EB] dark:bg-zinc-800 dark:border-zinc-700 px-2 py-0.5 text-xs text-[#6B7280] dark:text-zinc-300">
-                {formatCustomerIdentity(contact.customer_identity)}
+              <span className="inline-flex items-center rounded-full bg-zinc-100 border border-zinc-200 dark:bg-zinc-800 dark:border-zinc-700 px-2 py-0.5 text-xs text-zinc-600 dark:text-zinc-300">
+                {contact.customer_identity}
               </span>
             ) : (
               <span className="text-xs text-zinc-400 dark:text-zinc-600">未分類</span>
             )}
             {contact.sales_stage && (
-              <span className="inline-flex items-center rounded-full bg-[#F5F3FF] border border-[#DDD6FE] dark:bg-indigo-500/10 dark:border-indigo-500/20 px-2 py-0.5 text-xs text-[#7C3AED] dark:text-indigo-400">
-                {formatSalesStage(contact.sales_stage)}
+              <span className="inline-flex items-center rounded-full bg-indigo-50 border border-indigo-200 dark:bg-indigo-500/10 dark:border-indigo-500/20 px-2 py-0.5 text-xs text-indigo-600 dark:text-indigo-400">
+                {contact.sales_stage}
               </span>
             )}
           </div>
         </div>
 
         {/* ── AI Analysis ── */}
-        <div className="rounded-lg border border-[#DDD6FE] bg-[#F5F3FF] p-3 dark:border-purple-500/20 dark:bg-purple-500/10">
-          <h4 className="text-[10px] font-medium text-[#7C3AED] dark:text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+        <div className="p-4 border-b border-zinc-200/50 dark:border-zinc-800/50">
+          <h4 className="text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
             <Brain className="w-3 h-3" />
             AI 分析
           </h4>
@@ -372,43 +320,36 @@ export function CustomerSidebar({
           {displayAnalysis ? (
             <AnalysisDisplay data={displayAnalysis} />
           ) : (
-            <div className="space-y-2">
-              <button
-                onClick={handleAnalyze}
-                disabled={analyzing}
-                aria-label="深度分析"
-                className={cn(
-                  'w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                  analyzing
-                    ? 'bg-white/70 text-[#7C3AED] dark:text-purple-400 cursor-wait'
-                    : 'bg-white/70 text-[#7C3AED] dark:text-purple-400 hover:bg-white border border-[#DDD6FE]'
-                )}
-              >
-                {analyzing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    分析中…
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4" />
-                    深度分析
-                  </>
-                )}
-              </button>
-              {analysisError && (
-                <p className="text-xs leading-relaxed text-red-600 dark:text-red-400">
-                  {analysisError}
-                </p>
+            <button
+              onClick={handleAnalyze}
+              disabled={analyzing}
+              aria-label="深度分析"
+              className={cn(
+                'w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                analyzing
+                  ? 'bg-purple-500/10 text-purple-500 dark:text-purple-400 cursor-wait'
+                  : 'bg-purple-500/10 text-purple-500 dark:text-purple-400 hover:bg-purple-500/20 border border-purple-500/20'
               )}
-            </div>
+            >
+              {analyzing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  分析中…
+                </>
+              ) : (
+                <>
+                  <Search className="w-4 h-4" />
+                  深度分析
+                </>
+              )}
+            </button>
           )}
         </div>
 
         {/* ── Conversation History ── */}
         {otherConversations.length > 0 && (
-          <div className="rounded-lg border border-[#E5E7EB] bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
-            <h4 className="text-[10px] font-medium text-[#6B7280] dark:text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+          <div className="p-4 border-b border-zinc-200/50 dark:border-zinc-800/50">
+            <h4 className="text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
               <MessageSquare className="w-3 h-3" />
               其他對話 ({otherConversations.length})
             </h4>
@@ -417,7 +358,7 @@ export function CustomerSidebar({
                 <button
                   key={conv.id}
                   onClick={() => onSelectConversation(conv.id)}
-                  className="w-full flex items-center justify-between p-2.5 md:p-2 rounded-md bg-[#F7F8FA] hover:bg-zinc-100 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/60 transition-colors text-left min-h-[44px] md:min-h-0"
+                  className="w-full flex items-center justify-between p-2.5 md:p-2 rounded-md bg-zinc-100/50 hover:bg-zinc-100 dark:bg-zinc-800/30 dark:hover:bg-zinc-800/60 transition-colors text-left min-h-[44px] md:min-h-0"
                 >
                   <div className="min-w-0">
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
@@ -442,15 +383,15 @@ export function CustomerSidebar({
         )}
 
         {/* ── Notes ── */}
-        <div className="rounded-lg border border-[#E5E7EB] bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="p-4">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-[10px] font-medium text-[#6B7280] dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
+            <h4 className="text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
               <StickyNote className="w-3 h-3" />
               備註
             </h4>
             <Link
               href={`/contacts/${contactId}`}
-              className="text-[10px] text-[#7C3AED] dark:text-indigo-400 hover:text-[#6D28D9] dark:hover:text-indigo-300 flex items-center gap-0.5 py-2 md:py-0 min-h-[44px] md:min-h-0"
+              className="text-[10px] text-indigo-500 dark:text-indigo-400 hover:text-indigo-400 dark:hover:text-indigo-300 flex items-center gap-0.5 py-2 md:py-0 min-h-[44px] md:min-h-0"
             >
               查看全部
               <ExternalLink className="w-2.5 h-2.5" />

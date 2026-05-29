@@ -1,7 +1,7 @@
 import { chromium, type Page } from 'playwright';
 
-const BASE = process.env.E2E_BASE_URL || 'https://frontend-production-0866.up.railway.app';
-const API_BASE = process.env.E2E_API_BASE || 'https://backend-production-5171.up.railway.app/api/v1';
+const BASE = 'https://miraculous-flow-production-e93d.up.railway.app';
+const API_BASE = 'https://inspiring-strength-production-a8ca.up.railway.app/api/v1';
 const results: { page: string; status: string; detail: string }[] = [];
 
 function log(page: string, status: 'PASS' | 'FAIL' | 'WARN', detail: string) {

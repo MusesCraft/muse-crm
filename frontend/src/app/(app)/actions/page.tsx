@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { actionsApi, type Action } from '@/lib/api';
-import { useAsync, useWebSocketEvent } from '@/lib/hooks';
+import { useAsync } from '@/lib/hooks';
 import { Avatar } from '@/components/avatar';
 import { ContactPreview } from '@/components/contact-preview';
 import { PriorityBadge, TypeBadge } from '@/components/badges';
@@ -207,12 +207,6 @@ export default function ActionsPage() {
     () => actionsApi.getActions(),
     []
   );
-
-  const refreshOnNewAction = useCallback(() => {
-    setLocalActions(null);
-    refetch();
-  }, [refetch]);
-  useWebSocketEvent('new_action', refreshOnNewAction);
 
   const actions = useMemo(() => localActions ?? fetchedActions ?? [], [localActions, fetchedActions]);
 

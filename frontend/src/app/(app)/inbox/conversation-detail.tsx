@@ -1,18 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import {
-  actionsApi,
-  aiCopilotApi,
-  inboxApi,
-  ocrApi,
-  conversationOpsApi,
-  usersApi,
-  type Conversation,
-  type Message,
-  type Analysis,
-  type UserOption,
-} from '@/lib/api';
+import { inboxApi, ocrApi, conversationOpsApi, type Conversation, type Message, type Analysis } from '@/lib/api';
 import { useAsync, useWebSocketEvent } from '@/lib/hooks';
 import { useAuth } from '@/lib/auth';
 import { Avatar } from '@/components/avatar';
@@ -23,13 +12,10 @@ import { MessageBubble } from './message-bubble';
 import { SendBar, type SendBarHandle } from './send-bar';
 import { TakeOverBanner } from '@/components/inbox/take-over-banner';
 import { InternalNoteBubble } from '@/components/inbox/internal-note-bubble';
-import { AssignMenu } from '@/components/inbox/assign-menu';
 import { Button } from '@/components/ui/button';
-import { formatCustomerIdentity, formatSalesStage } from '@/lib/contact-labels';
 import {
   CheckCircle2,
   Clock,
-  PlusCircle,
   MessageSquare,
   Brain,
   ChevronDown,
@@ -39,7 +25,6 @@ import {
   X,
   Lightbulb,
   ChevronLeft,
-  WandSparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -48,13 +33,6 @@ interface ConversationDetailProps {
   onClose: () => void;
   /** 手機版返回列表 */
   onBack?: () => void;
-}
-
-const ANALYSIS_POLL_TIMEOUT_MS = 60000;
-const ANALYSIS_POLL_INTERVAL_MS = 2500;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function formatDateTime(dateStr: string): string {
@@ -70,13 +48,13 @@ function AnalysisCard({ analysis }: { analysis: Analysis }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-white border border-[#E5E7EB] dark:bg-zinc-800/50 dark:border-zinc-700/50 rounded-lg p-3">
+    <div className="bg-zinc-50 border border-zinc-200 dark:bg-zinc-800/50 dark:border-zinc-700/50 rounded-lg p-3">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between text-left"
       >
         <div className="flex items-center gap-2">
-          <Brain className="w-4 h-4 text-[#7C3AED]" />
+          <Brain className="w-4 h-4 text-purple-400" />
           <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{analysis.analysis_type}</span>
           <span className="text-xs text-zinc-400 dark:text-zinc-500">{analysis.model_used}</span>
         </div>
@@ -117,8 +95,8 @@ function AiSuggestionCard({
 
   if (!analyses || analyses.length === 0) {
     return (
-      <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-white dark:bg-zinc-800/50 border border-[#E5E7EB] dark:border-zinc-700/50">
-        <p className="text-xs text-[#6B7280] dark:text-zinc-500 flex items-center gap-1.5">
+      <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50">
+        <p className="text-xs text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
           <Lightbulb className="w-3.5 h-3.5" />
           點擊「深度分析」查看 AI 建議
         </p>
@@ -129,16 +107,16 @@ function AiSuggestionCard({
   if (!suggestedReply) return null;
 
   return (
-    <div className="mx-4 mb-2 px-3 py-2.5 rounded-lg bg-[#F5F3FF] dark:bg-purple-500/10 border border-[#DDD6FE] dark:border-purple-500/30">
+    <div className="mx-4 mb-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-purple-500/5 to-indigo-500/5 dark:from-purple-500/10 dark:to-indigo-500/10 border border-purple-500/20 dark:border-purple-500/30">
       <div className="flex items-center gap-1.5 mb-1.5">
-        <Lightbulb className="w-3.5 h-3.5 text-[#7C3AED] dark:text-purple-400" />
-        <span className="text-xs font-semibold text-[#7C3AED] dark:text-purple-400">AI 建議回覆</span>
+        <Lightbulb className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400" />
+        <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">AI 建議回覆</span>
       </div>
       <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed mb-2">{suggestedReply}</p>
       <div className="flex items-center gap-2">
         <button
           onClick={() => onUse(suggestedReply)}
-          className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-[#7C3AED] text-white hover:bg-[#6D28D9] transition-colors"
+          className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-purple-500 text-white hover:bg-purple-600 transition-colors"
         >
           使用此回覆
         </button>
@@ -187,14 +165,8 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
   const { user } = useAuth();
   const [resolving, setResolving] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [creatingAction, setCreatingAction] = useState(false);
-  const [generatingReply, setGeneratingReply] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
-  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
-  const [agents, setAgents] = useState<UserOption[]>([]);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrToast, setOcrToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -211,20 +183,10 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
     [conversationId]
   );
 
-  const canManage = user?.role === 'admin' || user?.role === 'manager';
-
   useEffect(() => {
     setLocalMessages([]);
-    setReplyToMessage(null);
-    setAnalysisError(null);
-    setActionNotice(null);
     prevMsgCountRef.current = 0;
   }, [conversationId]);
-
-  useEffect(() => {
-    if (!canManage) return;
-    usersApi.getAgents().then(setAgents).catch(() => setAgents([]));
-  }, [canManage]);
 
   useEffect(() => {
     msgCountRef.current = conv?.messages?.length || 0;
@@ -248,29 +210,18 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
     return () => clearInterval(id);
   }, [conversationId, refetch]);
 
-  // WebSocket：新訊息或對話狀態變動時刷新
+  // WebSocket：對話被接管/歸還/求援/已解決時刷新
   const refreshOnEvent = useCallback((data: unknown) => {
     const payload = data as { conversation_id?: string } | undefined;
     if (payload?.conversation_id && String(payload.conversation_id) === String(conversationId)) {
       refetch();
     }
   }, [conversationId, refetch]);
-  useWebSocketEvent('new_message', refreshOnEvent);
   useWebSocketEvent('conversation.assigned', refreshOnEvent);
   useWebSocketEvent('conversation.escalated', refreshOnEvent);
   useWebSocketEvent('conversation.taken_over', refreshOnEvent);
   useWebSocketEvent('conversation.returned', refreshOnEvent);
   useWebSocketEvent('conversation.resolved', refreshOnEvent);
-  useWebSocketEvent('session_closed', refreshOnEvent);
-  useWebSocketEvent('conversation.closed', refreshOnEvent);
-  useWebSocketEvent('analysis_complete', refreshOnEvent);
-  useWebSocketEvent('message.updated', refreshOnEvent);
-  useWebSocketEvent('message.edited', refreshOnEvent);
-  useWebSocketEvent('message.deleted', refreshOnEvent);
-  useWebSocketEvent('message.pinned', refreshOnEvent);
-  useWebSocketEvent('message.unpinned', refreshOnEvent);
-  useWebSocketEvent('message.reaction_updated', refreshOnEvent);
-  useWebSocketEvent('message.forwarded', refreshOnEvent);
 
   useEffect(() => {
     const count = (conv?.messages?.length || 0) + localMessages.length;
@@ -297,7 +248,6 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
 
   const handleMessageSent = useCallback((msg: Message) => {
     setLocalMessages((prev) => [...prev, msg]);
-    setReplyToMessage(null);
     lastSentRef.current = Date.now();
   }, []);
 
@@ -310,31 +260,6 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
   const handleAiSuggestionUse = useCallback((text: string) => {
     sendBarRef.current?.setTextAndFocus(text);
   }, []);
-
-  const handleGenerateReply = useCallback(async () => {
-    if (!conv || generatingReply) return;
-    setGeneratingReply(true);
-    setActionNotice(null);
-    try {
-      const existingReply = conv.analyses?.[0]?.result?.suggested_reply;
-      if (typeof existingReply === 'string' && existingReply.trim()) {
-        sendBarRef.current?.setTextAndFocus(existingReply);
-        return;
-      }
-
-      const result = await aiCopilotApi.getSuggestions(conv.id);
-      const firstSuggestion = result.data?.suggestions?.[0]?.text;
-      if (firstSuggestion) {
-        sendBarRef.current?.setTextAndFocus(firstSuggestion);
-      } else {
-        setActionNotice('目前沒有可用的回覆草稿');
-      }
-    } catch (err) {
-      setActionNotice(err instanceof Error ? err.message : '產生回覆失敗');
-    } finally {
-      setGeneratingReply(false);
-    }
-  }, [conv, generatingReply]);
 
   // ── OCR ──
 
@@ -389,51 +314,14 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
     }
   };
 
-  const handleCreateAction = async () => {
-    if (!conv || creatingAction) return;
-    setCreatingAction(true);
-    setActionNotice(null);
-    try {
-      await actionsApi.createAction({
-        contact_id: conv.contact_id,
-        conversation_id: conv.id,
-        action_type: 'followup',
-        description: `跟進 ${conv.contact?.name || '客戶'} 的本次對話`,
-        priority: conv.urgency === 'high' ? 'high' : 'medium',
-      });
-      setActionNotice('已建立待辦');
-    } catch (err) {
-      setActionNotice(err instanceof Error ? err.message : '建立待辦失敗');
-    } finally {
-      setCreatingAction(false);
-    }
-  };
-
   const handleAnalyze = async () => {
     if (!conv || analyzing) return;
     setAnalyzing(true);
-    setAnalysisError(null);
-    const previousAnalysisId = conv.analyses?.[0]?.id ? String(conv.analyses[0].id) : null;
-
     try {
       await inboxApi.analyzeConversation(conv.id);
-      const deadline = Date.now() + ANALYSIS_POLL_TIMEOUT_MS;
-      while (Date.now() < deadline) {
-        await sleep(ANALYSIS_POLL_INTERVAL_MS);
-        const fresh = await inboxApi.getConversation(conv.id);
-        const latest = fresh.analyses?.[0] || null;
-        const latestId = latest?.id ? String(latest.id) : null;
-        if (latestId && latestId !== previousAnalysisId) {
-          refetch();
-          setAnalyzing(false);
-          return;
-        }
-      }
-
-      setAnalysisError('分析任務已送出，但目前尚未產生結果。請稍後重試或檢查背景任務。');
-      refetch();
-    } catch (err) {
-      setAnalysisError(err instanceof Error ? err.message : '分析送出失敗');
+      setTimeout(() => refetch(), 2000);
+    } catch {
+      // ignore
     } finally {
       setAnalyzing(false);
     }
@@ -460,134 +348,74 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
   return (
     <>
       {/* Header */}
-      <div className="border-b border-[#E5E7EB] dark:border-zinc-800 px-4 sm:px-6 py-3 flex-shrink-0 bg-white dark:bg-zinc-900">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            {onBack && (
-              <button
-                onClick={onBack}
-                aria-label="返回列表"
-                className="md:hidden p-2 -ml-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800"
-              >
-                <ChevronLeft className="w-4 h-4 text-zinc-500" />
-              </button>
-            )}
-            <Avatar
-              name={conv.contact?.name || '未知'}
-              url={conv.contact?.avatar_url}
-              size="sm"
-            />
-            <div className="flex items-center gap-2 min-w-0 flex-wrap">
-              <h2 className="text-sm font-semibold text-[#1F2933] dark:text-white truncate">
-                {conv.contact?.name || '未知客戶'}
-              </h2>
+      <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 px-4 sm:px-6 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-2">
+          {onBack && (
+            <button
+              onClick={onBack}
+              aria-label="返回列表"
+              className="md:hidden p-2 -ml-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              <ChevronLeft className="w-4 h-4 text-zinc-500" />
+            </button>
+          )}
+          <Avatar
+            name={conv.contact?.name || '未知'}
+            url={conv.contact?.avatar_url}
+            size="sm"
+          />
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">
+              {conv.contact?.name || '未知客戶'}
+            </h2>
+            <div className="flex items-center gap-2">
               <ChannelBadge channel={conv.channel} />
               <StatusBadge status={conv.status} />
-              {conv.contact?.customer_identity && (
-                <span className="inline-flex items-center rounded-full border border-[#E5E7EB] bg-[#F7F8FA] px-2 py-0.5 text-xs text-[#6B7280] dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300">
-                  {formatCustomerIdentity(conv.contact.customer_identity)}
-                </span>
-              )}
-              {conv.contact?.sales_stage && (
-                <span className="inline-flex items-center rounded-full border border-[#DDD6FE] bg-[#F5F3FF] px-2 py-0.5 text-xs text-[#7C3AED] dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-300">
-                  {formatSalesStage(conv.contact.sales_stage)}
-                </span>
-              )}
             </div>
           </div>
-          <span className="hidden 2xl:flex items-center gap-1 text-xs text-zinc-400 dark:text-zinc-500">
-            <Clock className="w-3 h-3" />
-            建立於 {formatDateTime(conv.started_at)}
-          </span>
         </div>
 
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <div className="min-w-0 flex items-center gap-3 text-[11px] text-[#6B7280] dark:text-zinc-500">
-            <span className="truncate">
-              最後互動：{formatDateTime(conv.last_message?.timestamp || conv.started_at)}
+        <div className="flex items-center gap-2 sm:gap-4">
+          <div className="hidden sm:flex items-center gap-4 text-xs text-zinc-400 dark:text-zinc-500">
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {formatDateTime(conv.started_at)}
             </span>
-            <span className="hidden sm:inline-flex items-center gap-1 flex-shrink-0">
+            <span className="flex items-center gap-1">
               <MessageSquare className="w-3 h-3" />
               {conv.message_count} 則
             </span>
           </div>
 
-          <div className="flex items-center justify-end gap-2 flex-shrink-0 flex-wrap">
-            {canManage && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCreateAction}
-                disabled={creatingAction}
-                aria-label="建立待辦"
-                className="text-[#6B7280] hover:text-[#2563EB] dark:text-zinc-400 dark:hover:text-blue-400"
-              >
-                {creatingAction ? (
-                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                ) : (
-                  <PlusCircle className="w-3.5 h-3.5 mr-1" />
-                )}
-                建立待辦
-              </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAnalyze}
+            disabled={analyzing}
+            aria-label="深度分析"
+            className="text-zinc-500 hover:text-purple-500 dark:text-zinc-400 dark:hover:text-purple-400"
+          >
+            {analyzing ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+            ) : (
+              <Search className="w-3.5 h-3.5 mr-1" />
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleGenerateReply}
-              disabled={generatingReply}
-              aria-label="產生回覆"
-              className="text-[#6B7280] hover:text-[#7C3AED] dark:text-zinc-400 dark:hover:text-purple-400"
-            >
-              {generatingReply ? (
-                <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-              ) : (
-                <WandSparkles className="w-3.5 h-3.5 mr-1" />
-              )}
-              產生回覆
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleAnalyze}
-              disabled={analyzing}
-              aria-label="深度分析"
-              className="text-[#6B7280] hover:text-[#7C3AED] dark:text-zinc-400 dark:hover:text-purple-400"
-            >
-              {analyzing ? (
-                <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-              ) : (
-                <Search className="w-3.5 h-3.5 mr-1" />
-              )}
-              {analyzing ? '分析中...' : '深度分析'}
-            </Button>
+            {analyzing ? '分析中...' : '深度分析'}
+          </Button>
 
-            {isOpen && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleResolve}
-                disabled={resolving}
-                className="text-zinc-500 hover:text-emerald-500 dark:text-zinc-400 dark:hover:text-emerald-400"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                {resolving ? '處理中...' : '標記已處理'}
-              </Button>
-            )}
-            {canManage && agents.length > 0 && (
-              <AssignMenu
-                conversationId={conv.id}
-                agents={agents}
-                currentHandlerId={conv.current_handler_id}
-                onAssigned={refetch}
-              />
-            )}
-          </div>
+          {isOpen && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResolve}
+              disabled={resolving}
+              className="text-zinc-500 hover:text-emerald-500 dark:text-zinc-400 dark:hover:text-emerald-400"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+              {resolving ? '處理中...' : '標記已解決'}
+            </Button>
+          )}
         </div>
-        {actionNotice && (
-          <div className="mt-2 text-[11px] text-[#6B7280] dark:text-zinc-400">
-            {actionNotice}
-          </div>
-        )}
       </div>
 
       {/* Take Over Banner（主管接管中或求援狀態） */}
@@ -600,7 +428,7 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-1 bg-[#F7F8FA] dark:bg-zinc-900">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-1">
         {allMessages.length > 0 ? (
           allMessages.map((msg) => (
             msg.is_internal ? (
@@ -614,10 +442,6 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
               <MessageBubble
                 key={msg.id}
                 message={msg}
-                channel={conv.channel}
-                onReply={setReplyToMessage}
-                onRefresh={refetch}
-                onError={handleSendError}
                 onOcr={msg.message_type === 'image' && msg.media_url ? handleOcr : undefined}
               />
             )
@@ -630,8 +454,8 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
 
       {/* Analyses */}
       {conv.analyses && conv.analyses.length > 0 && (
-        <div className="border-t border-[#E5E7EB] dark:border-zinc-800 p-4 space-y-2 max-h-60 overflow-y-auto flex-shrink-0 bg-white dark:bg-zinc-900">
-          <h3 className="text-xs font-medium text-[#6B7280] uppercase tracking-wider mb-2">
+        <div className="border-t border-zinc-200 dark:border-zinc-800 p-4 space-y-2 max-h-60 overflow-y-auto flex-shrink-0">
+          <h3 className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">
             AI 分析摘要
           </h3>
           {conv.analyses.map((a) => (
@@ -641,12 +465,6 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
       )}
 
       {/* AI Suggestion */}
-      {analysisError && (
-        <div className="mx-4 mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
-          {analysisError}
-        </div>
-      )}
-
       <AiSuggestionCard analyses={conv.analyses} onUse={handleAiSuggestionUse} />
 
       {/* Message Input Area */}
@@ -655,8 +473,6 @@ export function ConversationDetail({ conversationId, onClose, onBack }: Conversa
         conversationId={conversationId}
         onMessageSent={handleMessageSent}
         onError={handleSendError}
-        replyToMessage={replyToMessage}
-        onCancelReply={() => setReplyToMessage(null)}
         currentHandlerId={conv.current_handler_id}
         onConversationChanged={refetch}
       />

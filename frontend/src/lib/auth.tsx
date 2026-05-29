@@ -39,7 +39,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     return null;
   });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !!localStorage.getItem('muse_token');
+    }
+    return true;
+  });
 
   // 用 refresh token 換發新 access token
   const tryRefreshToken = useCallback(async (): Promise<boolean> => {
@@ -83,8 +88,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         })
         .finally(() => setIsLoading(false));
-    } else {
-      Promise.resolve().then(() => setIsLoading(false));
     }
   }, [tryRefreshToken]);
 

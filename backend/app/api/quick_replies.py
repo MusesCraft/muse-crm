@@ -8,11 +8,8 @@ MUSE CRM — Quick Replies API
 import json
 import os
 import logging
-import uuid
 
 from flask import jsonify, request, g
-from sqlalchemy import text
-
 from . import api_bp
 from .. import db
 from ..models.quick_reply import QuickReply
@@ -40,24 +37,15 @@ def _seed_from_json():
 
     count = 0
     for item in items:
-        seed_id = item.get('id')
-        qr_kwargs = {
-            'category': item.get('category', 'general'),
-            'title': item.get('title', ''),
-            'content': item.get('content', ''),
-            'trigger_keywords': item.get('trigger_keywords', []),
-            'priority': item.get('priority', 'template'),
-            'is_system': True,
-        }
-        # Historical seed IDs are human-readable values like ``SR-001`` while
-        # the database primary key is UUID. Preserve valid UUIDs only and let
-        # SQLAlchemy generate UUIDs for legacy seed IDs.
-        if seed_id:
-            try:
-                qr_kwargs['id'] = uuid.UUID(str(seed_id))
-            except (TypeError, ValueError):
-                pass
-        qr = QuickReply(**qr_kwargs)
+        qr = QuickReply(
+            id=item.get('id', None),
+            category=item.get('category', 'general'),
+            title=item.get('title', ''),
+            content=item.get('content', ''),
+            trigger_keywords=item.get('trigger_keywords', []),
+            priority=item.get('priority', 'template'),
+            is_system=True,
+        )
         db.session.add(qr)
         count += 1
 
@@ -67,72 +55,11 @@ def _seed_from_json():
 
 
 _seeded = False
-_schema_checked = False
-
-
-def _ensure_quick_reply_schema():
-    """Add columns introduced after the original quick_replies table creation.
-
-    Railway production currently relies on ``db.create_all()`` during startup. That
-    creates missing tables but does not alter existing tables, so older databases
-    can miss columns added by later model/migration changes. Keep this idempotent
-    guard until Alembic migrations are reinstated for production deploys.
-    """
-    db.session.execute(text("ALTER TABLE quick_replies ADD COLUMN IF NOT EXISTS attachments JSON DEFAULT '[]'"))
-    db.session.execute(text("ALTER TABLE quick_replies ADD COLUMN IF NOT EXISTS created_by UUID NULL"))
-
-    columns = {
-        row.column_name: row.udt_name
-        for row in db.session.execute(text("""
-            SELECT column_name, udt_name
-            FROM information_schema.columns
-            WHERE table_name = 'quick_replies'
-              AND column_name IN ('id', 'created_by')
-        """))
-    }
-
-    uuid_pattern = (
-        '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-'
-        '[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-    )
-
-    # Older environments created quick_replies.id as varchar(36). The ORM now
-    # maps it as UUID, so writes can commit and then fail while refreshing the
-    # row. Normalize legacy tables in-place before CRUD runs.
-    if columns.get('id') != 'uuid':
-        legacy_ids = db.session.execute(
-            text("SELECT id FROM quick_replies WHERE id !~ :pattern"),
-            {'pattern': uuid_pattern},
-        ).scalars().all()
-        for legacy_id in legacy_ids:
-            db.session.execute(
-                text("UPDATE quick_replies SET id = :new_id WHERE id = :old_id"),
-                {'new_id': str(uuid.uuid4()), 'old_id': legacy_id},
-            )
-        db.session.execute(text("ALTER TABLE quick_replies ALTER COLUMN id TYPE UUID USING id::uuid"))
-
-    if columns.get('created_by') and columns.get('created_by') != 'uuid':
-        db.session.execute(
-            text("""
-                UPDATE quick_replies
-                SET created_by = NULL
-                WHERE created_by IS NOT NULL
-                  AND created_by !~ :pattern
-            """),
-            {'pattern': uuid_pattern},
-        )
-        db.session.execute(
-            text("ALTER TABLE quick_replies ALTER COLUMN created_by TYPE UUID USING created_by::uuid")
-        )
-    db.session.commit()
 
 
 def _ensure_seeded():
     """確保資料庫中有語錄（空表時自動種子匯入，結果快取避免每次查詢）。"""
-    global _seeded, _schema_checked
-    if not _schema_checked:
-        _ensure_quick_reply_schema()
-        _schema_checked = True
+    global _seeded
     if _seeded:
         return
     if QuickReply.query.first() is None:
@@ -238,7 +165,6 @@ def get_quick_reply(response_id: str):
 @require_role('admin', 'manager')
 def create_quick_reply():
     """新增語錄"""
-    _ensure_seeded()
     data = request.get_json(silent=True) or {}
 
     category = (data.get('category') or '').strip()
@@ -270,7 +196,6 @@ def create_quick_reply():
 @require_role('admin', 'manager')
 def update_quick_reply(response_id: str):
     """更新語錄"""
-    _ensure_seeded()
     item = QuickReply.query.get(response_id)
     if not item:
         return jsonify({'error': f'語錄 {response_id} 不存在'}), 404
@@ -301,7 +226,6 @@ def update_quick_reply(response_id: str):
 @require_role('admin', 'manager')
 def delete_quick_reply(response_id: str):
     """刪除語錄（系統語錄僅限 admin 刪除）"""
-    _ensure_seeded()
     item = QuickReply.query.get(response_id)
     if not item:
         return jsonify({'error': f'語錄 {response_id} 不存在'}), 404

@@ -17,7 +17,7 @@ export function ReplySuggestion({ text, confidence, onUse }: Props) {
   };
 
   return (
-    <div className="border border-[#DDD6FE] dark:border-purple-500/20 rounded-md p-2 bg-[#F5F3FF] dark:bg-purple-500/10">
+    <div className="border border-zinc-200 dark:border-zinc-800 rounded-md p-2 bg-zinc-50 dark:bg-zinc-800/30">
       <p className="text-xs text-zinc-700 dark:text-zinc-200 leading-relaxed whitespace-pre-wrap">{text}</p>
       <div className="flex items-center justify-between mt-1.5">
         {confidence !== undefined && (
@@ -25,7 +25,7 @@ export function ReplySuggestion({ text, confidence, onUse }: Props) {
         )}
         <button
           onClick={handleCopy}
-          className="ml-auto flex items-center gap-1 text-[10px] text-[#7C3AED] hover:text-[#6D28D9]"
+          className="ml-auto flex items-center gap-1 text-[10px] text-indigo-500 hover:text-indigo-600"
         >
           <Copy className="w-3 h-3" />
           採用

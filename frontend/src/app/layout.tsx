@@ -20,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-Hant" suppressHydrationWarning>
+    <html lang="zh-Hant" className="dark" suppressHydrationWarning>
       <body
         className={`${inter.variable} font-sans antialiased bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100`}
         style={{ fontFamily: 'var(--font-inter), system-ui, -apple-system, sans-serif' }}

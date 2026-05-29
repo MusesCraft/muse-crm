@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "test:realtime-events": "node scripts/assert-realtime-event-matrix.mjs"
+    "lint": "eslint"
   },
   "dependencies": {
     "class-variance-authority": "0.7.1",

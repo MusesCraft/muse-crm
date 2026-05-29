@@ -3,7 +3,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { Zap, Loader2, Shield, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { Zap, Loader2, Shield, Lock, CheckCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -83,12 +83,13 @@ export default function LoginPage() {
               <label htmlFor="password" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 密碼
               </label>
-              <a
-                href="mailto:service@muses-crafts.com?subject=MUSE%20CRM%20密碼重設協助"
-                className="text-xs text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200 underline-offset-2 hover:underline"
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300"
               >
-                忘記密碼？
-              </a>
+                {showPassword ? '隱藏' : '顯示'}
+              </button>
             </div>
             <div className="relative">
               <input
@@ -98,22 +99,11 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="w-full rounded-xl border border-zinc-300 bg-white dark:border-zinc-600 dark:bg-zinc-800/80 px-4 py-3 pr-12 text-sm text-zinc-900 dark:text-white placeholder-zinc-500 dark:placeholder-zinc-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition"
-                placeholder="輸入密碼"
+                className="w-full rounded-xl border border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50 px-4 py-3 pr-10 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition"
+                placeholder="••••••••"
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? '隱藏輸入內容' : '顯示輸入內容'}
-                aria-pressed={showPassword}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-zinc-500 hover:text-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:text-zinc-300 dark:hover:text-white"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+              <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
             </div>
-            <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-              無法登入時請聯絡管理員協助重設密碼。
-            </p>
           </div>
 
           <button

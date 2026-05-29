@@ -13,12 +13,12 @@ import { Inbox, Users, UserCheck, Building2, CheckCircle2, Archive, Sparkles, X,
 import { EmptyState } from '@/components/loading';
 import { cn } from '@/lib/utils';
 
-const NAV_WIDTH = 160;          // 左側 nav 固定寬
+const NAV_WIDTH = 200;          // 左側 nav 固定寬
 const LIST_MIN = 240;
 const LIST_MAX = 480;
-const LIST_DEFAULT = 300;
-const COPILOT_MIN = 340;
-const COPILOT_MAX = 400;
+const LIST_DEFAULT = 320;
+const COPILOT_MIN = 280;
+const COPILOT_MAX = 480;
 const COPILOT_DEFAULT = 360;
 const STORAGE_KEY = 'muse_inbox_panels';
 
@@ -68,8 +68,8 @@ function InboxNav({
 }) {
   const items = VIEWS.filter((v) => !v.requiresManager || isManager);
   return (
-    <nav className="px-3 py-4 space-y-1" aria-label="收件匣視圖">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-[#6B7280] dark:text-zinc-500 px-2 mb-2">
+    <nav className="px-3 py-4 space-y-0.5" aria-label="收件匣視圖">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-2 mb-2">
         視圖
       </p>
       {items.map((v) => {
@@ -80,10 +80,10 @@ function InboxNav({
             key={v.key}
             onClick={() => onChange(v.key)}
             className={cn(
-              'w-full flex items-center gap-2.5 px-2.5 py-2 text-xs rounded-lg text-left transition-colors',
+              'w-full flex items-center gap-2.5 px-2.5 py-1.5 text-xs rounded-md text-left transition-colors',
               active
-                ? 'bg-[#F5F3FF] text-[#7C3AED] shadow-sm dark:bg-indigo-500/10 dark:text-indigo-300'
-                : 'text-[#6B7280] dark:text-zinc-300 hover:bg-white hover:text-[#1F2933] dark:hover:bg-zinc-800'
+                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'
+                : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
             )}
           >
             <Icon className="w-3.5 h-3.5 flex-shrink-0" />
@@ -108,59 +108,6 @@ function viewToParams(view: InboxView): {
     case 'resolved': return { status: 'resolved' };
     case 'closed': return { status: 'closed' };
   }
-}
-
-type ContactUpdatedPayload = {
-  contact_id: string | number;
-  conversation_ids?: Array<string | number>;
-  changed_fields?: string[];
-};
-
-type NewMessagePayload = {
-  message_id?: string | number;
-  conversation_id?: string | number;
-  contact_id?: string | number;
-  channel?: string;
-  message?: {
-    id?: string | number;
-    sent_at?: string | null;
-  };
-  contact?: {
-    id?: string | number;
-  };
-  conversation?: {
-    id?: string | number;
-    status?: string | null;
-  };
-};
-
-type ConversationClosedPayload = {
-  conversation_id?: string | number;
-  contact_id?: string | number;
-  contact?: {
-    id?: string | number;
-  };
-  conversation?: {
-    id?: string | number;
-    contact_id?: string | number;
-    status?: string | null;
-  };
-};
-
-function listFingerprint(items: Conversation[]): string {
-  return items.map((c) => [
-    c.id,
-    c.status,
-    c.urgency || '',
-    c.current_handler_id || '',
-    c.supervisor_id || '',
-    c.contact?.customer_identity || '',
-    c.contact?.sales_stage || '',
-    c.contact?.last_seen || '',
-    c.message_count,
-    c.last_message?.id || '',
-    c.last_message?.timestamp || '',
-  ].join(':')).join('|');
 }
 
 // ──────────────────────────────────────────────────────
@@ -245,14 +192,8 @@ export default function InboxPage() {
     [page, status, channel, search, view]
   );
 
-  const selectedConv = selectedId
-    ? (data?.data || []).find((c) => c.id === selectedId)
-    : null;
-
-  const listFingerprintRef = useRef('');
-  useEffect(() => {
-    listFingerprintRef.current = listFingerprint(data?.data || []);
-  }, [data?.data]);
+  const totalRef = useRef(0);
+  useEffect(() => { totalRef.current = data?.pagination?.total || 0; }, [data?.pagination?.total]);
 
   const pollingRef = useRef(false);
   useEffect(() => {
@@ -269,8 +210,7 @@ export default function InboxPage() {
           search: search || undefined,
           view: viewParams.view,
         });
-        const freshFingerprint = listFingerprint(fresh.data || []);
-        if (freshFingerprint !== listFingerprintRef.current) {
+        if (fresh.pagination?.total !== totalRef.current) {
           refetch();
         }
       } catch {
@@ -289,83 +229,6 @@ export default function InboxPage() {
   useWebSocketEvent('conversation.taken_over', listRefresh);
   useWebSocketEvent('conversation.returned', listRefresh);
   useWebSocketEvent('conversation.resolved', listRefresh);
-  useWebSocketEvent<ConversationClosedPayload>('session_closed', (payload) => {
-    const payloadConversationId = payload.conversation_id || payload.conversation?.id;
-    const payloadContactId = payload.contact_id || payload.conversation?.contact_id || payload.contact?.id;
-    if (!payloadConversationId && !payloadContactId) {
-      refetch();
-      return;
-    }
-
-    const affectedSelected = !!selectedId && !!payloadConversationId && String(selectedId) === String(payloadConversationId);
-    const affectsVisibleList = (data?.data || []).some((conv) =>
-      (!!payloadConversationId && String(conv.id) === String(payloadConversationId)) ||
-      (!!payloadContactId && String(conv.contact_id) === String(payloadContactId))
-    );
-
-    if (affectedSelected || affectsVisibleList || view === 'closed') {
-      refetch();
-    }
-  });
-  useWebSocketEvent<ConversationClosedPayload>('conversation.closed', (payload) => {
-    const payloadConversationId = payload.conversation_id || payload.conversation?.id;
-    const payloadContactId = payload.contact_id || payload.conversation?.contact_id || payload.contact?.id;
-    if (!payloadConversationId && !payloadContactId) {
-      refetch();
-      return;
-    }
-
-    const affectedSelected = !!selectedId && !!payloadConversationId && String(selectedId) === String(payloadConversationId);
-    const affectsVisibleList = (data?.data || []).some((conv) =>
-      (!!payloadConversationId && String(conv.id) === String(payloadConversationId)) ||
-      (!!payloadContactId && String(conv.contact_id) === String(payloadContactId))
-    );
-
-    if (affectedSelected || affectsVisibleList || view === 'closed') {
-      refetch();
-    }
-  });
-  useWebSocketEvent<NewMessagePayload>('new_message', (payload) => {
-    const payloadConversationId = payload.conversation_id || payload.conversation?.id;
-    const payloadContactId = payload.contact_id || payload.contact?.id;
-    const affectedSelected =
-      !!selectedId &&
-      !!payloadConversationId &&
-      String(selectedId) === String(payloadConversationId);
-    const affectsVisibleList = (data?.data || []).some((conv) =>
-      (!!payloadConversationId && String(conv.id) === String(payloadConversationId)) ||
-      (!!payloadContactId && String(conv.contact_id) === String(payloadContactId))
-    );
-
-    const currentStatus = status || viewParams.status || '';
-    const payloadStatus = payload.conversation?.status || '';
-    const statusMatches = !currentStatus || !payloadStatus || currentStatus === payloadStatus;
-    const channelMatches = !channel || !payload.channel || channel === payload.channel;
-    const currentViewCanReceiveNewMessages = view !== 'resolved' && view !== 'closed';
-
-    if (
-      affectedSelected ||
-      affectsVisibleList ||
-      (currentViewCanReceiveNewMessages && statusMatches && channelMatches)
-    ) {
-      refetch();
-    }
-  });
-  useWebSocketEvent<ContactUpdatedPayload>('contact.updated', (payload) => {
-    const conversationIds = new Set((payload.conversation_ids || []).map(String));
-    const affectedSelected =
-      !!selectedConv &&
-      (String(selectedConv.contact_id) === String(payload.contact_id) ||
-        conversationIds.has(String(selectedConv.id)));
-    const affectsVisibleList = (data?.data || []).some((conv) =>
-      String(conv.contact_id) === String(payload.contact_id) ||
-      conversationIds.has(String(conv.id))
-    );
-
-    if (affectedSelected || affectsVisibleList) {
-      refetch();
-    }
-  });
 
   const handleSelect = useCallback((id: string | number) => {
     setSelectedId(id);
@@ -378,20 +241,24 @@ export default function InboxPage() {
     setMobileView('list');
   }, [refetch]);
 
+  const selectedConv = selectedId
+    ? (data?.data || []).find((c) => c.id === selectedId)
+    : null;
+
   const showCustomerSidebar = !!(selectedConv && selectedConv.contact_id);
 
   return (
-    <div className="flex h-screen relative bg-[#F7F8FA] text-[#1F2933]">
+    <div className="flex h-screen relative">
       {/* Left nav (視圖切換) — 桌面才顯示 */}
       <aside
         style={{ width: NAV_WIDTH }}
-        className="hidden lg:flex flex-col border-r border-[#E5E7EB] dark:border-zinc-800 bg-[#F7F8FA] dark:bg-zinc-950 flex-shrink-0"
+        className="hidden lg:flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 flex-shrink-0"
       >
         <InboxNav current={view} onChange={handleViewChange} isManager={isManager} />
       </aside>
 
       {/* Mobile view tabs（< lg） */}
-      <div className="lg:hidden absolute top-0 left-0 right-0 z-20 border-b border-[#E5E7EB] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2 py-1 flex gap-1 overflow-x-auto">
+      <div className="lg:hidden absolute top-0 left-0 right-0 z-20 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2 py-1 flex gap-1 overflow-x-auto">
         {VIEWS.filter((v) => !v.requiresManager || isManager).map((v) => (
           <button
             key={v.key}
@@ -413,7 +280,6 @@ export default function InboxPage() {
         style={{ width: listWidth }}
         className={cn(
           'border-r border-zinc-200 dark:border-zinc-800 flex flex-col bg-zinc-50/50 dark:bg-zinc-950/50 flex-shrink-0',
-          'border-r border-[#E5E7EB] bg-white dark:bg-zinc-950',
           mobileView === 'list' ? 'flex' : 'hidden md:flex',
           // 行動裝置 list 全寬
           'w-full md:w-auto pt-10 lg:pt-0'
@@ -448,7 +314,6 @@ export default function InboxPage() {
       <div
         className={cn(
           'flex-1 flex flex-col bg-white dark:bg-zinc-900 min-w-0',
-          'bg-[#F7F8FA] dark:bg-zinc-900',
           mobileView === 'detail' ? 'flex' : 'hidden md:flex'
         )}
       >
@@ -472,7 +337,7 @@ export default function InboxPage() {
         <button
           onClick={() => setCopilotOpen(true)}
           aria-label="開啟 AI Copilot"
-          className="hidden lg:flex absolute right-4 top-3 z-10 items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-[#7C3AED] text-white hover:bg-[#6D28D9] shadow"
+          className="hidden lg:flex absolute right-4 top-3 z-10 items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md bg-indigo-500 text-white hover:bg-indigo-600 shadow"
         >
           <Sparkles className="w-3 h-3" />
           Copilot
@@ -489,12 +354,12 @@ export default function InboxPage() {
           />
           <aside
             style={{ width: copilotWidth }}
-            className="hidden lg:flex flex-col flex-shrink-0 border-l border-[#E5E7EB] dark:border-zinc-800 bg-[#F7F8FA] dark:bg-zinc-950 overflow-hidden"
+            className="hidden lg:flex flex-col flex-shrink-0 border-l border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 overflow-hidden"
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E7EB] dark:border-zinc-800 bg-white dark:bg-zinc-900">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-200 dark:border-zinc-800">
               <div className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#7C3AED]" />
-                <h3 className="text-xs font-semibold text-[#1F2933] dark:text-zinc-200">AI / 客戶情報</h3>
+                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                <h3 className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">AI Copilot</h3>
               </div>
               <button
                 onClick={() => setCopilotOpen(false)}
@@ -508,7 +373,7 @@ export default function InboxPage() {
               <CopilotPanel key={String(selectedId)} conversationId={selectedId} />
             </div>
             {showCustomerSidebar && (
-              <div className="border-t border-[#E5E7EB] dark:border-zinc-800 max-h-[42%] overflow-y-auto">
+              <div className="border-t border-zinc-200 dark:border-zinc-800 max-h-[40%] overflow-y-auto">
                 <CustomerSidebar
                   contactId={selectedConv!.contact_id}
                   channel={selectedConv!.channel}
@@ -526,7 +391,7 @@ export default function InboxPage() {
         <button
           onClick={() => setCopilotDrawerOpen(true)}
           aria-label="開啟 AI Copilot"
-          className="lg:hidden fixed right-4 bottom-24 z-30 flex items-center gap-1.5 px-3 py-2 rounded-full bg-[#7C3AED] text-white shadow-lg hover:bg-[#6D28D9]"
+          className="lg:hidden fixed right-4 bottom-24 z-30 flex items-center gap-1.5 px-3 py-2 rounded-full bg-indigo-500 text-white shadow-lg hover:bg-indigo-600"
         >
           <Sparkles className="w-4 h-4" />
           <span className="text-xs">Copilot</span>
@@ -540,11 +405,11 @@ export default function InboxPage() {
             className="absolute inset-0 bg-black/40"
             onClick={() => setCopilotDrawerOpen(false)}
           />
-          <aside className="absolute right-0 top-0 bottom-0 w-[88%] max-w-md bg-[#F7F8FA] dark:bg-zinc-950 flex flex-col">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-[#E5E7EB] dark:border-zinc-800 bg-white dark:bg-zinc-900">
+          <aside className="absolute right-0 top-0 bottom-0 w-[88%] max-w-md bg-zinc-50 dark:bg-zinc-950 flex flex-col">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-200 dark:border-zinc-800">
               <div className="flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-[#7C3AED]" />
-                <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">AI / 客戶情報</h3>
+                <Sparkles className="w-4 h-4 text-indigo-500" />
+                <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">AI Copilot</h3>
               </div>
               <button
                 onClick={() => setCopilotDrawerOpen(false)}

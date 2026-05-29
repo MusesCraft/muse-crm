@@ -135,40 +135,16 @@ export interface Contact {
   sales_stage?: 'initial' | 'evaluating' | 'quoted' | 'won' | 'lost' | null;
 }
 
-export type MessageType =
-  | 'text'
-  | 'image'
-  | 'sticker'
-  | 'attachment'
-  | 'referral'
-  | 'interactive'
-  | 'callback_query'
-  | 'button'
-  | string;
-
-export type InteractivePayload = Record<string, unknown>;
-
 export interface Message {
   id: string | number;
   conversation_id: string | number;
   sender_type: 'customer' | 'business' | 'system';
-  message_type: MessageType;
+  message_type: string;
   content: string;
   media_url: string | null;
   timestamp: string;
   is_read: boolean;
   platform_message_id: string | null;
-  telegram_message_id?: string | null;
-  metadata?: InteractivePayload | null;
-  message_metadata?: InteractivePayload | null;
-  interactive_payload?: InteractivePayload | null;
-  reactions?: Record<string, string[]>;
-  reply_to_message_id?: string | null;
-  edited_at?: string | null;
-  deleted_at?: string | null;
-  deleted_for?: string[];
-  pinned_at?: string | null;
-  pinned_by?: string | null;
   quick_intent?: string;
   /** PR-2：內部備註（不對外發送） */
   is_internal?: boolean;
@@ -304,8 +280,6 @@ function transformContact(raw: any): Contact {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function transformMessage(raw: any): Message {
-  const metadata = raw.message_metadata ?? raw.metadata ?? null;
-  const interactivePayload = raw.interactive_payload ?? metadata;
   return {
     id: raw.id,
     conversation_id: raw.conversation_id,
@@ -316,17 +290,6 @@ function transformMessage(raw: any): Message {
     timestamp: raw.sent_at || raw.timestamp || raw.created_at || '',
     is_read: raw.is_read ?? false,
     platform_message_id: raw.meta_message_id || raw.platform_message_id || null,
-    telegram_message_id: raw.telegram_message_id ?? null,
-    metadata,
-    message_metadata: metadata,
-    interactive_payload: interactivePayload,
-    reactions: raw.reactions && typeof raw.reactions === 'object' ? raw.reactions : {},
-    reply_to_message_id: raw.reply_to_message_id ?? null,
-    edited_at: raw.edited_at ?? null,
-    deleted_at: raw.deleted_at ?? null,
-    deleted_for: Array.isArray(raw.deleted_for) ? raw.deleted_for : [],
-    pinned_at: raw.pinned_at ?? null,
-    pinned_by: raw.pinned_by ?? null,
     quick_intent: raw.quick_intent || undefined,
     is_internal: raw.is_internal ?? false,
     mentions: Array.isArray(raw.mentions) ? raw.mentions : [],
@@ -678,12 +641,10 @@ export const actionsApi = {
 
   async createAction(data: {
     contact_id: string | number;
-    conversation_id?: string | number;
     action_type: string;
     description: string;
     priority: string;
     due_date?: string;
-    assigned_to?: string;
   }) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw = await request<any>('/actions', {
@@ -780,15 +741,6 @@ export interface SendMessageOptions {
   isInternal?: boolean;
   /** PR-2：被 @ 提及的 user id 清單 */
   mentions?: string[];
-  /** 回覆/引用的訊息 ID */
-  replyToMessageId?: string | number | null;
-}
-
-export interface MessageActionResponse {
-  message: string;
-  platform_supported?: boolean;
-  platform_message?: string;
-  data: Message;
 }
 
 export const inboxSendApi = {
@@ -809,7 +761,6 @@ export const inboxSendApi = {
           media_url: mediaUrl,
           is_internal: opts?.isInternal ?? false,
           mentions: opts?.mentions ?? [],
-          reply_to_message_id: opts?.replyToMessageId ?? null,
         }),
       }
     );
@@ -821,87 +772,6 @@ export const inboxSendApi = {
 
   async sendImage(conversationId: string | number, imageUrl: string, caption?: string) {
     return await inboxSendApi.sendMessage(conversationId, caption || '', 'image', imageUrl);
-  },
-};
-
-// ── Inbox Message Actions API ───────────────────────────
-
-export const inboxMessageActionsApi = {
-  async addReaction(messageId: string | number, emoji: string) {
-    const raw = await request<MessageActionResponse>(`/inbox/messages/${messageId}/reactions`, {
-      method: 'POST',
-      body: JSON.stringify({ emoji }),
-    });
-    return { ...raw, data: transformMessage(raw.data) };
-  },
-
-  async removeReaction(messageId: string | number, emoji: string) {
-    const raw = await request<MessageActionResponse>(
-      `/inbox/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
-      { method: 'DELETE' }
-    );
-    return { ...raw, data: transformMessage(raw.data) };
-  },
-
-  async pin(messageId: string | number) {
-    const raw = await request<MessageActionResponse>(`/inbox/messages/${messageId}/pin`, {
-      method: 'POST',
-    });
-    return { ...raw, data: transformMessage(raw.data) };
-  },
-
-  async unpin(messageId: string | number) {
-    const raw = await request<MessageActionResponse>(`/inbox/messages/${messageId}/pin`, {
-      method: 'DELETE',
-    });
-    return { ...raw, data: transformMessage(raw.data) };
-  },
-
-  async edit(messageId: string | number, content: string) {
-    const raw = await request<MessageActionResponse>(`/inbox/messages/${messageId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ content }),
-    });
-    return { ...raw, data: transformMessage(raw.data) };
-  },
-
-  async delete(messageId: string | number, deletedFor: string | string[] = 'everyone') {
-    const raw = await request<MessageActionResponse>(`/inbox/messages/${messageId}`, {
-      method: 'DELETE',
-      body: JSON.stringify({ deleted_for: deletedFor }),
-    });
-    return { ...raw, data: transformMessage(raw.data) };
-  },
-
-  async forward(messageId: string | number, targetConversationId: string | number) {
-    const raw = await request<MessageActionResponse>(`/inbox/messages/${messageId}/forward`, {
-      method: 'POST',
-      body: JSON.stringify({ target_conversation_id: targetConversationId }),
-    });
-    return { ...raw, data: transformMessage(raw.data) };
-  },
-};
-
-export const inboxConversationStateApi = {
-  async markRead(conversationId: string | number) {
-    return await request<{ message: string; conversation_id: string }>(
-      `/inbox/conversations/${conversationId}/read`,
-      { method: 'POST' }
-    );
-  },
-
-  async markUnread(conversationId: string | number) {
-    return await request<{ message: string; conversation_id: string }>(
-      `/inbox/conversations/${conversationId}/unread`,
-      { method: 'POST' }
-    );
-  },
-
-  async typing(conversationId: string | number) {
-    return await request<{ message: string; platform_supported?: boolean; conversation_id: string }>(
-      `/inbox/conversations/${conversationId}/typing`,
-      { method: 'POST' }
-    );
   },
 };
 

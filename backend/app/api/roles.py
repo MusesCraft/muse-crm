@@ -43,7 +43,6 @@ def _validate_permissions(permissions: dict) -> str | None:
 
 @api_bp.route('/roles', methods=['GET'])
 @login_required
-@require_role('admin')
 def list_roles():
     """取得所有身份組（依 position 排序）"""
     roles = Role.query.order_by(Role.position.asc(), Role.created_at.asc()).all()
@@ -164,7 +163,6 @@ def delete_role(role_id):
 
 @api_bp.route('/users/<user_id>/roles', methods=['GET'])
 @login_required
-@require_role('admin')
 def get_user_roles(user_id):
     """取得使用者的所有身份組"""
     user = User.query.get_or_404(user_id)

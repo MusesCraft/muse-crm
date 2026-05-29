@@ -6,11 +6,9 @@ MUSE CRM — Inbox API
 
 import logging
 from datetime import datetime, timezone
-from urllib.parse import unquote
 
 from flask import jsonify, request
 from sqlalchemy import desc
-from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.orm import joinedload, subqueryload
 
 from . import api_bp
@@ -21,11 +19,8 @@ from ..utils import escape_like
 from ..utils.auth import login_required
 from ..utils.permissions import get_current_user, require_role
 from ..utils.scope import apply_contact_scope, apply_conversation_scope
-from ..realtime.emitter import emit_new_message
 
 logger = logging.getLogger(__name__)
-
-TELEGRAM_NATIVE_UNSUPPORTED = '尚未支援 Telegram 原生操作'
 
 
 def _check_conversation_access(conversation):
@@ -38,71 +33,6 @@ def _check_conversation_access(conversation):
         if not scoped:
             return jsonify({'error': '權限不足'}), 403
     return None
-
-
-def _get_message_or_error(message_id):
-    message = Message.query.get(message_id)
-    if not message:
-        return None, (jsonify({'error': '訊息不存在'}), 404)
-    denied = _check_conversation_access(message.conversation)
-    if denied:
-        return None, denied
-    return message, None
-
-
-def _ensure_telegram_conversation(conversation):
-    if conversation.channel != 'telegram':
-        return jsonify({'error': '此操作僅支援 Telegram 對話'}), 400
-    return None
-
-
-def _message_action_response(message, message_text='訊息已更新', status=200):
-    return jsonify({
-        'message': message_text,
-        'platform_supported': False,
-        'platform_message': TELEGRAM_NATIVE_UNSUPPORTED,
-        'data': message.to_dict(),
-    }), status
-
-
-def _emit_message_action(message, event='message.updated'):
-    try:
-        from ..realtime.emitter import emit_scoped
-
-        conversation = message.conversation
-        contact = message.contact
-        emit_scoped(
-            event,
-            {
-                'message_id': str(message.id),
-                'conversation_id': str(message.conversation_id),
-                'contact_id': str(message.contact_id),
-                'channel': conversation.channel,
-                'message': message.to_dict(),
-            },
-            assigned_user_id=str(conversation.current_handler_id) if conversation.current_handler_id else None,
-            team_id=str(contact.assigned_user.team_id) if getattr(contact, 'assigned_user', None) and contact.assigned_user.team_id else None,
-        )
-    except Exception as exc:
-        logger.warning(f"[message action] realtime emit failed: {exc}")
-
-
-def _emit_new_message_safely(message, conversation, contact):
-    try:
-        emit_new_message(message=message, conversation=conversation, contact=contact)
-    except Exception as exc:
-        logger.warning(f"[send_message] new_message realtime emit failed: {exc}")
-
-
-def _validate_reply_to_message(conversation_id, reply_to_message_id):
-    if not reply_to_message_id:
-        return None, None
-    reply_to = Message.query.get(reply_to_message_id)
-    if not reply_to or str(reply_to.conversation_id) != str(conversation_id):
-        return None, (jsonify({'error': 'reply_to_message_id 不存在或不屬於此對話'}), 400)
-    if reply_to.deleted_at:
-        return None, (jsonify({'error': '不能回覆已刪除的訊息'}), 400)
-    return reply_to, None
 
 from ..services.contact_service import infer_contact_priority
 
@@ -257,14 +187,7 @@ def get_conversation_detail(conversation_id):
         'conversation': conversation.to_dict(),
         'contact': conversation.contact.to_dict(),
         'messages': [msg.to_dict() for msg in messages],
-        'analyses': [
-            analysis.to_dict()
-            for analysis in sorted(
-                conversation.analyses,
-                key=lambda item: item.created_at or datetime.min.replace(tzinfo=timezone.utc),
-                reverse=True,
-            )
-        ]
+        'analyses': [analysis.to_dict() for analysis in conversation.analyses]
     })
 
 
@@ -331,23 +254,14 @@ def send_message(conversation_id):
 
     data = request.get_json() or {}
 
+    content = (data.get('content') or '').strip()
     message_type = data.get('message_type', 'text')
-    allowed_outbound_types = {'text', 'image'}
-    if not isinstance(message_type, str) or message_type not in allowed_outbound_types:
-        return jsonify({'error': '不支援的訊息類型'}), 400
-
-    raw_content = data.get('content') or ''
-    content = raw_content.strip() if isinstance(raw_content, str) else str(raw_content).strip()
     media_url = data.get('media_url')
     # PR-2 新增：內部備註與 @ 提及
     is_internal = bool(data.get('is_internal', False))
     mentions = data.get('mentions') or []
     if not isinstance(mentions, list):
         return jsonify({'error': 'mentions 必須為陣列'}), 400
-    reply_to_message_id = data.get('reply_to_message_id')
-    reply_to_message, reply_error = _validate_reply_to_message(conversation.id, reply_to_message_id)
-    if reply_error:
-        return reply_error
 
     if message_type == 'text' and not content:
         return jsonify({'error': '請提供訊息內容'}), 400
@@ -401,7 +315,6 @@ def send_message(conversation_id):
         media_url=media_url if message_type == 'image' else None,
         is_internal=is_internal,
         mentions=mentions,
-        reply_to_message_id=reply_to_message.id if reply_to_message else None,
         sent_at=now,
     )
     db.session.add(msg)
@@ -411,7 +324,6 @@ def send_message(conversation_id):
     conversation.last_message_at = now
 
     db.session.commit()
-    _emit_new_message_safely(msg, conversation, contact)
 
     response = {
         'message': '訊息已發送' if sent_via_api else '訊息已記錄（Meta API 未連接）',
@@ -479,284 +391,12 @@ def send_image_message(conversation_id):
     conversation.last_message_at = now
 
     db.session.commit()
-    _emit_new_message_safely(msg, conversation, contact)
 
     return jsonify({
         'message': '圖片已發送' if success else '圖片已記錄（Meta API 未連接）',
         'sent_via_api': success,
         'message_id': str(msg.id),
     })
-
-
-# ── Message Actions（Telegram native capability boundary） ───────────────
-
-
-@api_bp.route('/inbox/messages/<message_id>/reactions', methods=['POST'])
-@login_required
-@require_role('admin', 'manager', 'user')
-def add_message_reaction(message_id):
-    message, err = _get_message_or_error(message_id)
-    if err:
-        return err
-    channel_err = _ensure_telegram_conversation(message.conversation)
-    if channel_err:
-        return channel_err
-
-    data = request.get_json(silent=True) or {}
-    emoji = data.get('emoji')
-    if not isinstance(emoji, str) or not emoji.strip():
-        return jsonify({'error': '請提供 emoji'}), 400
-    emoji = emoji.strip()
-    if len(emoji) > 32:
-        return jsonify({'error': 'emoji 長度不可超過 32'}), 400
-
-    actor = get_current_user()
-    actor_id = str(actor.id) if actor else 'unknown'
-    reactions = dict(message.reactions or {})
-    users = reactions.get(emoji)
-    if not isinstance(users, list):
-        users = []
-    if actor_id not in users:
-        users.append(actor_id)
-    reactions[emoji] = users
-    message.reactions = reactions
-    flag_modified(message, 'reactions')
-
-    db.session.commit()
-    _emit_message_action(message, 'message.reaction_updated')
-    return _message_action_response(message, '已記錄訊息反應')
-
-
-@api_bp.route('/inbox/messages/<message_id>/reactions/<path:emoji>', methods=['DELETE'])
-@login_required
-@require_role('admin', 'manager', 'user')
-def remove_message_reaction(message_id, emoji):
-    message, err = _get_message_or_error(message_id)
-    if err:
-        return err
-    channel_err = _ensure_telegram_conversation(message.conversation)
-    if channel_err:
-        return channel_err
-
-    decoded_emoji = unquote(emoji or '').strip()
-    if not decoded_emoji:
-        return jsonify({'error': '請提供 emoji'}), 400
-
-    actor = get_current_user()
-    actor_id = str(actor.id) if actor else 'unknown'
-    reactions = dict(message.reactions or {})
-    users = reactions.get(decoded_emoji)
-    if isinstance(users, list):
-        users = [uid for uid in users if uid != actor_id]
-        if users:
-            reactions[decoded_emoji] = users
-        else:
-            reactions.pop(decoded_emoji, None)
-    message.reactions = reactions
-    flag_modified(message, 'reactions')
-
-    db.session.commit()
-    _emit_message_action(message, 'message.reaction_updated')
-    return _message_action_response(message, '已移除訊息反應')
-
-
-@api_bp.route('/inbox/messages/<message_id>/pin', methods=['POST'])
-@login_required
-@require_role('admin', 'manager', 'user')
-def pin_message(message_id):
-    message, err = _get_message_or_error(message_id)
-    if err:
-        return err
-    channel_err = _ensure_telegram_conversation(message.conversation)
-    if channel_err:
-        return channel_err
-
-    actor = get_current_user()
-    message.pinned_at = datetime.now(timezone.utc)
-    message.pinned_by = actor.id if actor else None
-    db.session.commit()
-    _emit_message_action(message, 'message.pinned')
-    return _message_action_response(message, '已記錄釘選訊息')
-
-
-@api_bp.route('/inbox/messages/<message_id>/pin', methods=['DELETE'])
-@login_required
-@require_role('admin', 'manager', 'user')
-def unpin_message(message_id):
-    message, err = _get_message_or_error(message_id)
-    if err:
-        return err
-    channel_err = _ensure_telegram_conversation(message.conversation)
-    if channel_err:
-        return channel_err
-
-    message.pinned_at = None
-    message.pinned_by = None
-    db.session.commit()
-    _emit_message_action(message, 'message.unpinned')
-    return _message_action_response(message, '已取消釘選訊息')
-
-
-@api_bp.route('/inbox/messages/<message_id>', methods=['PATCH'])
-@login_required
-@require_role('admin', 'manager', 'user')
-def edit_message(message_id):
-    message, err = _get_message_or_error(message_id)
-    if err:
-        return err
-    channel_err = _ensure_telegram_conversation(message.conversation)
-    if channel_err:
-        return channel_err
-    if message.sender_type != 'business':
-        return jsonify({'error': '只能編輯我方訊息'}), 400
-    if message.deleted_at:
-        return jsonify({'error': '不能編輯已刪除的訊息'}), 400
-
-    data = request.get_json(silent=True) or {}
-    raw_content = data.get('content')
-    if not isinstance(raw_content, str) or not raw_content.strip():
-        return jsonify({'error': '請提供訊息內容'}), 400
-
-    message.content = raw_content.strip()
-    message.edited_at = datetime.now(timezone.utc)
-    db.session.commit()
-    _emit_message_action(message, 'message.edited')
-    return _message_action_response(message, '已記錄訊息編輯')
-
-
-@api_bp.route('/inbox/messages/<message_id>', methods=['DELETE'])
-@login_required
-@require_role('admin', 'manager', 'user')
-def delete_message(message_id):
-    message, err = _get_message_or_error(message_id)
-    if err:
-        return err
-    channel_err = _ensure_telegram_conversation(message.conversation)
-    if channel_err:
-        return channel_err
-
-    data = request.get_json(silent=True) or {}
-    deleted_for = data.get('deleted_for') or ['everyone']
-    if isinstance(deleted_for, str):
-        deleted_for = [deleted_for]
-    if not isinstance(deleted_for, list) or not all(isinstance(item, str) for item in deleted_for):
-        return jsonify({'error': 'deleted_for 必須為字串或字串陣列'}), 400
-
-    message.deleted_at = datetime.now(timezone.utc)
-    message.deleted_for = deleted_for
-    flag_modified(message, 'deleted_for')
-    db.session.commit()
-    _emit_message_action(message, 'message.deleted')
-    return _message_action_response(message, '已記錄訊息刪除')
-
-
-@api_bp.route('/inbox/messages/<message_id>/forward', methods=['POST'])
-@login_required
-@require_role('admin', 'manager', 'user')
-def forward_message(message_id):
-    source_message, err = _get_message_or_error(message_id)
-    if err:
-        return err
-    channel_err = _ensure_telegram_conversation(source_message.conversation)
-    if channel_err:
-        return channel_err
-    if source_message.deleted_at:
-        return jsonify({'error': '不能轉發已刪除的訊息'}), 400
-
-    data = request.get_json(silent=True) or {}
-    target_conversation_id = data.get('target_conversation_id') or data.get('conversation_id')
-    if not target_conversation_id:
-        return jsonify({'error': '請提供 target_conversation_id'}), 400
-
-    target_conversation = Conversation.query.get(target_conversation_id)
-    if not target_conversation:
-        return jsonify({'error': '目標對話不存在'}), 404
-    denied = _check_conversation_access(target_conversation)
-    if denied:
-        return denied
-    channel_err = _ensure_telegram_conversation(target_conversation)
-    if channel_err:
-        return channel_err
-
-    now = datetime.now(timezone.utc)
-    metadata = dict(source_message.message_metadata or {})
-    metadata['forwarded_from_message_id'] = str(source_message.id)
-    metadata['forwarded_from_conversation_id'] = str(source_message.conversation_id)
-    forwarded = Message(
-        conversation_id=target_conversation.id,
-        contact_id=target_conversation.contact_id,
-        sender_type='business',
-        message_type=source_message.message_type,
-        content=source_message.content,
-        media_url=source_message.media_url,
-        message_metadata=metadata,
-        sent_at=now,
-    )
-    db.session.add(forwarded)
-    target_conversation.message_count = Conversation.message_count + 1
-    target_conversation.last_message_at = now
-    db.session.commit()
-    _emit_message_action(forwarded, 'message.forwarded')
-
-    return jsonify({
-        'message': '已記錄轉發訊息',
-        'platform_supported': False,
-        'platform_message': TELEGRAM_NATIVE_UNSUPPORTED,
-        'data': forwarded.to_dict(),
-    }), 201
-
-
-@api_bp.route('/inbox/conversations/<conversation_id>/read', methods=['POST'])
-@login_required
-@require_role('admin', 'manager', 'user')
-def mark_conversation_read(conversation_id):
-    conversation = Conversation.query.get_or_404(conversation_id)
-    denied = _check_conversation_access(conversation)
-    if denied:
-        return denied
-
-    Message.query.filter_by(conversation_id=conversation.id).update(
-        {'is_read': True},
-        synchronize_session=False,
-    )
-    db.session.commit()
-    return jsonify({'message': '對話已標記為已讀', 'conversation_id': str(conversation.id)})
-
-
-@api_bp.route('/inbox/conversations/<conversation_id>/unread', methods=['POST'])
-@login_required
-@require_role('admin', 'manager', 'user')
-def mark_conversation_unread(conversation_id):
-    conversation = Conversation.query.get_or_404(conversation_id)
-    denied = _check_conversation_access(conversation)
-    if denied:
-        return denied
-
-    Message.query.filter_by(conversation_id=conversation.id).update(
-        {'is_read': False},
-        synchronize_session=False,
-    )
-    db.session.commit()
-    return jsonify({'message': '對話已標記為未讀', 'conversation_id': str(conversation.id)})
-
-
-@api_bp.route('/inbox/conversations/<conversation_id>/typing', methods=['POST'])
-@login_required
-@require_role('admin', 'manager', 'user')
-def send_typing_indicator(conversation_id):
-    conversation = Conversation.query.get_or_404(conversation_id)
-    denied = _check_conversation_access(conversation)
-    if denied:
-        return denied
-    channel_err = _ensure_telegram_conversation(conversation)
-    if channel_err:
-        return channel_err
-
-    return jsonify({
-        'message': TELEGRAM_NATIVE_UNSUPPORTED,
-        'platform_supported': False,
-        'conversation_id': str(conversation.id),
-    }), 501
 
 
 @api_bp.route('/inbox/conversations/<conversation_id>/close', methods=['POST'])

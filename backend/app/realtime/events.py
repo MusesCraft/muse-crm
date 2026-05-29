@@ -18,25 +18,19 @@ from .. import db
 logger = logging.getLogger(__name__)
 
 
-def _authenticate_ws(auth=None):
+def _authenticate_ws():
     """
     從 WebSocket 連線提取並驗證 JWT。
 
-    優先從 Socket.IO auth payload 取 token，其次從 query param，
-    最後從 Authorization header。
+    優先從 auth query param 取 token，其次從 Authorization header。
 
     Returns:
         User 或 None
     """
     import jwt as pyjwt
 
-    token = None
-    if isinstance(auth, dict):
-        token = auth.get('token') or auth.get('auth')
-
     # 從 query param 或 header 取 token
-    if not token:
-        token = request.args.get('auth') or request.args.get('token')
+    token = request.args.get('auth')
     if not token:
         auth_header = request.headers.get('Authorization', '')
         if auth_header.startswith('Bearer '):
@@ -69,7 +63,7 @@ def _authenticate_ws(auth=None):
 
 
 @socketio.on('connect', namespace='/notifications')
-def handle_connect(auth=None):
+def handle_connect():
     """
     WebSocket 連線事件。
 
@@ -77,7 +71,7 @@ def handle_connect(auth=None):
     驗證通過後加入 user-specific room（user_{user_id}）
     以及角色 room（role_{role}）。
     """
-    user = _authenticate_ws(auth)
+    user = _authenticate_ws()
 
     if not user:
         disconnect()

@@ -265,7 +265,7 @@ def analyze_conversation(self, conversation_id: str, trigger_type: str = "auto")
         # 短對話跳過分析（CRM-017）
         min_msgs = _get_min_messages_for_analysis()
         msg_count = conversation.message_count or 0
-        if trigger_type != 'manual' and msg_count < min_msgs:
+        if msg_count < min_msgs:
             logger.info(
                 f"[analyze_conversation] 短對話跳過分析：{conversation_id}，"
                 f"訊息數 {msg_count} < 門檻 {min_msgs}"
